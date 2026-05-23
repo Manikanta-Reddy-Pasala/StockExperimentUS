@@ -1,0 +1,26 @@
+{
+  "model": "n20_daily_large_only",
+  "start": "2022-05-24",
+  "end": "2026-05-24",
+  "years": 4.0,
+  "capital": 1000000.0,
+  "final_nav": 2753736.0,
+  "total_return_pct": 175.37,
+  "cagr_pct": 28.82,
+  "max_dd_pct": 71.68,
+  "max_dd_realized_pct": 65.77,
+  "calmar": 0.4,
+  "trades": 159,
+  "wins": 83,
+  "losses": 76,
+  "win_rate_pct": 52.2,
+  "open_position": {
+    "sym": "INTC",
+    "qty": 22978,
+    "entry_px": 84.99,
+    "entry_date": "2026-04-27",
+    "last_px": 119.84,
+    "mtm_value": 2753683.0,
+    "unrealized_pnl": 800783.0
+  }
+}

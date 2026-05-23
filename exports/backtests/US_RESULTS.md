@@ -29,6 +29,30 @@ US figures materially lower (except momentum_n100) and higher-DD because the
 US window **includes the 2022 bear** (India window was 2023-26 bull-only) and
 US large-cap momentum is more crowded/correlated than India mid-cap rotation.
 
+## Apples-to-apples: US on India's exact window (2023-05-15 → 2026-05-12)
+
+To remove the 2022-bear confound, the same US models re-run on India's window:
+
+| Model | US (2023-26) | US DD | India (2023-26) | India DD | Verdict |
+|-------|-------------:|------:|----------------:|---------:|---------|
+| momentum_n100_top5_max1 | **+184.73%** | 44.90% | +65.1% | 37.3% | **Works better in US** |
+| momentum_pseudo_n100_adv | +77.62% | 36.56% | +149.15% | 16.17% | Works, weaker |
+| midcap_narrow_60d_breakout | +41.19% | 27.60% | +86.63% | 15.15% | Works, weaker (⚠ lookahead) |
+| n20_daily_large_only | +36.97% | **71.68%** | +139.55% | 25.66% | **Does not transfer** |
+
+**Takeaways:**
+- **Do the India models work in the US?** Partly. On a fair window, `momentum_n100`
+  (real index, top-1 monthly) is *stronger* in the US (Nasdaq-100 had NVDA/AVGO/
+  -class single-name runs Nifty-100 lacked). `pseudo_n100` and `midcap` still make
+  money but with less edge than in India. `n20_daily` (daily rebalance) is broken
+  in the US — 72% drawdown; US large-caps are too correlated, so daily rotation
+  just churns (149 trades) without the dispersion India mid-caps provide.
+- The full-4yr US numbers at the top of this file are dragged down by the 2022
+  bear that India's 3-yr window never saw.
+- The 3 weaker models were optimized over 19 phases on NSE mid/small-cap data —
+  those params (30d lookback, top-1, smallcap tilt) don't transfer cleanly to a
+  more efficient US large-cap tape.
+
 ## Caveats (read before trusting these numbers)
 
 1. **Survivorship bias.** nasdaq500/nasdaq100 are *current* constituents. Names

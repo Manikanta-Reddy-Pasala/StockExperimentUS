@@ -1,0 +1,25 @@
+{
+  "model": "momentum_pseudo_n100_adv",
+  "start": "2022-05-24",
+  "end": "2026-05-24",
+  "years": 4.0,
+  "capital": 1000000.0,
+  "final_nav": 3505950.0,
+  "total_return_pct": 250.6,
+  "cagr_pct": 36.84,
+  "max_dd_pct": 48.42,
+  "calmar": 0.76,
+  "trades": 32,
+  "wins": 16,
+  "losses": 16,
+  "win_rate_pct": 50.0,
+  "open_position": {
+    "sym": "INTC",
+    "qty": 29255,
+    "entry_px": 99.62,
+    "entry_date": "2026-05-01",
+    "last_px": 119.84,
+    "mtm_value": 3505919.0,
+    "unrealized_pnl": 591536.0
+  }
+}
