@@ -15,16 +15,17 @@ import sys, json, csv, argparse
 from pathlib import Path
 from datetime import date, timedelta
 
-sys.path.insert(0, "/app")
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
 import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
 
 LOOKBACK = 30
-N100_CSV = "/app/src/data/symbols/nifty100.csv"
+N100_CSV = str(ROOT / "src/data/symbols/nasdaq100.csv")
 
-DEFAULT_START = date(2023, 5, 15)
-DEFAULT_END   = date(2026, 5, 12)
+DEFAULT_START = date(2022, 5, 24)
+DEFAULT_END   = date(2026, 5, 24)
 DEFAULT_CAP   = 1_000_000.0
 
 
@@ -33,20 +34,20 @@ def load_n100():
     with open(N100_CSV) as f:
         for r in csv.DictReader(f):
             if r.get("Series", "").strip() == "EQ":
-                out.append(f"NSE:{r['Symbol'].strip()}-EQ")
+                out.append(r['Symbol'].strip())
     return out
 
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None,
         mid_month_check: bool = False, mid_month_lead_pct: float = 5.0):
     n100_syms = load_n100()
-    print(f"NSE Nifty 100 universe: {len(n100_syms)} stocks")
+    print(f"Nasdaq 100 universe: {len(n100_syms)} stocks")
 
     eng = _get_engine()
     with eng.connect() as c:
         df = pd.read_sql(text(
             "SELECT symbol,date,close,volume FROM historical_data "
-            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='fyers' "
+            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='yfinance' "
             "ORDER BY symbol,date"
         ), c, params={"s": n100_syms, "a": start - timedelta(days=400), "b": end})
 
@@ -172,7 +173,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None,
     calmar = cagr / max(0.01, mdd)
 
     print(f"\n## RESULTS")
-    print(f"  Final NAV:    Rs.{final:,.0f}")
+    print(f"  Final NAV:    ${final:,.0f}")
     print(f"  Total return: {(final/capital-1)*100:+.2f}%")
     print(f"  CAGR ({yrs:.2f}y): {cagr:+.2f}%")
     print(f"  Trades: {len(trades)} (W={wins}, L={losses}, WR={wins/max(1,wins+losses)*100:.1f}%)")

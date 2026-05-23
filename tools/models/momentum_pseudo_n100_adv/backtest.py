@@ -9,45 +9,34 @@ import sys, json, argparse
 from pathlib import Path
 from datetime import date, timedelta
 
-sys.path.insert(0, "/app")
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
 import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
-from tools.shared.universes import nifty500_symbols
+from tools.shared.universes import nasdaq500_symbols
 
 
 LOOKBACK = 30
 ADV_WIN  = 20
 UNIV_SIZE = 100
-MAX_PRICE = 3000  # skip stocks > ₹3000 at entry (DIXON/MARUTI etc were big losers)
-# Drop Small-cap NSE Nifty Smallcap 250 stocks from universe (free +2pp CAGR, DD unchanged).
-import csv as _csv
-_SML_PATH = "/app/src/data/symbols/nifty_smallcap250.csv"
-def _load_smallcap():
-    out = set()
-    try:
-        with open(_SML_PATH) as f:
-            for r in _csv.DictReader(f):
-                if r.get("Series","").strip()=="EQ":
-                    out.add(r["Symbol"].strip())
-    except FileNotFoundError:
-        pass
-    return out
-_SMALLCAP = _load_smallcap()
-DEFAULT_START = date(2023, 5, 15)
-DEFAULT_END   = date(2026, 5, 12)
+MAX_PRICE = 1e9  # off for $1M backtest (was Rs.3000 share-count floor for Rs.30k live)
+# No US small-cap exclusion list built; keep empty for parity with the India model.
+_SMALLCAP = set()
+DEFAULT_START = date(2022, 5, 24)
+DEFAULT_END   = date(2026, 5, 24)
 DEFAULT_CAP   = 1_000_000.0
 
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     eng = _get_engine()
-    n500 = [f"NSE:{s}-EQ" for s, _ in nifty500_symbols()]
-    print(f"N500 pool: {len(n500)}")
+    n500 = [s for s, _ in nasdaq500_symbols()]
+    print(f"Nasdaq 500 pool: {len(n500)}")
 
     with eng.connect() as c:
         df = pd.read_sql(text(
             "SELECT symbol,date,close,volume FROM historical_data "
-            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='fyers' "
+            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='yfinance' "
             "ORDER BY symbol,date"
         ), c, params={"s": n500, "a": start - timedelta(days=400), "b": end})
 
@@ -176,7 +165,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
         mdd = max(mdd, dd)
     calmar = cagr / max(0.01, mdd)
 
-    print(f"\nFinal NAV: Rs.{final:,.0f}")
+    print(f"\nFinal NAV: ${final:,.0f}")
     print(f"Total: {(final/capital-1)*100:+.2f}%  CAGR: {cagr:+.2f}%")
     print(f"Trades: {len(trades)} (W={wins} L={losses}, WR={wins/max(1,wins+losses)*100:.1f}%)")
     print(f"Max DD (rebal cap_after): {mdd:.2f}%  Calmar: {calmar:.2f}")

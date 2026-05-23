@@ -10,20 +10,21 @@ import sys, json, csv, argparse
 from pathlib import Path
 from datetime import date, timedelta
 
-sys.path.insert(0, "/app")
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
 import pandas as pd
 from sqlalchemy import text
 from tools.shared.ohlcv_cache import _get_engine
-from tools.shared.universes import nifty500_symbols
+from tools.shared.universes import nasdaq500_symbols
 
 
 UNIV_SIZE = 20
 LOOKBACK  = 30
 ADV_WIN   = 20
 SMA_LONG  = 200
-N100_CSV  = "/app/src/data/symbols/nifty100.csv"
-DEFAULT_START = date(2023, 5, 15)
-DEFAULT_END   = date(2026, 5, 12)
+N100_CSV  = str(ROOT / "src/data/symbols/nasdaq100.csv")
+DEFAULT_START = date(2022, 5, 24)
+DEFAULT_END   = date(2026, 5, 24)
 DEFAULT_CAP   = 1_000_000.0
 
 
@@ -38,15 +39,15 @@ def load_n100():
 
 def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     n100 = load_n100()
-    print(f"NSE Nifty 100 filter: {len(n100)} stocks")
+    print(f"Nasdaq 100 filter: {len(n100)} stocks")
 
     eng = _get_engine()
-    n500 = [f"NSE:{s}-EQ" for s, _ in nifty500_symbols()]
+    n500 = [s for s, _ in nasdaq500_symbols()]
 
     with eng.connect() as c:
         df = pd.read_sql(text(
             "SELECT symbol,date,close,volume FROM historical_data "
-            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='fyers' "
+            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='yfinance' "
             "ORDER BY symbol,date"
         ), c, params={"s": n500, "a": start - timedelta(days=400), "b": end})
 
@@ -149,7 +150,7 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
     calmar = cagr / max(0.01, mdd_nav)
 
     print(f"\n## v2 Large-only RESULTS")
-    print(f"  Final NAV:    Rs.{final:,.0f}")
+    print(f"  Final NAV:    ${final:,.0f}")
     print(f"  Total return: {(final/capital-1)*100:+.2f}%")
     print(f"  CAGR ({yrs:.2f}y): {cagr:+.2f}%")
     print(f"  Trades: {len(trades)} (wins={wins}, losses={losses}, WR={wins/max(1,wins+losses)*100:.1f}%)")

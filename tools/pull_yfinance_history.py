@@ -29,7 +29,7 @@ def get_engine():
             import psycopg  # noqa: F401
         except ImportError:
             url = url.replace("postgresql+psycopg://", "postgresql+psycopg2://")
-    return create_engine(url)
+    return create_engine(url, pool_pre_ping=True)
 
 
 def load_universe(path: str) -> list[str]:
@@ -45,19 +45,22 @@ def insert_symbol(conn, sym: str, df: pd.DataFrame) -> int:
     conn.execute(text("DELETE FROM historical_data WHERE symbol=:s AND data_source='yfinance' "
                       "AND date BETWEEN :a AND :b"),
                  {"s": sym, "a": df.index.min().date(), "b": df.index.max().date()})
-    n = 0
+    rows = []
     for ts, r in df.iterrows():
         d = ts.date()
+        vol = r["Volume"]
+        rows.append({
+            "sym": sym, "d": d, "ts": int(datetime(d.year, d.month, d.day).timestamp()),
+            "o": float(r["Open"]), "h": float(r["High"]), "l": float(r["Low"]),
+            "c": float(r["Close"]), "v": int(vol) if pd.notna(vol) else 0,
+            "ac": float(r["Adj Close"]) if "Adj Close" in df.columns and pd.notna(r["Adj Close"]) else float(r["Close"]),
+        })
+    if rows:
         conn.execute(text(
             "INSERT INTO historical_data "
             "(symbol,date,timestamp,open,high,low,close,volume,adj_close,data_source,api_resolution,is_adjusted) "
-            "VALUES (:sym,:d,:ts,:o,:h,:l,:c,:v,:ac,'yfinance','1D',false)"),
-            {"sym": sym, "d": d, "ts": int(datetime(d.year, d.month, d.day).timestamp()),
-             "o": float(r["Open"]), "h": float(r["High"]), "l": float(r["Low"]),
-             "c": float(r["Close"]), "v": int(r["Volume"] or 0),
-             "ac": float(r.get("Adj Close", r["Close"]))})
-        n += 1
-    return n
+            "VALUES (:sym,:d,:ts,:o,:h,:l,:c,:v,:ac,'yfinance','1D',false)"), rows)
+    return len(rows)
 
 
 def main() -> int:
@@ -76,16 +79,16 @@ def main() -> int:
         batch = syms[i:i + args.batch]
         data = yf.download(batch, start=args.start, end=args.end, group_by="ticker",
                            auto_adjust=False, threads=True, progress=False)
-        with eng.begin() as conn:
-            for sym in batch:
-                try:
-                    sub = data[sym] if len(batch) > 1 else data
-                    sub = sub.dropna(subset=["Open", "High", "Low", "Close"])
-                    if sub.empty:
-                        failed.append(sym); continue
+        for sym in batch:
+            try:
+                sub = data[sym] if len(batch) > 1 else data
+                sub = sub.dropna(subset=["Open", "High", "Low", "Close"])
+                if sub.empty:
+                    failed.append(sym); continue
+                with eng.begin() as conn:          # per-symbol tx: one failure can't poison others
                     total += insert_symbol(conn, sym, sub)
-                except Exception as e:  # noqa: BLE001
-                    failed.append(sym); print(f"  ! {sym}: {e}", file=sys.stderr, flush=True)
+            except Exception as e:  # noqa: BLE001
+                failed.append(sym); print(f"  ! {sym}: {e}", file=sys.stderr, flush=True)
         print(f"  batch {i//args.batch+1}: {min(i+args.batch,len(syms))}/{len(syms)} done, rows={total}", flush=True)
         time.sleep(1)
     print(f"DONE rows={total} failed={len(failed)}: {failed[:30]}", flush=True)
