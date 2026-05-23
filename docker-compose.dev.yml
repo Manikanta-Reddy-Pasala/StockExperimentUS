@@ -1,0 +1,108 @@
+services:
+  # PostgreSQL database
+  database:
+    image: postgres:15
+    container_name: trading_system_db_dev
+    environment:
+      POSTGRES_DB: trading_system
+      POSTGRES_USER: trader
+      POSTGRES_PASSWORD: trader_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - trading_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trader -d trading_system"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Dragonfly for caching and session management
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly
+    container_name: trading_system_dragonfly_dev
+    command: ["dragonfly", "--proactor_threads=2", "--maxmemory=512mb"]
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - trading_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-h", "localhost", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Trading system application - Development mode
+  trading_system:
+    build: .
+    container_name: trading_system_app_dev
+    depends_on:
+      database:
+        condition: service_healthy
+      dragonfly:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+psycopg://trader:trader_password@database:5432/trading_system
+      - DRAGONFLY_URL=redis://dragonfly:6379/0
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - PYTHONPATH=/app
+      - FYERS_CLIENT_ID=${FYERS_CLIENT_ID:-your_client_id}
+      - FYERS_ACCESS_TOKEN=${FYERS_ACCESS_TOKEN:-your_access_token}
+      # Stock Screening Configuration - Stage 1: Market Data Screening
+      - SCREENING_MIN_PRICE_THRESHOLD=${SCREENING_MIN_PRICE_THRESHOLD:-50.0}
+      - SCREENING_MIN_DAILY_VOLUME=${SCREENING_MIN_DAILY_VOLUME:-50000}
+      - SCREENING_MAX_DAILY_CHANGE_PERCENT=${SCREENING_MAX_DAILY_CHANGE_PERCENT:-25.0}
+      - SCREENING_BATCH_SIZE=${SCREENING_BATCH_SIZE:-50}
+      - SCREENING_QUOTES_RATE_LIMIT_DELAY=${SCREENING_QUOTES_RATE_LIMIT_DELAY:-0.2}
+      - SCREENING_MAX_ATR_PERCENTAGE=${SCREENING_MAX_ATR_PERCENTAGE:-5.0}
+      - SCREENING_MIN_AVG_VOLUME_20D=${SCREENING_MIN_AVG_VOLUME_20D:-100000}
+      - SCREENING_MAX_BID_ASK_SPREAD=${SCREENING_MAX_BID_ASK_SPREAD:-2.0}
+      - SCREENING_MIN_HISTORICAL_VOLATILITY=${SCREENING_MIN_HISTORICAL_VOLATILITY:-10.0}
+      - SCREENING_MAX_HISTORICAL_VOLATILITY=${SCREENING_MAX_HISTORICAL_VOLATILITY:-60.0}
+      - SCREENING_MAX_BETA=${SCREENING_MAX_BETA:-1.2}
+      # Stock Screening Configuration - Stage 2: Business Logic Screening
+      - SCREENING_MAX_SECTOR_ALLOCATION=${SCREENING_MAX_SECTOR_ALLOCATION:-30.0}
+      - SCREENING_MIN_MARKET_CAP_CRORES=${SCREENING_MIN_MARKET_CAP_CRORES:-500}
+      - SCREENING_MAX_FINAL_STOCKS=${SCREENING_MAX_FINAL_STOCKS:-50}
+      - SCREENING_MAX_POSITION_SIZE=${SCREENING_MAX_POSITION_SIZE:-5.0}
+      - SCREENING_MAX_PE_RATIO=${SCREENING_MAX_PE_RATIO:-50.0}
+      - SCREENING_MIN_ROE=${SCREENING_MIN_ROE:-5.0}
+      - SCREENING_MAX_DEBT_EQUITY=${SCREENING_MAX_DEBT_EQUITY:-2.0}
+      - SCREENING_MIN_DIVIDEND_YIELD=${SCREENING_MIN_DIVIDEND_YIELD:-0.0}
+    ports:
+      - "5001:5001"
+    volumes:
+      # Mount source code for live reloading
+      - ./src:/app/src:ro
+      - ./run.py:/app/run.py:ro
+      - ./requirements.txt:/app/requirements.txt:ro
+      - ./logs:/app/logs
+      # Mount templates for live reloading
+      - ./src/web/templates:/app/src/web/templates:ro
+      - ./src/web/static:/app/src/web/static:ro
+      # Mount models directory for persistence
+      - ./api/v1/ml/trained:/app/api/v1/ml/trained
+    restart: unless-stopped
+    networks:
+      - trading_network
+    command: python run.py --multi-user --dev
+    # Override the health check for development
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres_data_dev:
+
+networks:
+  trading_network:
+    driver: bridge

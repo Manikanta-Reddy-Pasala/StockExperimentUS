@@ -1,0 +1,382 @@
+{% extends "v2/base.html" %}
+{% block title %}Today's Picks - Trading Models{% endblock %}
+{% block page_title %}Today's Picks{% endblock %}
+
+{% block content %}
+<style>
+  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
+  .row-held { background: #fffbea !important; font-weight: 600; }
+  .model-card-header { cursor: pointer; }
+  .model-card-header:hover { background: #f1f5fc; }
+  .badge-disabled { background: #6c757d; }
+  .badge-held { background: #198754; }
+  .badge-rank-1 { background: #ffd60a; color: #333; }
+  .small-mute { font-size: 0.78rem; color: #8b95a5; }
+</style>
+
+<div id="picks_container">
+  <div class="text-muted py-3 text-center">Loading…</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 4 equity models to show. `schedule` drives the next-rebalance display.
+const MODELS = [
+  {key: "momentum_n100_top5_max1",     title: "Momentum N100 Top-5 (mc=1)",        desc: "Monthly rotation + mid-month check • real Nifty 100 • 30d return",        schedule: "monthly_midcheck"},
+  {key: "n20_daily_large_only",        title: "N20 Daily ADV ∩ N100",              desc: "Daily rotation • top-20 ADV ∩ N100 • uptrend",                            schedule: "daily"},
+  {key: "midcap_narrow_60d_breakout",  title: "Midcap 60d Breakout",               desc: "Event-driven • 60d-high + vol surge + 200d SMA",                          schedule: "event"},
+  {key: "momentum_pseudo_n100_adv",    title: "Pseudo-N100 ADV",                    desc: "Monthly rotation • top-100 ADV from N500 • yearly-PIT rebuild",            schedule: "monthly"},
+];
+
+// Format YYYY-MM-DD in local TZ (avoid toISOString → UTC date drift).
+function _ymdLocal(d) {
+  const p = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth()+1) + '-' + p(d.getDate());
+}
+
+// First weekday on/after a given local date.
+function _firstWeekday(d) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  while (x.getDay() === 0 || x.getDay() === 6) x.setDate(x.getDate()+1);
+  return x;
+}
+
+// Compute next rebalance date+days for a given schedule. Mirrors backend
+// _next_rebalance() logic so UI doesn't need an extra API round trip.
+function nextRebalance(schedule) {
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+  if (schedule === "monthly_midcheck") {
+    // Two candidate dates:
+    //   (1) first weekday on/after the 15th of THIS month
+    //   (2) first weekday of NEXT month
+    // Return whichever is SOONER and still in the future.
+    let mid = _firstWeekday(new Date(today.getFullYear(), today.getMonth(), 15));
+    let next = _firstWeekday(new Date(today.getFullYear(), today.getMonth()+1, 1));
+    let target, kind;
+    if (mid > startOfToday) { target = mid; kind = 'mid-month'; }
+    else                    { target = next; kind = 'monthly'; }
+    const days = Math.max(0, Math.ceil((target - startOfToday) / 86400000));
+    return {label: _ymdLocal(target), days, kind};
+  }
+
+  if (schedule === "monthly") {
+    let target = today.getDate() <= 7
+      ? _firstWeekday(startOfToday)
+      : _firstWeekday(new Date(today.getFullYear(), today.getMonth()+1, 1));
+    const days = Math.max(0, Math.ceil((target - startOfToday) / 86400000));
+    return {label: _ymdLocal(target), days, kind: 'monthly'};
+  }
+
+  if (schedule === "daily") {
+    let target = new Date(today);
+    target.setDate(target.getDate() + 1);
+    target = _firstWeekday(target);
+    const days = Math.ceil((target - startOfToday) / 86400000);
+    return {label: _ymdLocal(target), days, kind: 'daily'};
+  }
+
+  return {label: 'event-driven', days: null, kind: 'event'};
+}
+
+const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
+const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
+const cls = n => n>0?"pos":(n<0?"neg":"neutral");
+
+async function fetchJSON(url) {
+  try {
+    const r = await fetch(url);
+    return await r.json();
+  } catch (e) {
+    return {success: false, error: e.message};
+  }
+}
+
+function renderCard(m, idx, ranking, status) {
+  const collapseId = "collapse_" + m.key;
+  const disabled = status && status.success && status.enabled === false;
+  const heldSym = status && status.success && status.current_position
+    ? status.current_position.sym
+    : null;
+
+  const top = (ranking && ranking.ranking) || [];
+  const rank1 = top[0];
+
+  let rows = "";
+  if (top.length === 0) {
+    const note = (ranking && ranking.note) || 'No ranking JSON yet — generate one for this model.';
+    rows = `<tr><td colspan="5" class="text-center text-muted py-3">
+      <div class="mb-2">${note}</div>
+      <button class="btn btn-sm btn-primary" onclick="runSignal('${m.key}', event)" title="Force re-run live_signal with latest data">
+        <i class="bi bi-arrow-clockwise"></i> Re-calculate ${m.title}
+      </button>
+    </td></tr>`;
+  } else {
+    rows = top.map(r => {
+      const held = heldSym && (heldSym.replace('NSE:','').replace('-EQ','') === r.symbol.replace('NSE:','').replace('-EQ',''));
+      const rowCls = held ? 'row-held' : '';
+      return `<tr class="${rowCls}">
+        <td>${r.rank === 1 ? '<span class="badge badge-rank-1">★ 1</span>' : '#'+r.rank}</td>
+        <td><strong>${r.symbol}</strong></td>
+        <td class="small text-muted">${r.name || ''}</td>
+        <td class="text-end ${cls(r.ret_30d_pct)}">${fmtPct(r.ret_30d_pct)}</td>
+        <td class="text-end">${fmtINR(r.price)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Header badges
+  let badges = '';
+  if (disabled) badges += ' <span class="badge badge-disabled">DISABLED</span>';
+  if (heldSym) badges += ` <span class="badge badge-held">HELD: ${heldSym.replace('NSE:','').replace('-EQ','')}</span>`;
+  if (ranking && ranking.universe_size) badges += ` <span class="badge bg-secondary">universe ${ranking.universe_size}</span>`;
+
+  const navHtml = status && status.success
+    ? `<span class="small-mute">NAV ${fmtINR(status.nav)} · P&amp;L <span class="${cls(status.pnl_pct)}">${fmtPct(status.pnl_pct)}</span></span>`
+    : '';
+
+  const _dateLbl = ranking && ranking.generated_at
+    ? (window.fmtIST ? window.fmtIST(ranking.generated_at) : ranking.generated_at)
+    : (ranking && ranking.date ? (window.fmtISTDate ? window.fmtISTDate(ranking.date) : ranking.date) : null);
+  const dateHtml = _dateLbl ? `<span class="small-mute" title="ranking generated">${_dateLbl}</span>` : '';
+
+  // Schedule + next rebalance pill (always visible on every card)
+  const _sched = nextRebalance(m.schedule);
+  const schedPill = _sched.kind === 'event'
+    ? `<span class="badge bg-secondary ms-1" title="Trades only when 60d-high + vol + SMA all fire">event-driven</span>`
+    : `<span class="badge bg-secondary ms-1" title="${_sched.kind} rotation">
+         ${_sched.kind}: ${_sched.label}${_sched.days != null ? ` (in ${_sched.days}d)` : ''}
+       </span>`;
+
+  // Top pick summary shown when collapsed — gives operator the most important
+  // signal at a glance without needing to expand. Click header to see top-5.
+  const isNearMiss = rank1 && rank1.name && rank1.name.includes('near-miss');
+  const topPickHtml = rank1
+    ? `<div class="mt-2 small">
+         <span class="badge ${isNearMiss ? 'bg-warning text-dark' : 'badge-rank-1'} me-1">${isNearMiss ? 'NEAR' : '★ 1'}</span>
+         <strong>${rank1.symbol}</strong>
+         <span class="text-muted">${(rank1.name || '').replace(' (near-miss)', '')}</span>
+         <span class="ms-2 ${cls(rank1.ret_30d_pct)}">${fmtPct(rank1.ret_30d_pct)}</span>
+         <span class="ms-2 text-muted">${fmtINR(rank1.price)}</span>
+       </div>`
+    : '<div class="mt-2 small text-muted">No top pick available</div>';
+
+  // Model-emitted note (e.g. midcap "no breakout today, showing near-miss")
+  const noteHtml = (ranking && ranking.note)
+    ? `<div class="alert alert-info py-2 px-3 small mb-0 rounded-0 border-0">
+         <i class="bi bi-info-circle me-1"></i>${ranking.note}
+       </div>`
+    : '';
+
+  // Held-vs-current-rank-1 banner — explains why UI may show a held symbol
+  // that's NOT in today's top-5. Distinguishes:
+  //   - Model-picked entry (regular monthly/daily rotation) → wait or force
+  //   - Manual sync entry (LINK_FYERS_POSITION, SEED) → not a model pick
+  let heldBannerHtml = '';
+  if (heldSym && status && status.current_position) {
+    const heldNorm = heldSym.replace('NSE:','').replace('-EQ','');
+    const inTop = (top || []).some(r =>
+      r.symbol.replace('NSE:','').replace('-EQ','') === heldNorm);
+    const cp = status.current_position;
+    const entryDate = cp.entry_date || '—';
+    const reason = (cp.entry_reason || '').toUpperCase();
+    const isManual = ['LINK_FYERS_POSITION','SEED','MANUAL'].includes(reason);
+    const sched = nextRebalance(m.schedule);
+    const rebalLine = sched.kind === 'event'
+      ? 'Rebalance: event-driven (on next breakout trigger)'
+      : `Next auto-rebalance: <strong>${sched.label}</strong> ${sched.days != null ? `(in ${sched.days} day${sched.days===1?'':'s'})` : ''} · ${sched.kind}`;
+
+    const originLine = isManual
+      ? `<span class="badge bg-info">MANUAL</span> Held <strong>${heldNorm}</strong> linked from broker on ${entryDate} (reason: <code>${reason}</code>) — NOT a model pick.`
+      : reason
+        ? `<span class="badge bg-primary">MODEL PICK</span> Entered <strong>${heldNorm}</strong> on ${entryDate} via <code>${reason}</code>.`
+        : `Entered <strong>${heldNorm}</strong> on ${entryDate}.`;
+
+    let actionLine;
+    let bannerCls;
+    if (inTop) {
+      actionLine = `Still in today's top-5 — no rotation needed.`;
+      bannerCls = 'alert-success';
+    } else if (rank1) {
+      const waitOrSell = sched.kind === 'monthly'
+        ? `Two options: (a) <strong>Wait</strong> — auto-rebalance ${sched.label} will SELL ${heldNorm} + BUY ${rank1.symbol}. (b) <strong>Force now</strong> via Portfolio page Rebalance button.`
+        : sched.kind === 'mid-month'
+          ? `Mid-month check ${sched.label} — rotates only if rank-1 leads held by ≥5pp.`
+          : sched.kind === 'daily'
+            ? `Daily rotation — next session will SELL ${heldNorm} + BUY ${rank1.symbol}.`
+            : `Will rotate to ${rank1.symbol} on next event trigger.`;
+      actionLine = `Today's rank-1 is <strong>${rank1.symbol}</strong> (${fmtPct(rank1.ret_30d_pct)}). ${waitOrSell}`;
+      bannerCls = isManual ? 'alert-info' : 'alert-warning';
+    } else {
+      actionLine = `No fresh ranking available — run signal first.`;
+      bannerCls = 'alert-warning';
+    }
+
+    heldBannerHtml = `
+      <div class="alert ${bannerCls} py-2 px-3 small mb-0 rounded-0 border-0">
+        <div>${originLine}</div>
+        <div class="mt-1"><i class="bi bi-arrow-right me-1"></i>${actionLine}</div>
+        <div class="small-mute mt-1">${rebalLine}</div>
+      </div>`;
+  }
+
+  return `
+    <div class="card mb-3">
+      <div class="card-header model-card-header d-flex justify-content-between align-items-center"
+           data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false">
+        <div>
+          <strong>${m.title}</strong>${badges}${schedPill}
+          <i class="bi bi-chevron-down ms-1 small-mute"></i>
+          <div class="small-mute mt-1">${m.desc}</div>
+          ${topPickHtml}
+        </div>
+        <div class="text-end">
+          ${navHtml}<br>${dateHtml}
+          <button class="btn btn-sm btn-outline-primary mt-1"
+                  onclick="runSignal('${m.key}', event)"
+                  title="Force re-run live_signal with latest data">
+            <i class="bi bi-arrow-clockwise"></i> Re-calculate
+          </button>
+        </div>
+      </div>
+      <div id="${collapseId}" class="collapse">
+        ${heldBannerHtml}
+        ${noteHtml}
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Rank</th><th>Symbol</th><th>Name</th>
+                <th class="text-end">30d Return</th><th class="text-end">Price ₹</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div class="border-top px-3 py-2 d-flex justify-content-between align-items-center">
+          <span class="small-mute">
+            <i class="bi bi-clock-history me-1"></i>Scheduled signals (cron emissions only)
+          </span>
+          <a href="/picks/${encodeURIComponent(m.key)}/signals"
+             class="btn btn-sm btn-outline-info"
+             onclick="event.stopPropagation()">
+            <i class="bi bi-list-ul"></i> View Signals (30d) →
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+async function load() {
+  const container = document.getElementById('picks_container');
+
+  // Use portfolio.enabled as authoritative source for which models render.
+  // triggers/status remains useful for ranking page context (NAV, P&L, pos).
+  const pf = await fetchJSON('/admin/models/portfolio');
+  const enabledMap = {};
+  if (pf.success) {
+    (pf.models || []).forEach(m => { enabledMap[m.model_name] = !!m.enabled; });
+  }
+
+  // Fire all fetches in parallel — 4 models × 2 endpoints
+  const fetches = MODELS.map(async (m, idx) => {
+    const [ranking, status] = await Promise.all([
+      fetchJSON(`/admin/${m.key}/ranking?top=5`),
+      fetchJSON(`/admin/models/${m.key}/triggers/status`),
+    ]);
+    return {m, idx, ranking, status};
+  });
+  const results = await Promise.all(fetches);
+  results.sort((a, b) => a.idx - b.idx);
+
+  // Hide disabled models entirely (authoritative via portfolio.enabled).
+  // Fallback to triggers/status.enabled if portfolio not reachable.
+  const isEnabled = r => {
+    if (r.m.key in enabledMap) return enabledMap[r.m.key];
+    return !(r.status && r.status.success && r.status.enabled === false);
+  };
+  const visible = results.filter(isEnabled);
+
+  if (visible.length === 0) {
+    container.innerHTML = '<div class="alert alert-warning text-center">' +
+      'All models are disabled. Re-enable one from <a href="/admin/v2/settings" class="alert-link">Settings</a> to see picks.</div>';
+    return;
+  }
+  // Re-index visible cards so the first stays open by default.
+  container.innerHTML = visible.map((r, i) => renderCard(r.m, i, r.ranking, r.status)).join('');
+}
+
+async function runSignal(modelKey, ev) {
+  if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+  const ok = await appModal.confirm('Re-calculate (Preview)',
+    `Re-run <strong>${modelKey}</strong>'s live_signal now?<br><br>` +
+    '<strong>Preview only.</strong> Fresh ranking is shown for comparison.<br>' +
+    '<strong>NOT stored</strong> in Signal History. Schedule still drives real orders.<br>' +
+    'Updates page in 10-60s.',
+    {okLabel: 'Re-calculate', okClass: 'btn-primary'});
+  if (!ok) return;
+  try {
+    // ?recalc=1 forces synchronous re-run with --force; live_signal skips
+    // audit write_signal on force, so this call does NOT pollute history.
+    const r = await fetch(`/admin/${modelKey}/ranking?top=5&recalc=1`, {cache: 'no-store'});
+    const d = await r.json();
+    if (d.success) {
+      // Build a "held vs fresh pick" diff before reloading cards.
+      let diffHtml = '';
+      try {
+        const pf = await fetchJSON('/admin/models/portfolio');
+        const m = (pf.models || []).find(x => x.model_name === modelKey);
+        const heldSym = m && m.open_symbol ? m.open_symbol : null;
+        const heldQty = m && m.open_qty ? m.open_qty : 0;
+        const heldPx  = m && m.open_entry_px ? m.open_entry_px : 0;
+        const top = (d.ranking || [])[0];
+        if (top) {
+          const newSym = top.symbol || '—';
+          const newPx  = top.price || 0;
+          const newRet = top.ret_30d_pct;
+          if (heldSym && _normSym(heldSym) === _normSym(newSym)) {
+            diffHtml = '<div class="alert alert-success py-2 small mb-0">' +
+              '<strong>No change.</strong> Held <code>' + heldSym + '</code> still rank-1. ' +
+              'Schedule will NOT rotate at next rebalance.</div>';
+          } else if (heldSym) {
+            diffHtml = '<div class="alert alert-warning py-2 small mb-0">' +
+              '<strong>Diff detected:</strong><br>' +
+              'Held: <code>' + heldSym + '</code> x' + heldQty + ' @ ₹' + Number(heldPx).toFixed(2) + '<br>' +
+              'Fresh rank-1: <code>' + newSym + '</code> @ ₹' + Number(newPx).toFixed(2) +
+              (newRet != null ? ' (' + (newRet>=0?'+':'') + Number(newRet).toFixed(2) + '%)' : '') + '<br>' +
+              '<em>Schedule decides if/when to rotate. This preview is not stored.</em></div>';
+          } else {
+            diffHtml = '<div class="alert alert-info py-2 small mb-0">' +
+              'Currently flat. Fresh rank-1: <code>' + newSym + '</code> @ ₹' + Number(newPx).toFixed(2) +
+              (newRet != null ? ' (' + (newRet>=0?'+':'') + Number(newRet).toFixed(2) + '%)' : '') + '<br>' +
+              '<em>Schedule decides entry. This preview is not stored.</em></div>';
+          }
+        }
+      } catch(_) {}
+      await load();
+      await appModal.alert('Re-calculated (Preview)',
+        '<div class="mb-2"><strong>Model:</strong> <code>' + modelKey + '</code> ' +
+        (d.ran_now ? '<span class="badge bg-success ms-1">fresh</span>' : '<span class="badge bg-secondary ms-1">cached</span>') +
+        ' <span class="badge bg-light text-dark ms-1">not stored</span></div>' +
+        diffHtml,
+        'info');
+    } else {
+      await appModal.alert('Failed', 'Error: <strong>' + (d.error || 'unknown') + '</strong>', 'danger');
+    }
+  } catch (e) {
+    await appModal.alert('Network Error', e.message, 'danger');
+  }
+}
+
+function _normSym(s) {
+  if (!s) return '';
+  return s.toUpperCase().replace(/^NSE:/, '').replace(/-EQ$/, '');
+}
+
+load();
+setInterval(load, 60000);  // refresh every 60s
+</script>
+{% endblock %}

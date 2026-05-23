@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FYERS Authorization Callback</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+            max-width: 400px;
+        }
+        .success {
+            color: #10b981;
+        }
+        .error {
+            color: #ef4444;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        button:hover {
+            background: #5a67d8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>FYERS Authorization</h2>
+        <div id="status">
+            <div class="spinner"></div>
+            <p>Processing authorization...</p>
+        </div>
+    </div>
+
+    <script>
+        // Function to extract auth_code from URL
+        function getAuthCodeFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('auth_code');
+        }
+
+        // Function to extract state (user_id) from URL
+        function getStateFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('state');
+        }
+
+        // Function to send auth_code to backend
+        async function sendAuthCodeToBackend(authCode, state) {
+            try {
+                const response = await fetch('/brokers/fyers/api/oauth/complete', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        auth_code: authCode,
+                        state: state
+                    })
+                });
+
+                const result = await response.json();
+                return result;
+            } catch (error) {
+                console.error('Error sending auth code to backend:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        // Main execution
+        async function handleCallback() {
+            const authCode = getAuthCodeFromURL();
+            const state = getStateFromURL();
+            const statusDiv = document.getElementById('status');
+
+            if (authCode) {
+                // Send auth_code to backend
+                const result = await sendAuthCodeToBackend(authCode, state);
+                
+                if (result.success) {
+                    statusDiv.innerHTML = `
+                        <h3 class="success">✓ Authorization Successful!</h3>
+                        <p>Your FYERS account has been connected successfully.</p>
+                        <p>Access token has been saved.</p>
+                        <button onclick="window.close()">Close Window</button>
+                        <p style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                            This window will close automatically in 5 seconds...
+                        </p>
+                    `;
+                    
+                    // Auto-close window after 5 seconds
+                    setTimeout(() => {
+                        window.close();
+                    }, 5000);
+                } else {
+                    statusDiv.innerHTML = `
+                        <h3 class="error">✗ Authorization Failed</h3>
+                        <p>${result.error || 'Failed to exchange authorization code for access token.'}</p>
+                        <button onclick="window.close()">Close Window</button>
+                    `;
+                }
+            } else {
+                // Check for error in URL
+                const error = new URLSearchParams(window.location.search).get('error');
+                const errorDescription = new URLSearchParams(window.location.search).get('error_description');
+                
+                statusDiv.innerHTML = `
+                    <h3 class="error">✗ Authorization Failed</h3>
+                    <p>${errorDescription || error || 'No authorization code received.'}</p>
+                    <button onclick="window.close()">Close Window</button>
+                `;
+            }
+        }
+
+        // Execute when page loads
+        window.onload = handleCallback;
+    </script>
+</body>
+</html>

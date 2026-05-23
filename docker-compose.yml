@@ -1,0 +1,223 @@
+x-common-env: &common-env
+  TZ: Asia/Kolkata
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-trader}:${POSTGRES_PASSWORD:-trader_password}@database:5432/${POSTGRES_DB:-trading_system}
+  DRAGONFLY_URL: redis://dragonfly:6379/0
+  PYTHONPATH: /app
+  FYERS_CLIENT_ID: ${FYERS_CLIENT_ID:-}
+  FYERS_API_SECRET: ${FYERS_API_SECRET:-}
+  FYERS_ACCESS_TOKEN: ${FYERS_ACCESS_TOKEN:-}
+  FYERS_PIN: ${FYERS_PIN:-}
+  FYERS_TOTP_KEY: ${FYERS_TOTP_KEY:-}
+  FYERS_CLIENT_ID_LOGIN: ${FYERS_CLIENT_ID_LOGIN:-}
+  SECRET_KEY: ${SECRET_KEY:-}
+  MAX_CONCURRENT: ${MAX_CONCURRENT:-1}
+  MIN_PRICE: ${MIN_PRICE:-1.0}
+  LIMIT_TOL_PCT: ${LIMIT_TOL_PCT:-0.1}
+  LIMIT_RETRY_PCT: ${LIMIT_RETRY_PCT:-0.2}
+  LIMIT_FALLBACK_S: ${LIMIT_FALLBACK_S:-20}
+  TG_BOT_TOKEN: ${TG_BOT_TOKEN:-}
+  TG_CHAT_ID: ${TG_CHAT_ID:-}
+
+x-screening-env: &screening-env
+  # Data Provider Mode
+  DATA_PROVIDER_MODE: ${DATA_PROVIDER_MODE:-auto}
+  YFINANCE_HISTORICAL_ENABLED: ${YFINANCE_HISTORICAL_ENABLED:-false}
+  # Stock Screening - Stage 1: Market Data
+  SCREENING_MIN_PRICE_THRESHOLD: ${SCREENING_MIN_PRICE_THRESHOLD:-50.0}
+  SCREENING_MIN_DAILY_VOLUME: ${SCREENING_MIN_DAILY_VOLUME:-50000}
+  SCREENING_MAX_DAILY_CHANGE_PERCENT: ${SCREENING_MAX_DAILY_CHANGE_PERCENT:-25.0}
+  SCREENING_BATCH_SIZE: ${SCREENING_BATCH_SIZE:-50}
+  SCREENING_QUOTES_RATE_LIMIT_DELAY: ${SCREENING_QUOTES_RATE_LIMIT_DELAY:-0.3}
+  SCREENING_MAX_ATR_PERCENTAGE: ${SCREENING_MAX_ATR_PERCENTAGE:-5.0}
+  SCREENING_MIN_AVG_VOLUME_20D: ${SCREENING_MIN_AVG_VOLUME_20D:-100000}
+  SCREENING_MAX_BID_ASK_SPREAD: ${SCREENING_MAX_BID_ASK_SPREAD:-2.0}
+  SCREENING_MIN_HISTORICAL_VOLATILITY: ${SCREENING_MIN_HISTORICAL_VOLATILITY:-10.0}
+  SCREENING_MAX_HISTORICAL_VOLATILITY: ${SCREENING_MAX_HISTORICAL_VOLATILITY:-60.0}
+  SCREENING_MAX_BETA: ${SCREENING_MAX_BETA:-1.2}
+  # Stock Screening - Stage 2: Business Logic
+  SCREENING_MAX_SECTOR_ALLOCATION: ${SCREENING_MAX_SECTOR_ALLOCATION:-30.0}
+  SCREENING_MIN_MARKET_CAP_CRORES: ${SCREENING_MIN_MARKET_CAP_CRORES:-500}
+  SCREENING_MAX_FINAL_STOCKS: ${SCREENING_MAX_FINAL_STOCKS:-50}
+  SCREENING_MAX_POSITION_SIZE: ${SCREENING_MAX_POSITION_SIZE:-5.0}
+  SCREENING_MAX_PE_RATIO: ${SCREENING_MAX_PE_RATIO:-50.0}
+  SCREENING_MIN_ROE: ${SCREENING_MIN_ROE:-5.0}
+  SCREENING_MAX_DEBT_EQUITY: ${SCREENING_MAX_DEBT_EQUITY:-2.0}
+  SCREENING_MIN_DIVIDEND_YIELD: ${SCREENING_MIN_DIVIDEND_YIELD:-0.0}
+  # Volatility configuration
+  VOLATILITY_MAX_STOCKS: ${VOLATILITY_MAX_STOCKS:-500}
+  VOLATILITY_BATCH_SIZE: ${VOLATILITY_BATCH_SIZE:-20}
+  VOLATILITY_RATE_LIMIT_DELAY: ${VOLATILITY_RATE_LIMIT_DELAY:-0.3}
+  VOLATILITY_MAX_WORKERS: ${VOLATILITY_MAX_WORKERS:-3}
+  VOLATILITY_HISTORICAL_DAYS: ${VOLATILITY_HISTORICAL_DAYS:-365}
+  VOLATILITY_ATR_PERIOD: ${VOLATILITY_ATR_PERIOD:-14}
+  VOLATILITY_BETA_PERIOD: ${VOLATILITY_BETA_PERIOD:-252}
+  VOLATILITY_HISTORICAL_VOLATILITY_PERIOD: ${VOLATILITY_HISTORICAL_VOLATILITY_PERIOD:-252}
+  VOLATILITY_VOLUME_AVERAGE_PERIOD: ${VOLATILITY_VOLUME_AVERAGE_PERIOD:-20}
+  VOLATILITY_FULL_REFRESH: ${VOLATILITY_FULL_REFRESH:-false}
+
+services:
+  # PostgreSQL database
+  database:
+    image: postgres:15.10
+    container_name: trading_system_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-trading_system}
+      POSTGRES_USER: ${POSTGRES_USER:-trader}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_password}
+      TZ: Asia/Kolkata
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - trading_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trader} -d ${POSTGRES_DB:-trading_system}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # Trading system application
+  trading_system:
+    build: .
+    container_name: trading_system_app
+    depends_on:
+      database:
+        condition: service_healthy
+      dragonfly:
+        condition: service_healthy
+    environment:
+      <<: [*common-env, *screening-env]
+      FLASK_ENV: production
+      # WebAuthn/Passkey Configuration
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-stock.oneshell.in}
+      WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Trading System}
+      WEBAUTHN_RP_ORIGIN: ${WEBAUTHN_RP_ORIGIN:-https://stock.oneshell.in}
+    ports:
+      - "127.0.0.1:5001:5001"
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - trading_network
+    # Production WSGI server (gunicorn) instead of the Werkzeug dev server.
+    # Single worker (so create_app's startup thread + model seeding run
+    # exactly once — no multi-process duplication) with 8 threads to
+    # handle concurrent requests. The dev server was dropping connections
+    # under concurrent load → intermittent "site can't be reached".
+    # 120s timeout covers slow Fyers/DB calls. graceful-timeout lets
+    # in-flight requests finish on deploy so no mid-request connection drop.
+    command: >
+      gunicorn
+      --workers 1
+      --threads 8
+      --worker-class gthread
+      --timeout 120
+      --graceful-timeout 30
+      --keep-alive 5
+      --bind 0.0.0.0:5001
+      --access-logfile -
+      --error-logfile -
+      "src.web.app:create_app()"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # Dragonfly for caching and session management
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly
+    container_name: trading_system_dragonfly
+    command: dragonfly --maxmemory=384mb --proactor_threads=1
+    environment:
+      - TZ=Asia/Kolkata
+    ports:
+      - "127.0.0.1:6379:6379"
+    restart: unless-stopped
+    networks:
+      - trading_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-h", "localhost", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # Technical Indicators Scheduler
+  technical_scheduler:
+    build: .
+    container_name: trading_system_technical_scheduler
+    depends_on:
+      database:
+        condition: service_healthy
+      dragonfly:
+        condition: service_healthy
+    environment:
+      <<: [*common-env, *screening-env]
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - trading_network
+    command: python scheduler.py
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import os; os.kill(1, 0)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # Data Pipeline Scheduler
+  data_scheduler:
+    build: .
+    container_name: trading_system_data_scheduler
+    depends_on:
+      database:
+        condition: service_healthy
+      dragonfly:
+        condition: service_healthy
+    environment:
+      <<: [*common-env, *screening-env]
+    volumes:
+      - ./logs:/app/logs
+      - ./exports:/app/exports
+    restart: unless-stopped
+    networks:
+      - trading_network
+    command: python data_scheduler.py
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import os; os.kill(1, 0)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+volumes:
+  postgres_data:
+
+networks:
+  trading_network:
+    driver: bridge

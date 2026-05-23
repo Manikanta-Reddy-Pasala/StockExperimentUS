@@ -1,0 +1,18 @@
+[Unit]
+Description=Trading System Scheduler (ML Training & Daily Snapshots)
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/app
+Environment="PYTHONPATH=/app"
+ExecStart=/usr/local/bin/python3 /app/scheduler.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

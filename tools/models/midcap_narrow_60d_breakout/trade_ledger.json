@@ -1,0 +1,98 @@
+[
+  {
+    "sym": "GMDCLTD",
+    "entry_date": "2023-05-18",
+    "exit_date": "2023-09-15",
+    "qty": 5935,
+    "entry_px": 168.47,
+    "exit_px": 288.31,
+    "pnl": 709538.0,
+    "ret_pct": 71.31,
+    "cap_after": 1709518.0,
+    "reason": "MAX_HOLD"
+  },
+  {
+    "sym": "BANDHANBNK",
+    "entry_date": "2023-09-18",
+    "exit_date": "2024-01-16",
+    "qty": 6850,
+    "entry_px": 249.55,
+    "exit_px": 229.52,
+    "pnl": -138791.0,
+    "ret_pct": -7.93,
+    "cap_after": 1570706.0,
+    "reason": "MAX_HOLD"
+  },
+  {
+    "sym": "COCHINSHIP",
+    "entry_date": "2024-01-18",
+    "exit_date": "2024-05-17",
+    "qty": 1830,
+    "entry_px": 857.86,
+    "exit_px": 1413.44,
+    "pnl": 1014101.0,
+    "ret_pct": 64.93,
+    "cap_after": 2584788.0,
+    "reason": "MAX_HOLD"
+  },
+  {
+    "sym": "KAYNES",
+    "entry_date": "2024-05-18",
+    "exit_date": "2024-09-16",
+    "qty": 824,
+    "entry_px": 3133.13,
+    "exit_px": 5303.94,
+    "pnl": 1784358.0,
+    "ret_pct": 69.46,
+    "cap_after": 4369126.0,
+    "reason": "MAX_HOLD"
+  },
+  {
+    "sym": "BSE",
+    "entry_date": "2024-09-17",
+    "exit_date": "2025-01-15",
+    "qty": 3828,
+    "entry_px": 1141.14,
+    "exit_px": 1926.74,
+    "pnl": 2999886.0,
+    "ret_pct": 69.01,
+    "cap_after": 7368992.0,
+    "reason": "MAX_HOLD"
+  },
+  {
+    "sym": "INDUSTOWER",
+    "entry_date": "2025-01-21",
+    "exit_date": "2025-05-21",
+    "qty": 19688,
+    "entry_px": 374.27,
+    "exit_px": 387.56,
+    "pnl": 253967.0,
+    "ret_pct": 3.65,
+    "cap_after": 7622939.0,
+    "reason": "MAX_HOLD"
+  },
+  {
+    "sym": "GRSE",
+    "entry_date": "2025-05-23",
+    "exit_date": "2025-09-22",
+    "qty": 2711,
+    "entry_px": 2811.81,
+    "exit_px": 2665.73,
+    "pnl": -403263.0,
+    "ret_pct": -5.1,
+    "cap_after": 7219656.0,
+    "reason": "MAX_HOLD"
+  },
+  {
+    "sym": "HINDCOPPER",
+    "entry_date": "2025-09-23",
+    "exit_date": "2026-01-21",
+    "qty": 24194,
+    "entry_px": 298.4,
+    "exit_px": 556.74,
+    "pnl": 6236899.0,
+    "ret_pct": 86.76,
+    "cap_after": 13456535.0,
+    "reason": "MAX_HOLD"
+  }
+]

@@ -1,0 +1,479 @@
+{% extends "v2/base.html" %}
+{% block title %}Portfolio - Trading Models{% endblock %}
+{% block page_title %}Portfolio{% endblock %}
+
+{% block content %}
+<style>
+  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
+  .summary-card { border-left: 4px solid #5b8def; }
+  .row-disabled td { opacity: 0.55; }
+</style>
+
+<!-- Fyers broker funds (real-time available cash in trading account) -->
+<div class="card mb-3" id="fyers-funds-card">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-center">
+      <div class="col-auto"><i class="bi bi-bank2 text-primary"></i></div>
+      <div class="col-md-auto">
+        <span class="text-muted small">Fyers Account · Available Cash</span>
+        <div class="fs-5 fw-bold" id="fyers_available_cash">--</div>
+      </div>
+      <div class="col-md-auto">
+        <span class="text-muted small">Utilised Margin</span>
+        <div class="fs-6" id="fyers_used_margin">--</div>
+      </div>
+      <div class="col-md-auto">
+        <span class="text-muted small">Total Margin</span>
+        <div class="fs-6" id="fyers_total_margin">--</div>
+      </div>
+      <div class="col-md-auto ms-auto">
+        <span class="small-mute" id="fyers_funds_ts">--</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Aggregate across all models -->
+<div class="card mb-4">
+  <div class="card-header"><strong>All Models Portfolio</strong></div>
+  <div class="card-body">
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-lg-2"><div class="text-muted small">Allocated</div><div class="fs-5 fw-bold" id="agg_alloc">--</div></div>
+      <div class="col-6 col-lg-2"><div class="text-muted small">Total NAV</div><div class="fs-5 fw-bold" id="agg_nav">--</div></div>
+      <div class="col-6 col-lg-2"><div class="text-muted small">Total P&amp;L</div><div class="fs-5 fw-bold" id="agg_pnl">--</div></div>
+      <div class="col-6 col-lg-2"><div class="text-muted small">Realized P&amp;L</div><div class="fs-5 fw-bold" id="agg_realized">--</div></div>
+      <div class="col-6 col-lg-2"><div class="text-muted small" title="Approximate lifetime broker charges (formula-based). Info only — already deducted from cash.">Approx Txn Charges</div><div class="fs-5 fw-bold neg" id="agg_charges">--</div></div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr>
+          <th>Model</th>
+          <th class="text-end" title="Original capital deposited">Allocated</th>
+          <th class="text-end" title="qty × entry price">Cost Basis</th>
+          <th class="text-end" title="Cash not tied up in any open position">Idle Cash</th>
+          <th>Open Position</th>
+          <th class="text-end" title="Live MTM = qty × LTP">Position Value</th>
+          <th class="text-end" title="Locked-in profit/loss from closed trades">Realized</th>
+          <th class="text-end" title="Cash + live position value">Available (Net Worth)</th>
+          <th class="text-end" title="NAV vs Allocated">Total P&amp;L</th>
+          <th class="text-end" title="Approximate lifetime broker charges (Buy + Sell), formula-based">Approx Txn Chg</th>
+          <th class="text-end">Trades</th>
+          <th class="text-center" style="min-width:140px;">Actions</th>
+        </tr></thead>
+        <tbody id="agg_tbody"><tr><td colspan="11" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><i class="bi bi-briefcase me-2"></i>Open Position(s) — Live Fyers</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr>
+        <th>Symbol</th><th>Model</th><th class="text-end">Qty</th><th class="text-end">Entry</th>
+        <th class="text-end">Live</th><th class="text-end">Cost</th>
+        <th class="text-end">Market Value</th><th class="text-end">P&amp;L ₹</th><th class="text-end">P&amp;L %</th>
+        <th class="text-center">Action</th>
+      </tr></thead>
+      <tbody id="positions"><tr><td colspan="10" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="alert alert-warning mt-3 py-2 small">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  <strong>LIVE trading active.</strong> Sell + Rebalance buttons place REAL Fyers orders. Confirm dialog required.
+</div>
+
+<!-- Dedicated rebalance modal — never shared with appModal to avoid
+     stale-listener races when switching from confirm to progress state. -->
+<div class="modal fade" id="rebalance-modal" tabindex="-1" aria-hidden="true"
+     data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content shadow-lg border-0">
+      <div class="modal-header" id="rebalance-modal-header">
+        <h5 class="modal-title" id="rebalance-modal-title">LIVE Rebalance</h5>
+      </div>
+      <div class="modal-body" id="rebalance-modal-body"></div>
+      <div class="modal-footer" id="rebalance-modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="rebalance-modal-cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="rebalance-modal-ok">Execute Rebalance</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
+const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
+const cls = n => n>0?"pos":(n<0?"neg":"neutral");
+
+// Models with wired live_signal + executor (i.e., per-model rebalance works).
+// finnifty options model has different flow; rebalance button hidden for it.
+const WIRED_MODELS = new Set([
+  'momentum_n100_top5_max1',
+  'momentum_pseudo_n100_adv',
+  'midcap_narrow_60d_breakout',
+  'n20_daily_large_only',
+]);
+
+// Symbol -> [model_name] map. Filled by loadAggregate, consumed by loadState.
+const SYMBOL_TO_MODEL = {};
+function _norm(sym) {
+  if (!sym) return '';
+  return sym.toUpperCase().replace(/^NSE:/, '').replace(/-EQ$/, '');
+}
+function lookupModel(sym) {
+  const key = _norm(sym);
+  const models = SYMBOL_TO_MODEL[key] || [];
+  if (!models.length) return '<span class="text-muted small">untracked</span>';
+  return models.map(m =>
+    `<a href="/admin/models/${m}/detail" class="badge bg-primary text-decoration-none">${m}</a>`
+  ).join(' ');
+}
+
+async function loadAggregate() {
+  try {
+    const r = await fetch('/admin/models/portfolio', {cache: 'no-store'});
+    const d = await r.json();
+    if (!d.success) return;
+    const t = d.total || {};
+    document.getElementById('agg_alloc').textContent = fmtINR(t.allocated_capital);
+    document.getElementById('agg_nav').textContent = fmtINR(t.nav);
+    const pnlEl = document.getElementById('agg_pnl');
+    pnlEl.textContent = fmtINR(t.pnl_total) + ' (' + fmtPct(t.return_pct) + ')';
+    pnlEl.className = 'fs-5 fw-bold ' + cls(t.pnl_total);
+    const realEl = document.getElementById('agg_realized');
+    realEl.textContent = fmtINR(t.realized_pnl);
+    realEl.className = 'fs-5 fw-bold ' + cls(t.realized_pnl);
+    const chEl = document.getElementById('agg_charges');
+    if (chEl) chEl.textContent = fmtINR(t.total_txn_charges);
+
+    Object.keys(SYMBOL_TO_MODEL).forEach(k => delete SYMBOL_TO_MODEL[k]);
+    (d.models||[]).forEach(m => {
+      if (!m.open_symbol) return;
+      const key = _norm(m.open_symbol);
+      (SYMBOL_TO_MODEL[key] = SYMBOL_TO_MODEL[key] || []).push(m.model_name);
+    });
+
+    const tbody = document.getElementById('agg_tbody');
+    tbody.innerHTML = '';
+    (d.models||[]).forEach(m => {
+      if (!m.enabled) return;  // hide disabled models entirely
+      const tr = document.createElement('tr');
+      const posHtml = m.open_symbol
+        ? `${m.open_symbol} <span class="text-muted small">x${m.open_qty} @ ${fmtINR(m.open_entry_px)}</span>`
+        : '<span class="text-muted">flat</span>';
+      const wired = WIRED_MODELS.has(m.model_name);
+      const rebalBtn = wired
+        ? `<button class="btn btn-sm btn-danger" onclick="rebalanceModel('${m.model_name}')">
+             <i class="bi bi-arrow-repeat"></i> Rebalance</button>`
+        : '<span class="text-muted small">n/a</span>';
+      const posCost = (Number(m.open_qty||0) * Number(m.open_entry_px||0)) || 0;
+      tr.innerHTML = `
+        <td><strong>${m.model_name}</strong></td>
+        <td class="text-end">${fmtINR(m.allocated_capital)}</td>
+        <td class="text-end">${fmtINR(posCost)}</td>
+        <td class="text-end">${fmtINR(m.cash)}</td>
+        <td>${posHtml}</td>
+        <td class="text-end">${fmtINR(m.position_value)}</td>
+        <td class="text-end ${cls(m.realized_pnl)}">${fmtINR(m.realized_pnl)}</td>
+        <td class="text-end"><strong>${fmtINR(m.nav)}</strong></td>
+        <td class="text-end ${cls(m.pnl_total)}">${fmtINR(m.pnl_total)} (${fmtPct(m.return_pct)})</td>
+        <td class="text-end neg" title="Buy ${fmtINR(m.buy_txn_charges)} + Sell ${fmtINR(m.sell_txn_charges)}"><strong>${fmtINR(m.total_txn_charges)}</strong></td>
+        <td class="text-end">${m.total_trades} (${m.wins}W/${m.losses}L)</td>
+        <td class="text-center">${rebalBtn}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+    if (!tbody.children.length) {
+      tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-3">No enabled models. <a href="/settings">Enable one in Settings</a>.</td></tr>';
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function loadFyersFunds() {
+  try {
+    const r = await fetch('/admin/momrot/state', {cache: 'no-store'});
+    const d = await r.json();
+    if (!d.success) return;
+    const s = d.data;
+    document.getElementById('fyers_available_cash').textContent = fmtINR(s.cash);
+    document.getElementById('fyers_used_margin').textContent = fmtINR(s.utilized_margin);
+    document.getElementById('fyers_total_margin').textContent = fmtINR(s.total_margin);
+    document.getElementById('fyers_funds_ts').textContent =
+      window.fmtIST ? window.fmtIST(s.ledger_updated_at) : (s.ledger_updated_at || '');
+  } catch(e) { console.error(e); }
+}
+
+async function loadState() {
+  await Promise.all([loadAggregate(), loadFyersFunds()]);
+  try {
+    const r = await fetch('/admin/momrot/state', {cache: 'no-store'});
+    const d = await r.json();
+    if (!d.success) return;
+    const s = d.data;
+
+    const tb = document.getElementById('positions');
+    if (!s.open_positions || s.open_positions.length === 0) {
+      tb.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">No open Fyers positions</td></tr>';
+    } else {
+      tb.innerHTML = s.open_positions.map(p => `
+        <tr>
+          <td><strong>${p.symbol}</strong></td>
+          <td>${lookupModel(p.symbol)}</td>
+          <td class="text-end">${p.qty.toLocaleString('en-IN')}</td>
+          <td class="text-end">${fmtINR(p.entry_price)}</td>
+          <td class="text-end">${fmtINR(p.live_price)}</td>
+          <td class="text-end">${fmtINR(p.cost)}</td>
+          <td class="text-end">${fmtINR(p.market_value)}</td>
+          <td class="text-end ${cls(p.unrealized_pnl)}">${fmtINR(p.unrealized_pnl)}</td>
+          <td class="text-end ${cls(p.unrealized_pct)}">${fmtPct(p.unrealized_pct)}</td>
+          <td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="sellNow('${p.symbol}', ${p.qty})"><i class="bi bi-cash"></i> Sell</button></td>
+        </tr>
+      `).join('');
+    }
+  } catch(e) { console.error(e); }
+}
+
+async function rebalanceModel(model) {
+  // Fetch model's latest ranking + position so user sees what will happen.
+  let preview = '';
+  try {
+    const [pfRes, rkRes] = await Promise.all([
+      fetch('/admin/models/portfolio', {cache: 'no-store'}).then(r => r.json()),
+      fetch(`/admin/${model}/ranking?top=5`, {cache: 'no-store'}).then(r => r.json()),
+    ]);
+    const m = (pfRes.success && (pfRes.models||[]).find(x => x.model_name === model)) || {};
+    const rank = (rkRes.success && rkRes.ranking) || [];
+    const rank1 = rank[0];
+    const heldNorm = _norm(m.open_symbol);
+    const inTop = rank1 && rank.some(r => _norm(r.symbol) === heldNorm);
+
+    // Estimate qty: floor((cash + currentHoldingMV) / rank1.price)
+    // Selling existing holding releases cash; rebalance can use ~all of NAV.
+    const buyingPower = (Number(m.cash) || 0) +
+                        ((Number(m.open_qty) || 0) * (Number(m.open_entry_px) || 0));
+    const estQty = rank1 && rank1.price > 0
+      ? Math.max(0, Math.floor(buyingPower / Number(rank1.price)))
+      : 0;
+    const estCost = estQty * (Number(rank1 && rank1.price) || 0);
+
+    let actionRow;
+    if (!rank1) {
+      actionRow = '<div class="text-warning">No ranking available — run signal first.</div>';
+    } else if (!m.open_symbol) {
+      actionRow = `<div>
+        <span class="badge bg-success">BUY</span> <strong>${rank1.symbol}</strong>
+        x<strong>${estQty}</strong> @ ${fmtINR(rank1.price)}
+        = ${fmtINR(estCost)}
+      </div>`;
+    } else if (inTop) {
+      actionRow = `<div class="text-muted">Already holding <strong>${m.open_symbol}</strong> (in top-5). No action.</div>`;
+    } else {
+      actionRow = `<div>
+        <span class="badge bg-danger">SELL</span> <strong>${m.open_symbol}</strong> x${m.open_qty}
+        <span class="mx-1">→</span>
+        <span class="badge bg-success">BUY</span> <strong>${rank1.symbol}</strong>
+        x<strong>${estQty}</strong> @ ${fmtINR(rank1.price)}
+        = ${fmtINR(estCost)}
+      </div>`;
+    }
+    preview = `
+      <div class="small mb-2">
+        <div><strong>Model:</strong> ${model}</div>
+        <div><strong>Cash (in ledger):</strong> ${fmtINR(m.cash)} · <strong>NAV:</strong> ${fmtINR(m.nav)}</div>
+        <div><strong>Buying power (cash + held cost):</strong> ${fmtINR(buyingPower)}</div>
+        <div><strong>Current:</strong> ${m.open_symbol ? m.open_symbol + ' x' + m.open_qty + ' @ ' + fmtINR(m.open_entry_px) : 'flat'}</div>
+        <div><strong>Rank-1:</strong> ${rank1 ? rank1.symbol + ' @ ' + fmtINR(rank1.price) + (rank1.live ? ' <span class="badge bg-success">LIVE</span>' : '') : '—'}</div>
+      </div>
+      ${actionRow}`;
+  } catch(e) {
+    preview = '<div class="text-warning">Could not load preview: ' + e.message + '</div>';
+  }
+
+  // Use a dedicated bootstrap modal that lives only on the portfolio page,
+  // so we never inherit stale handlers from the global appModal.
+  const modalEl = document.getElementById('rebalance-modal');
+  const titleEl = document.getElementById('rebalance-modal-title');
+  const bodyEl = document.getElementById('rebalance-modal-body');
+  const headerEl = document.getElementById('rebalance-modal-header');
+  const okBtn = document.getElementById('rebalance-modal-ok');
+  const cancelBtn = document.getElementById('rebalance-modal-cancel');
+  const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+
+  // Phase 1: confirm
+  titleEl.textContent = 'LIVE Rebalance';
+  headerEl.className = 'modal-header bg-danger text-white';
+  bodyEl.innerHTML = preview + '<hr><div class="small text-muted">Runs live_signal + LIVE fyers_executor. SELL/BUY orders placed on Fyers.</div>';
+  okBtn.textContent = 'Execute Rebalance';
+  okBtn.className = 'btn btn-danger';
+  okBtn.style.display = '';
+  cancelBtn.style.display = '';
+  bsModal.show();
+
+  const ok = await new Promise(resolve => {
+    okBtn.onclick = () => resolve(true);
+    cancelBtn.onclick = () => { bsModal.hide(); resolve(false); };
+  });
+  if (!ok) return;
+
+  // Phase 2: progress (same modal, no hide/show needed)
+  titleEl.textContent = 'LIVE Rebalance — Working';
+  bodyEl.innerHTML = `<div class="d-flex align-items-center mb-2">
+       <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+       <span>Submitting rebalance for <code>${model}</code>…</span>
+     </div>`;
+  okBtn.style.display = 'none';
+  cancelBtn.style.display = 'none';
+
+  // Convenience helpers scoped to this rebalance flow
+  const prog = {
+    update: (h) => { bodyEl.innerHTML = h; },
+    setTitle: (t) => { titleEl.textContent = t; },
+    finish: (h, type='info') => {
+      bodyEl.innerHTML = h;
+      headerEl.className = 'modal-header ' + (type === 'danger' ? 'bg-danger text-white' : (type === 'success' ? 'bg-success text-white' : ''));
+      okBtn.textContent = 'OK';
+      okBtn.className = 'btn ' + (type === 'danger' ? 'btn-danger' : (type === 'success' ? 'btn-success' : 'btn-primary'));
+      okBtn.style.display = '';
+      cancelBtn.style.display = 'none';
+      return new Promise(resolve => {
+        okBtn.onclick = () => { bsModal.hide(); resolve(true); };
+      });
+    },
+  };
+
+  let d;
+  try {
+    const r = await fetch(`/admin/${model}/rebalance`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({dry_run: false}),
+    });
+    d = await r.json();
+  } catch (e) {
+    await prog.finish('<div class="text-danger">Network error: <strong>' + e.message + '</strong></div>', 'danger');
+    return;
+  }
+  if (!d.success) {
+    await prog.finish('<div class="text-danger">Error: <strong>' + (d.error || 'unknown') + '</strong></div>', 'danger');
+    return;
+  }
+
+  const sigId = d.signal_task_id;
+  const exeId = d.execute_task_id;
+
+  // Status labels per task state
+  const stateBadge = (t) => {
+    if (!t) return '<span class="badge bg-secondary">pending</span>';
+    if (t.status === 'running' || t.status === 'started') return '<span class="badge bg-warning text-dark">running</span>';
+    if (t.status === 'completed') return '<span class="badge bg-success">completed</span>';
+    if (t.status === 'failed' || t.status === 'error' || t.status === 'timeout') return `<span class="badge bg-danger">${t.status}</span>`;
+    return `<span class="badge bg-secondary">${t.status || 'pending'}</span>`;
+  };
+
+  const fetchTask = async (id) => {
+    try {
+      const r = await fetch(`/admin/task/${id}/status`);
+      const j = await r.json();
+      return j.success ? j.task : null;
+    } catch (_) { return null; }
+  };
+
+  // Extract a useful one-line summary from executor stdout (order id / qty / symbol).
+  const extractOrderInfo = (output) => {
+    if (!output) return '';
+    const lines = String(output).split('\n');
+    const tail = lines.slice(-50);
+    const orderLine = tail.find(l => /order_id|placed|BUY|SELL/.test(l));
+    return orderLine ? orderLine.trim() : tail.slice(-3).join('<br>');
+  };
+
+  // Poll loop — exit when both signal+execute are terminal, OR after 180s.
+  const deadline = Date.now() + 180000;
+  let sigT = null, exeT = null;
+  const isTerminal = (t) => t && ['completed','failed','error','timeout'].includes(t.status);
+
+  while (Date.now() < deadline) {
+    [sigT, exeT] = await Promise.all([fetchTask(sigId), fetchTask(exeId)]);
+    const sigSum = sigT && sigT.output ? `<div class="small text-muted mt-1">${extractOrderInfo(sigT.output)}</div>` : '';
+    const exeSum = exeT && exeT.output ? `<div class="small text-muted mt-1">${extractOrderInfo(exeT.output)}</div>` : '';
+    const errSig = sigT && sigT.error && sigT.status !== 'completed' ? `<div class="small text-danger mt-1">${String(sigT.error).slice(0,300)}</div>` : '';
+    const errExe = exeT && exeT.error && exeT.status !== 'completed' ? `<div class="small text-danger mt-1">${String(exeT.error).slice(0,300)}</div>` : '';
+
+    prog.update(`
+      <div class="mb-3">
+        <div class="d-flex align-items-center justify-content-between">
+          <div><strong>1. Signal</strong> <code class="small">${sigId}</code></div>
+          ${stateBadge(sigT)}
+        </div>
+        ${sigSum}${errSig}
+      </div>
+      <div class="mb-3">
+        <div class="d-flex align-items-center justify-content-between">
+          <div><strong>2. Execute (Fyers)</strong> <code class="small">${exeId}</code></div>
+          ${stateBadge(exeT)}
+        </div>
+        ${exeSum}${errExe}
+      </div>
+      <div class="small text-muted">Polling… auto-refresh every 2s. Closes when execute terminates.</div>
+    `);
+
+    if (isTerminal(sigT) && isTerminal(exeT)) break;
+    // Signal failed → execute won't run; still wait briefly in case it's about to start.
+    if (isTerminal(sigT) && sigT.status !== 'completed' && (Date.now() - deadline + 180000) > 10000) break;
+
+    await new Promise(r => setTimeout(r, 2000));
+  }
+
+  // Decide final outcome.
+  const sigOk = sigT && sigT.status === 'completed';
+  const exeOk = exeT && exeT.status === 'completed';
+  let type, html;
+  if (sigOk && exeOk) {
+    type = 'success';
+    html = `<div class="mb-2"><strong>Signal:</strong> ${stateBadge(sigT)} &nbsp; <strong>Execute:</strong> ${stateBadge(exeT)}</div>
+            <div class="small mt-2"><strong>Executor output (tail):</strong></div>
+            <pre class="small mt-1" style="max-height:240px;overflow:auto;background:#f8f9fa;padding:8px;">${(exeT.output || '').split('\n').slice(-25).join('\n')}</pre>`;
+  } else if (sigOk && !exeOk) {
+    type = 'danger';
+    html = `<div class="mb-2"><strong>Signal:</strong> ${stateBadge(sigT)} &nbsp; <strong>Execute:</strong> ${stateBadge(exeT)}</div>
+            <div class="text-danger small mt-2">${(exeT && (exeT.error || exeT.output) || 'Executor did not complete.').slice(-500)}</div>`;
+  } else {
+    type = 'danger';
+    html = `<div class="mb-2"><strong>Signal:</strong> ${stateBadge(sigT)} &nbsp; <strong>Execute:</strong> ${stateBadge(exeT)}</div>
+            <div class="text-danger small mt-2">${(sigT && (sigT.error || sigT.output) || 'Signal did not complete.').slice(-500)}</div>`;
+  }
+  prog.setTitle(type === 'success' ? 'Rebalance Complete' : 'Rebalance Failed');
+  await prog.finish(html, type);
+  loadState();
+}
+
+async function sellNow(symbol, qty) {
+  const ok = await appModal.confirm('LIVE SELL', `Sell <strong>${symbol}</strong> qty=<strong>${qty}</strong> at market. Proceed?`,
+                                     {okLabel:'Place SELL', okClass:'btn-danger', headerCls:'bg-danger text-white'});
+  if (!ok) return;
+  const r = await fetch('/admin/momrot/sell-now', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({symbol, qty})
+  });
+  const d = await r.json();
+  if (d.success) {
+    const oid = d.order_id || '';
+    await appModal.alert('Order Placed',
+      `SELL placed: <strong>${symbol}</strong> qty=${qty}` + (oid ? `<br><code class="small">order_id: ${oid}</code>` : ''),
+      'success');
+  } else {
+    await appModal.alert('Order Failed', 'Fyers error: <strong>' + (d.error || 'unknown') + '</strong>', 'danger');
+  }
+  setTimeout(() => loadState(), 3000);
+}
+
+loadState();
+setInterval(loadState, 30000);
+</script>
+{% endblock %}

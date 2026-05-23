@@ -1,0 +1,349 @@
+{% extends "v2/base.html" %}
+{% block title %}{{ model_name }} — Balance Sheet & Transactions{% endblock %}
+{% block page_title %}Model Detail{% endblock %}
+
+{% block content %}
+<style>
+  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
+  .bs-card { border-radius: 10px; border: 1px solid #e3e6ef; }
+  .bs-card .card-header { background: #fafbff; border-bottom: 1px solid #e3e6ef; }
+  .metric-table td { padding: 8px 12px; font-variant-numeric: tabular-nums; }
+  .metric-table .k { color: #6c757d; width: 50%; }
+  .metric-table .v { font-weight: 600; text-align: right; }
+  .metric-table .v.headline { font-size: 1.15rem; }
+  .metric-table tr.bs-section td.bs-section-hdr { background: #f4f6fb; color: #4f5868; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 12px; }
+  .pos-card .pos-line { font-size: 1rem; line-height: 1.5; }
+  .pos-card .pos-line strong { font-size: 1.15rem; }
+  .txn-table { font-size: 0.85rem; }
+  .txn-table tbody td { padding: 6px 10px; vertical-align: middle; font-variant-numeric: tabular-nums; }
+  .txn-table thead th { background: #fafbff; font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; padding: 8px 10px; }
+  .side-badge { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; letter-spacing: 0.5px; }
+  .side-BUY { background: #d4edda; color: #155724; }
+  .side-SELL { background: #f8d7da; color: #721c24; }
+  .side-DEPOSIT { background: #cfe2ff; color: #084298; }
+  .side-WITHDRAW { background: #fff3cd; color: #856404; }
+  .model-tag { font-size: 0.65rem; padding: 1px 6px; border-radius: 8px; background: #eef2ff; color: #3a4cc8; border: 1px solid #d8e0ff; }
+  .live-badge { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px; }
+  .disabled-badge { background: #f1f3f5; color: #6c757d; border: 1px solid #dee2e6; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
+  .empty-state { padding: 30px; text-align: center; color: #6c757d; font-style: italic; }
+</style>
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <h2 class="h4 mb-1"><code>{{ model_name }}</code></h2>
+    <div class="text-muted small">{{ label }}</div>
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    <span id="enabled_badge" class="live-badge">…</span>
+    <a href="/" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Back to Dashboard
+    </a>
+    <button id="refresh_btn" class="btn btn-sm btn-outline-primary">
+      <i class="bi bi-arrow-clockwise"></i> Refresh
+    </button>
+  </div>
+</div>
+
+<!-- Balance Sheet + Open Position row -->
+<div class="row g-3 mb-3">
+  <!-- Balance Sheet card -->
+  <div class="col-12 col-lg-6">
+    <div class="card bs-card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong><i class="bi bi-cash-stack me-1 text-primary"></i> Balance Sheet</strong>
+        <small class="text-muted" id="as_of">—</small>
+      </div>
+      <div class="card-body p-2">
+        <table class="table table-borderless metric-table mb-0">
+          <tbody>
+            <tr class="bs-section"><td colspan="2" class="bs-section-hdr">Capital flow — should sum to Allocated</td></tr>
+            <tr><td class="k">Allocated (deposits)</td><td class="v headline" id="bs_invested">—</td></tr>
+            <tr><td class="k" title="Cash sitting idle — not deployed in any position">+ Idle Cash</td><td class="v" id="bs_cash">—</td></tr>
+            <tr><td class="k" title="qty × entry price for currently held position">+ Cost Basis (open pos)</td><td class="v" id="bs_entry_cost">—</td></tr>
+            <tr><td class="k" title="Approximate BUY-side broker charges lifetime (formula-estimated)">+ Approx Buy Charges (lifetime)</td><td class="v neg" id="bs_buy_charges">—</td></tr>
+            <tr><td class="k" title="Approximate SELL-side broker charges lifetime (formula-estimated)">+ Approx Sell Charges (lifetime)</td><td class="v neg" id="bs_sell_charges">—</td></tr>
+            <tr><td class="k" id="bs_realized_label" title="Closed-trade gross P&L = qty × (sell_px − buy_px) before charges">± Closed-trade gross P&amp;L</td><td class="v" id="bs_realized_signed">—</td></tr>
+            <tr><td class="k"><strong>≈ Reconcile total</strong></td><td class="v headline" id="bs_reconcile">—</td></tr>
+            <tr><td colspan="2" style="font-size:0.72rem;color:#6c757d;padding:4px 12px;line-height:1.4;">
+              Approximate reconciliation. Charges are formula-estimated, not broker-exact — small drift expected.
+              Realized net (<span id="bs_realized_note">—</span>) ≈
+              Closed-trade gross (<span id="bs_realgross_note">—</span>)
+              − Approx sell charges (<span id="bs_sell_chg_note">—</span>).
+            </td></tr>
+            <tr class="bs-section"><td colspan="2" class="bs-section-hdr">Live position view</td></tr>
+            <tr><td class="k" title="Live MTM = qty × current LTP">Position Value (Live MTM)</td><td class="v" id="bs_position_value">—</td></tr>
+            <tr><td class="k" title="Current position P&L = Live MTM − Cost basis">Current Position P&amp;L</td><td class="v headline" id="bs_unrealized">—</td></tr>
+            <tr class="bs-section"><td colspan="2" class="bs-section-hdr">P&amp;L summary</td></tr>
+            <tr><td class="k" title="Realized P&L from closed trades">Realized P&amp;L (closed trades)</td><td class="v" id="bs_realized">—</td></tr>
+            <tr><td class="k" title="NAV − Allocated. Charges already deducted from cash at trade time."><strong>Total P&amp;L (NAV − Allocated)</strong></td><td class="v headline" id="bs_total_pnl">—</td></tr>
+            <tr><td class="k"><strong>NAV (cash + position MTM)</strong></td><td class="v headline" id="bs_nav">—</td></tr>
+            <tr><td class="k"><strong>Return %</strong></td><td class="v headline" id="bs_return_pct">—</td></tr>
+            <tr><td class="k">Trades (W / L)</td><td class="v" id="bs_trades">—</td></tr>
+            <tr><td class="k">Win Rate</td><td class="v" id="bs_win_rate">—</td></tr>
+            <tr><td class="k"><strong>Approx Txn Charges (lifetime)</strong></td><td class="v headline neg" id="bs_total_charges">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Open Position card -->
+  <div class="col-12 col-lg-6">
+    <div class="card bs-card h-100 pos-card">
+      <div class="card-header">
+        <strong><i class="bi bi-graph-up-arrow me-1 text-success"></i> Open Position</strong>
+      </div>
+      <div class="card-body" id="pos_body">
+        <div class="empty-state">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Transaction History -->
+<div class="card bs-card">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <strong><i class="bi bi-list-ul me-1 text-primary"></i> Transaction History</strong>
+    <div class="d-flex gap-3 small text-muted" id="txn_summary">—</div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover txn-table mb-0">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Model</th>
+            <th>Side</th>
+            <th>Symbol</th>
+            <th class="text-end">Qty</th>
+            <th class="text-end">Price</th>
+            <th class="text-end">Value</th>
+            <th class="text-end">P&amp;L</th>
+            <th>Reason</th>
+            <th>Order ID</th>
+          </tr>
+        </thead>
+        <tbody id="txn_body">
+          <tr><td colspan="10" class="empty-state">Loading transactions…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const MODEL_NAME = {{ model_name | tojson }};
+
+function fmtINR(v) {
+  if (v == null || v === '' || Number.isNaN(Number(v))) return '—';
+  const n = Number(v);
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(n);
+  return sign + '₹' + abs.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+function fmtPct(v) {
+  if (v == null || v === '' || Number.isNaN(Number(v))) return '—';
+  return Number(v).toFixed(2) + '%';
+}
+function fmtNum(v) {
+  if (v == null || v === '' || Number.isNaN(Number(v))) return '—';
+  return Number(v).toLocaleString('en-IN');
+}
+// Render in IST regardless of viewer locale (markets are Asia/Kolkata).
+const fmtDate = (iso) => window.fmtIST ? window.fmtIST(iso) : (iso || '—');
+function cls(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n === 0) return 'neutral';
+  return n > 0 ? 'pos' : 'neg';
+}
+
+async function loadBalanceSheet() {
+  try {
+    const r = await fetch(`/admin/${encodeURIComponent(MODEL_NAME)}/balance-sheet`);
+    const data = await r.json();
+    if (!data.success) throw new Error(data.error || 'failed');
+
+    // Header badge
+    const badge = document.getElementById('enabled_badge');
+    if (data.enabled) {
+      badge.className = 'live-badge';
+      badge.textContent = 'LIVE';
+    } else {
+      badge.className = 'disabled-badge';
+      badge.textContent = 'DISABLED';
+    }
+    document.getElementById('as_of').textContent =
+      'as of ' + fmtDate(data.as_of);
+
+    // Balance sheet table
+    const invNum = Number(data.invested_amount || 0);
+    const cashNum = Number(data.cash || 0);
+    const entryCost = Number(data.entry_cost_open || 0);
+    const lifetimeBuyChg = Number(data.buy_txn_charges || 0);
+    const lifetimeSellChg = Number(data.sell_txn_charges || 0);
+    const realNum = Number(data.realized_pnl || 0);
+    const realGross = Number(data.realized_pnl_gross || 0);
+
+    document.getElementById('bs_invested').textContent = fmtINR(invNum);
+    document.getElementById('bs_cash').textContent = fmtINR(cashNum);
+    document.getElementById('bs_entry_cost').innerHTML =
+      entryCost > 0 ? fmtINR(entryCost) : '<span class="text-muted">— (flat)</span>';
+    document.getElementById('bs_buy_charges').textContent = fmtINR(lifetimeBuyChg);
+    document.getElementById('bs_sell_charges').textContent = fmtINR(lifetimeSellChg);
+
+    // Full identity (sell chg visible, realized GROSS used in identity line):
+    //   alloc = cash + cost + buy_chg + sell_chg - realized_gross
+    // realized_gross = price diff only (= realized_net + sell_chg)
+    // For N20: 14983.63 + 14981.08 + 27.25 + 28.44 - 20.40 = 30000 ✓
+    // Sign on the realized line: GAIN (gross > 0) subtracts (price-diff in cash
+    // already); LOSS (gross < 0) adds back (money gone from cash).
+    const rsEl = document.getElementById('bs_realized_signed');
+    const rsLabel = document.getElementById('bs_realized_label');
+    rsLabel.innerHTML = realGross >= 0
+      ? '− Closed-trade gross gain'
+      : '+ Closed-trade gross loss';
+    rsEl.textContent = fmtINR(Math.abs(realGross));
+    rsEl.className = 'v ' + cls(realGross);
+
+    document.getElementById('bs_sell_chg_note').textContent = fmtINR(lifetimeSellChg);
+    document.getElementById('bs_realized_note').textContent = fmtINR(realNum);
+    document.getElementById('bs_realgross_note').textContent = fmtINR(realGross);
+
+    const reconEl = document.getElementById('bs_reconcile');
+    const reconSum = cashNum + entryCost + lifetimeBuyChg + lifetimeSellChg - realGross;
+    const drift = reconSum - invNum;
+    reconEl.innerHTML = `${fmtINR(reconSum)} <small class="${Math.abs(drift) < 1 ? 'text-success' : 'text-danger'}">` +
+      `(target ${fmtINR(invNum)}, drift ${drift >= 0 ? '+' : ''}${fmtINR(drift)})</small>`;
+
+    const posValueEl = document.getElementById('bs_position_value');
+    if (data.open_position) {
+      posValueEl.textContent = fmtINR(data.open_position.position_value);
+    } else {
+      posValueEl.innerHTML = '<span class="text-muted">— (flat)</span>';
+    }
+    const realizedEl = document.getElementById('bs_realized');
+    realizedEl.textContent = fmtINR(data.realized_pnl);
+    realizedEl.className = 'v ' + cls(data.realized_pnl);
+
+    const unrealEl = document.getElementById('bs_unrealized');
+    unrealEl.textContent = fmtINR(data.unrealized_pnl);
+    unrealEl.className = 'v ' + cls(data.unrealized_pnl);
+
+    const totalEl = document.getElementById('bs_total_pnl');
+    totalEl.textContent = fmtINR(data.total_pnl);
+    totalEl.className = 'v headline ' + cls(data.total_pnl);
+
+    document.getElementById('bs_nav').textContent = fmtINR(data.nav);
+    const retEl = document.getElementById('bs_return_pct');
+    retEl.textContent = fmtPct(data.return_pct);
+    retEl.className = 'v headline ' + cls(data.return_pct);
+
+    document.getElementById('bs_trades').textContent =
+      `${data.total_trades || 0} (${data.wins || 0}W / ${data.losses || 0}L)`;
+    document.getElementById('bs_win_rate').textContent = fmtPct(data.win_rate_pct);
+    // bs_buy_charges + bs_sell_charges already populated above (moved up).
+    document.getElementById('bs_total_charges').textContent = fmtINR(data.total_txn_charges);
+
+    // Open position card
+    const posBody = document.getElementById('pos_body');
+    if (data.open_position) {
+      const op = data.open_position;
+      const pnlCls = cls(op.unrealized_pnl);
+      posBody.innerHTML = `
+        <div class="pos-line mb-2">
+          <strong>${op.symbol}</strong>
+          <span class="text-muted">x ${fmtNum(op.qty)} shares</span>
+        </div>
+        <table class="table table-sm table-borderless mb-0 metric-table">
+          <tbody>
+            <tr><td class="k">Entry Price</td><td class="v">${fmtINR(op.entry_px)}</td></tr>
+            <tr><td class="k">Entry Date</td><td class="v">${op.entry_date ? (window.fmtISTDate ? window.fmtISTDate(op.entry_date) : op.entry_date) : '—'}</td></tr>
+            <tr><td class="k" title="qty × entry price (ex-charges)">Cost Basis</td><td class="v">${fmtINR(op.entry_cost)}</td></tr>
+            <tr><td class="k" title="Brokerage + STT + GST + exchange + SEBI + stamp paid on this BUY">Buy Charges</td><td class="v neg">${fmtINR(op.entry_charges)}</td></tr>
+            <tr><td class="k" title="Cost basis + buy charges = total INR deployed to open this position">Total Deployed</td><td class="v">${fmtINR(Number(op.entry_cost || 0) + Number(op.entry_charges || 0))}</td></tr>
+            <tr><td class="k">Current Price (MTM)</td><td class="v">${fmtINR(op.current_px)}</td></tr>
+            <tr><td class="k">Position Value (MTM)</td><td class="v">${fmtINR(op.position_value)}</td></tr>
+            <tr><td class="k"><strong>Unrealized P&amp;L</strong></td>
+                <td class="v headline ${pnlCls}">${fmtINR(op.unrealized_pnl)} <small>(${fmtPct(op.unrealized_pct)})</small></td></tr>
+          </tbody>
+        </table>
+      `;
+    } else {
+      posBody.innerHTML = '<div class="empty-state">No open position. Model is flat.</div>';
+    }
+  } catch (e) {
+    console.error('balance-sheet load failed', e);
+    document.getElementById('pos_body').innerHTML =
+      `<div class="empty-state text-danger">Error: ${e.message || e}</div>`;
+  }
+}
+
+async function loadTradeHistory() {
+  try {
+    const r = await fetch(`/admin/${encodeURIComponent(MODEL_NAME)}/trade-history`);
+    const data = await r.json();
+    if (!data.success) throw new Error(data.error || 'failed');
+
+    const trades = data.trades || [];
+    const sum = data.summary || {};
+
+    // Summary line
+    const totPnlCls = cls(sum.total_pnl);
+    document.getElementById('txn_summary').innerHTML = `
+      <span><strong>${sum.total_buys || 0}</strong> buys</span>
+      <span><strong>${sum.total_sells || 0}</strong> sells</span>
+      <span><strong>${sum.total_deposits || 0}</strong> deposits</span>
+      <span><strong>${sum.total_withdrawals || 0}</strong> withdrawals</span>
+      <span class="${totPnlCls}">Realized P&L: <strong>${fmtINR(sum.total_pnl)}</strong></span>
+      <span>Win rate: <strong>${fmtPct(sum.win_rate_pct)}</strong></span>
+    `;
+
+    const body = document.getElementById('txn_body');
+    if (!trades.length) {
+      body.innerHTML =
+        '<tr><td colspan="10" class="empty-state">No trades yet for this model.</td></tr>';
+      return;
+    }
+
+    const rows = trades.map(t => {
+      const side = (t.side || '').toUpperCase();
+      const pnlVal = t.pnl;
+      const pnlCell = pnlVal == null
+        ? '<span class="text-muted">—</span>'
+        : `<span class="${cls(pnlVal)}">${fmtINR(pnlVal)}</span>`;
+      const isCashflow = side === 'DEPOSIT' || side === 'WITHDRAW';
+      const sym = isCashflow ? '<span class="text-muted">—</span>' : (t.symbol || '—');
+      const qty = isCashflow ? '—' : fmtNum(t.qty);
+      const px  = isCashflow ? '—' : fmtINR(t.price);
+      return `
+        <tr>
+          <td>${fmtDate(t.trade_at)}</td>
+          <td><span class="model-tag">${t.model_name || MODEL_NAME}</span></td>
+          <td><span class="side-badge side-${side}">${side || '—'}</span></td>
+          <td><code>${sym}</code></td>
+          <td class="text-end">${qty}</td>
+          <td class="text-end">${px}</td>
+          <td class="text-end">${fmtINR(t.value)}</td>
+          <td class="text-end">${pnlCell}</td>
+          <td><small class="text-muted">${t.reason || ''}</small></td>
+          <td><small class="text-muted">${t.fyers_order_id || ''}</small></td>
+        </tr>
+      `;
+    }).join('');
+    body.innerHTML = rows;
+  } catch (e) {
+    console.error('trade-history load failed', e);
+    document.getElementById('txn_body').innerHTML =
+      `<tr><td colspan="10" class="empty-state text-danger">Error: ${e.message || e}</td></tr>`;
+  }
+}
+
+async function loadAll() {
+  await Promise.all([loadBalanceSheet(), loadTradeHistory()]);
+}
+
+document.getElementById('refresh_btn').addEventListener('click', loadAll);
+loadAll();
+</script>
+{% endblock %}

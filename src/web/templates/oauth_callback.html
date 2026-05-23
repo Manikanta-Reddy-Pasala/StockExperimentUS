@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FYERS OAuth Callback</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .callback-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 3rem;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        .success-icon {
+            color: #28a745;
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        .error-icon {
+            color: #dc3545;
+            font-size: 4rem;
+            margin-bottom: 1rem;
+        }
+        .message {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            color: #6c757d;
+        }
+        .btn-close {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 25px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .btn-close:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+        }
+        .spinner {
+            display: inline-block;
+            width: 2rem;
+            height: 2rem;
+            border: 0.25rem solid #f3f3f3;
+            border-top: 0.25rem solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="callback-container">
+        {% if success %}
+            <i class="bi bi-check-circle-fill success-icon"></i>
+            <h2 class="mb-3">Success!</h2>
+            <p class="message">{{ message }}</p>
+            <button class="btn-close" onclick="window.close()">
+                <i class="bi bi-x-circle me-2"></i>Close Window
+            </button>
+        {% else %}
+            <i class="bi bi-x-circle-fill error-icon"></i>
+            <h2 class="mb-3">Error</h2>
+            <p class="message">{{ message }}</p>
+            <button class="btn-close" onclick="window.close()">
+                <i class="bi bi-x-circle me-2"></i>Close Window
+            </button>
+        {% endif %}
+    </div>
+
+    <script>
+        // Auto-close window after 5 seconds if successful
+        {% if success %}
+        setTimeout(function() {
+            window.close();
+        }, 5000);
+        {% endif %}
+    </script>
+</body>
+</html>

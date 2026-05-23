@@ -1,0 +1,368 @@
+{% extends "v2/base.html" %}
+{% block title %}Audit — Forensics{% endblock %}
+{% block page_title %}Audit{% endblock %}
+
+{% block content %}
+<style>
+  .audit-tabs .nav-link { font-size: 0.85rem; }
+  .audit-table { font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+  .audit-table th { background: #fafbff; font-weight: 600; }
+  .audit-table td { padding: 4px 8px; vertical-align: middle; }
+  .filter-bar { background: #f8f9fa; padding: 8px 12px; border-radius: 6px; margin-bottom: 8px; }
+  .pos { color: #15a36b !important; } .neg { color: #d4453a !important; } .muted { color: #6c757d; }
+  .pill { font-size: 0.7rem; padding: 2px 8px; border-radius: 10px; }
+  .pill-buy   { background: #d4edda; color: #155724; }
+  .pill-sell  { background: #f8d7da; color: #721c24; }
+  .pill-hold  { background: #fff3cd; color: #856404; }
+  .pill-ok    { background: #d4edda; color: #155724; }
+  .pill-fail  { background: #f8d7da; color: #721c24; }
+  .pill-skip  { background: #e2e3e5; color: #41464b; }
+</style>
+
+<h2 class="h5 mb-3"><i class="bi bi-journal-check me-2"></i>Audit Forensics</h2>
+
+<ul class="nav nav-tabs audit-tabs" id="auditTab" role="tablist">
+  <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-orders">Orders</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-decisions">Decisions</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-rankings">Rankings</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-signals">Signals</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-config">Config Changes</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-data">Data Quality</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-system">System Events</button></li>
+  <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-charges">Broker Charges</button></li>
+</ul>
+
+<div class="tab-content border border-top-0 p-3 bg-white">
+
+  <div class="tab-pane fade show active" id="tab-orders">
+    <div class="filter-bar d-flex gap-2 align-items-center">
+      <label class="small mb-0">Model:</label>
+      <select id="orders-model" class="form-select form-select-sm" style="width:auto;">
+        <option value="">All</option>
+      </select>
+      <label class="small mb-0">Days:</label>
+      <select id="orders-days" class="form-select form-select-sm" style="width:auto;">
+        <option>7</option><option selected>30</option><option>90</option>
+      </select>
+      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadOrders()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm audit-table"><thead><tr>
+        <th>Placed (IST)</th><th>Model</th><th>Symbol</th><th>Side</th>
+        <th class="text-end">Qty</th><th class="text-end">Ordered ₹</th><th class="text-end">Fill ₹</th>
+        <th>Status</th><th class="text-end">Slippage</th><th class="text-end" title="Brokerage + STT + GST + exchange + SEBI + stamp + DP">Charges ₹</th><th>Order ID</th>
+      </tr></thead><tbody id="orders-body"><tr><td colspan="11" class="text-center muted">Loading…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="tab-decisions">
+    <div class="filter-bar d-flex gap-2 align-items-center">
+      <label class="small mb-0">Model:</label>
+      <select id="dec-model" class="form-select form-select-sm" style="width:auto;"><option value="">All</option></select>
+      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadDecisions()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm audit-table"><thead><tr>
+        <th>Decided (IST)</th><th>Model</th><th>Trigger</th><th>Decision</th>
+        <th>Held</th><th>Rank-1</th><th class="text-end">Qty sized</th><th class="text-end">Clamped</th><th>Reason</th>
+      </tr></thead><tbody id="dec-body"><tr><td colspan="9" class="text-center muted">Loading…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="tab-rankings">
+    <div class="filter-bar d-flex gap-2 align-items-center">
+      <label class="small mb-0">Model:</label>
+      <select id="rk-model" class="form-select form-select-sm" style="width:auto;"><option value="">All</option></select>
+      <label class="small mb-0">Date (YYYY-MM-DD):</label>
+      <input id="rk-date" type="date" class="form-control form-control-sm" style="width:auto;">
+      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadRankings()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm audit-table"><thead><tr>
+        <th>Date</th><th>Model</th><th class="text-end">Rank</th><th>Symbol</th>
+        <th class="text-end">Score</th><th class="text-end">Price</th>
+        <th class="text-end">Universe</th><th class="text-end">Qualifying</th>
+      </tr></thead><tbody id="rk-body"><tr><td colspan="8" class="text-center muted">Loading…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="tab-signals">
+    <div class="filter-bar d-flex gap-2 align-items-center">
+      <label class="small mb-0">Model:</label>
+      <select id="sig-model" class="form-select form-select-sm" style="width:auto;"><option value="">All</option></select>
+      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadSignals()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm audit-table"><thead><tr>
+        <th>Emitted (IST)</th><th>Date</th><th>Model</th><th>Type</th><th>Symbol</th><th>Side</th>
+        <th class="text-end">Price</th><th>Reason</th>
+      </tr></thead><tbody id="sig-body"><tr><td colspan="8" class="text-center muted">Loading…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="tab-config">
+    <div class="filter-bar d-flex gap-2 align-items-center">
+      <label class="small mb-0">Model:</label>
+      <select id="cfg-model" class="form-select form-select-sm" style="width:auto;"><option value="">All</option></select>
+      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadConfig()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm audit-table"><thead><tr>
+        <th>When (IST)</th><th>By</th><th>Model</th><th>Field</th><th>Old → New</th><th>Reason</th>
+      </tr></thead><tbody id="cfg-body"><tr><td colspan="6" class="text-center muted">Loading…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="tab-data">
+    <div class="filter-bar"><button class="btn btn-sm btn-outline-primary" onclick="loadDataQ()"><i class="bi bi-arrow-clockwise"></i> Refresh</button></div>
+    <div class="table-responsive">
+      <table class="table table-sm audit-table"><thead><tr>
+        <th>Snapshot (IST)</th><th>Model</th><th>Wired</th><th>Sufficient</th>
+        <th class="text-end">Universe</th><th class="text-end">Universe Age</th>
+        <th class="text-end">Coverage %</th><th class="text-end">Stale Days</th>
+      </tr></thead><tbody id="dq-body"><tr><td colspan="8" class="text-center muted">Loading…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="tab-system">
+    <div class="filter-bar"><button class="btn btn-sm btn-outline-primary" onclick="loadSysEvents()"><i class="bi bi-arrow-clockwise"></i> Refresh</button></div>
+    <div class="table-responsive">
+      <table class="table table-sm audit-table"><thead><tr>
+        <th>When (IST)</th><th>Type</th><th>Component</th><th>Metadata</th>
+      </tr></thead><tbody id="sys-body"><tr><td colspan="4" class="text-center muted">Loading…</td></tr></tbody></table>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="tab-charges">
+    <div class="filter-bar d-flex gap-2 align-items-center">
+      <label class="small mb-0">Days:</label>
+      <select id="charges-days" class="form-select form-select-sm" style="width:auto;">
+        <option>30</option><option>90</option><option selected>365</option><option>3650</option>
+      </select>
+      <span class="text-muted small">Brokerage + STT + GST + exchange + SEBI + stamp + DP (SEBI rates, CNC delivery)</span>
+      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadCharges()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm audit-table"><thead><tr>
+        <th>Model</th>
+        <th class="text-end">BUYs</th><th class="text-end">BUY Charges ₹</th><th class="text-end">BUY Turnover ₹</th>
+        <th class="text-end">SELLs</th><th class="text-end">SELL Charges ₹</th><th class="text-end">SELL Turnover ₹</th>
+        <th class="text-end"><strong>Total Charges ₹</strong></th>
+        <th class="text-end" title="Total charges as % of total turnover">% Turnover</th>
+      </tr></thead><tbody id="charges-body"><tr><td colspan="9" class="text-center muted">Loading…</td></tr></tbody></table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const fmtINR = n => (n==null || isNaN(n)) ? '—' : '₹' + Number(n).toLocaleString('en-IN', {maximumFractionDigits:2});
+const fmtT = iso => window.fmtIST ? window.fmtIST(iso) : (iso || '—');
+const fmtD = iso => window.fmtISTDate ? window.fmtISTDate(iso) : (iso || '—');
+const cls = n => (n>0?'pos':(n<0?'neg':'muted'));
+const sidePill = s => `<span class="pill ${s==='BUY'?'pill-buy':(s==='SELL'?'pill-sell':'pill-skip')}">${s||'—'}</span>`;
+
+const ALL_MODELS = [
+  'momentum_n100_top5_max1',
+  'momentum_pseudo_n100_adv',
+  'midcap_narrow_60d_breakout',
+  'n20_daily_large_only',
+  'finnifty_ic_otm4_w300_lots5',
+];
+
+// Populate all model dropdowns once
+['orders-model','dec-model','rk-model','sig-model','cfg-model'].forEach(id => {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  ALL_MODELS.forEach(m => {
+    const o = document.createElement('option'); o.value = m; o.textContent = m;
+    sel.appendChild(o);
+  });
+});
+
+async function _get(url) {
+  const r = await fetch(url, {cache:'no-store'});
+  return await r.json();
+}
+
+async function loadOrders() {
+  const model = document.getElementById('orders-model').value;
+  const days = document.getElementById('orders-days').value;
+  const u = `/admin/audit/orders?days=${days}` + (model ? `&model=${encodeURIComponent(model)}` : '');
+  const d = await _get(u);
+  const body = document.getElementById('orders-body');
+  if (!d.success) { body.innerHTML = `<tr><td colspan="11" class="text-danger">${d.error||'err'}</td></tr>`; return; }
+  body.innerHTML = (d.orders || []).map(o => `
+    <tr>
+      <td>${fmtT(o.placed_at)}</td>
+      <td><code class="small">${o.model_name||'—'}</code></td>
+      <td><strong>${o.symbol}</strong></td>
+      <td>${sidePill(o.side)}</td>
+      <td class="text-end">${o.qty}</td>
+      <td class="text-end">${fmtINR(o.ordered_price)}</td>
+      <td class="text-end">${fmtINR(o.fill_price)}</td>
+      <td><span class="pill ${o.status==='placed'||o.status==='filled'?'pill-ok':'pill-fail'}">${o.status}</span></td>
+      <td class="text-end ${cls(-(o.slippage_inr||0))}">${o.slippage_inr==null?'—':fmtINR(o.slippage_inr)}</td>
+      <td class="text-end neg">${o.charges_inr==null?'—':fmtINR(o.charges_inr)}</td>
+      <td><code class="small">${o.fyers_order_id||'—'}</code></td>
+    </tr>`).join('') || '<tr><td colspan="11" class="text-center muted">No orders.</td></tr>';
+}
+
+async function loadCharges() {
+  const days = document.getElementById('charges-days').value;
+  const d = await _get(`/admin/audit/charges-summary?days=${days}`);
+  const body = document.getElementById('charges-body');
+  if (!d.success) { body.innerHTML = `<tr><td colspan="9" class="text-danger">${d.error||'err'}</td></tr>`; return; }
+  const rows = d.by_model || [];
+  let html = rows.map(r => `
+    <tr>
+      <td><code class="small">${r.model_name}</code></td>
+      <td class="text-end">${r.buy_count}</td>
+      <td class="text-end neg">${fmtINR(r.buy_charges)}</td>
+      <td class="text-end">${fmtINR(r.buy_turnover)}</td>
+      <td class="text-end">${r.sell_count}</td>
+      <td class="text-end neg">${fmtINR(r.sell_charges)}</td>
+      <td class="text-end">${fmtINR(r.sell_turnover)}</td>
+      <td class="text-end neg"><strong>${fmtINR(r.total_charges)}</strong></td>
+      <td class="text-end">${r.charges_pct_of_turnover.toFixed(3)}%</td>
+    </tr>`).join('');
+  const t = d.total || {};
+  html += `
+    <tr style="background:#f0f3ff; font-weight:600;">
+      <td><strong>TOTAL</strong></td>
+      <td class="text-end">${t.buy_count||0}</td>
+      <td class="text-end neg">${fmtINR(t.buy_charges)}</td>
+      <td class="text-end">${fmtINR(t.buy_turnover)}</td>
+      <td class="text-end">${t.sell_count||0}</td>
+      <td class="text-end neg">${fmtINR(t.sell_charges)}</td>
+      <td class="text-end">${fmtINR(t.sell_turnover)}</td>
+      <td class="text-end neg"><strong>${fmtINR(t.total_charges)}</strong></td>
+      <td class="text-end">${(t.charges_pct_of_turnover||0).toFixed(3)}%</td>
+    </tr>`;
+  body.innerHTML = html || '<tr><td colspan="9" class="text-center muted">No charges yet — first trade pending.</td></tr>';
+}
+
+async function loadDecisions() {
+  const model = document.getElementById('dec-model').value;
+  const d = await _get(`/admin/audit/decisions?days=30` + (model?`&model=${encodeURIComponent(model)}`:''));
+  const body = document.getElementById('dec-body');
+  if (!d.success) { body.innerHTML = `<tr><td colspan="9" class="text-danger">${d.error||'err'}</td></tr>`; return; }
+  body.innerHTML = (d.decisions || []).map(x => `
+    <tr>
+      <td>${fmtT(x.decided_at)}</td>
+      <td><code class="small">${x.model_name}</code></td>
+      <td>${x.trigger}</td>
+      <td><span class="pill ${x.decision==='OPEN'||x.decision==='ROTATE'?'pill-ok':'pill-skip'}">${x.decision}</span></td>
+      <td>${x.held_symbol ? `${x.held_symbol} ×${x.held_qty||0}` : '<span class="muted">flat</span>'}</td>
+      <td>${x.rank1_symbol||'—'} ${x.rank1_price?'@ '+fmtINR(x.rank1_price):''}</td>
+      <td class="text-end">${x.qty_sized||0}</td>
+      <td class="text-end">${x.qty_clamped||0}</td>
+      <td class="small">${x.reason||''}</td>
+    </tr>`).join('') || '<tr><td colspan="9" class="text-center muted">No decisions.</td></tr>';
+}
+
+async function loadRankings() {
+  const model = document.getElementById('rk-model').value;
+  const date = document.getElementById('rk-date').value;
+  let u = `/admin/audit/rankings?days=7`;
+  if (model) u += `&model=${encodeURIComponent(model)}`;
+  if (date) u += `&date=${date}`;
+  const d = await _get(u);
+  const body = document.getElementById('rk-body');
+  if (!d.success) { body.innerHTML = `<tr><td colspan="8" class="text-danger">${d.error||'err'}</td></tr>`; return; }
+  body.innerHTML = (d.rankings || []).map(r => `
+    <tr>
+      <td>${fmtD(r.trading_date)}</td>
+      <td><code class="small">${r.model_name}</code></td>
+      <td class="text-end"><strong>${r.rank}</strong></td>
+      <td><strong>${r.symbol}</strong> <span class="muted small">${r.name||''}</span></td>
+      <td class="text-end ${cls(r.score)}">${r.score!=null?Number(r.score).toFixed(2)+'%':'—'}</td>
+      <td class="text-end">${fmtINR(r.price)}</td>
+      <td class="text-end">${r.universe_size||'—'}</td>
+      <td class="text-end">${r.qualifying_count||'—'}</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="text-center muted">No rankings.</td></tr>';
+}
+
+async function loadSignals() {
+  const model = document.getElementById('sig-model').value;
+  const d = await _get(`/admin/audit/signals?days=30` + (model?`&model=${encodeURIComponent(model)}`:''));
+  const body = document.getElementById('sig-body');
+  if (!d.success) { body.innerHTML = `<tr><td colspan="8" class="text-danger">${d.error||'err'}</td></tr>`; return; }
+  body.innerHTML = (d.signals || []).map(s => `
+    <tr>
+      <td>${fmtT(s.emitted_at)}</td>
+      <td>${fmtD(s.trading_date)}</td>
+      <td><code class="small">${s.model_name}</code></td>
+      <td><span class="pill ${s.signal_type==='HOLD'?'pill-hold':(s.signal_type.startsWith('ENTRY')?'pill-ok':'pill-skip')}">${s.signal_type}</span></td>
+      <td>${s.symbol||'—'}</td>
+      <td>${sidePill(s.side)}</td>
+      <td class="text-end">${fmtINR(s.price)}</td>
+      <td class="small">${s.reason||''}</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="text-center muted">No signals.</td></tr>';
+}
+
+async function loadConfig() {
+  const model = document.getElementById('cfg-model').value;
+  const d = await _get(`/admin/audit/config-changes?days=30` + (model?`&model=${encodeURIComponent(model)}`:''));
+  const body = document.getElementById('cfg-body');
+  if (!d.success) { body.innerHTML = `<tr><td colspan="6" class="text-danger">${d.error||'err'}</td></tr>`; return; }
+  body.innerHTML = (d.changes || []).map(c => `
+    <tr>
+      <td>${fmtT(c.changed_at)}</td>
+      <td><code class="small">${c.changed_by||'—'}</code></td>
+      <td><code class="small">${c.model_name||'—'}</code></td>
+      <td><strong>${c.field}</strong></td>
+      <td class="small">${JSON.stringify(c.old_value&&c.old_value.v)} → ${JSON.stringify(c.new_value&&c.new_value.v)}</td>
+      <td><span class="pill pill-skip">${c.reason||''}</span></td>
+    </tr>`).join('') || '<tr><td colspan="6" class="text-center muted">No config changes.</td></tr>';
+}
+
+async function loadDataQ() {
+  const d = await _get(`/admin/audit/data-quality?days=90`);
+  const body = document.getElementById('dq-body');
+  if (!d.success) { body.innerHTML = `<tr><td colspan="8" class="text-danger">${d.error||'err'}</td></tr>`; return; }
+  body.innerHTML = (d.snapshots || []).map(x => `
+    <tr>
+      <td>${fmtT(x.snapshot_at)}</td>
+      <td><code class="small">${x.model_name}</code></td>
+      <td><span class="pill ${x.wired?'pill-ok':'pill-skip'}">${x.wired?'WIRED':'UNWIRED'}</span></td>
+      <td><span class="pill ${x.data_sufficient?'pill-ok':'pill-fail'}">${x.data_sufficient?'OK':'STALE'}</span></td>
+      <td class="text-end">${x.universe_size||'—'}</td>
+      <td class="text-end">${x.universe_age_days==null?'—':x.universe_age_days+'d'}</td>
+      <td class="text-end">${x.coverage_pct==null?'—':Number(x.coverage_pct).toFixed(1)+'%'}</td>
+      <td class="text-end">${x.stale_days==null?'—':x.stale_days+'d'}</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="text-center muted">No data-quality snapshots yet — first run at 22:05 IST.</td></tr>';
+}
+
+async function loadSysEvents() {
+  const d = await _get(`/admin/audit/system-events?days=7`);
+  const body = document.getElementById('sys-body');
+  if (!d.success) { body.innerHTML = `<tr><td colspan="4" class="text-danger">${d.error||'err'}</td></tr>`; return; }
+  body.innerHTML = (d.events || []).map(e => `
+    <tr>
+      <td>${fmtT(e.event_at)}</td>
+      <td><span class="pill pill-skip">${e.event_type}</span></td>
+      <td><code class="small">${e.component}</code></td>
+      <td class="small"><code>${JSON.stringify(e.metadata)}</code></td>
+    </tr>`).join('') || '<tr><td colspan="4" class="text-center muted">No events.</td></tr>';
+}
+
+// Lazy-load on tab show
+document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(b => {
+  b.addEventListener('shown.bs.tab', () => {
+    const t = b.dataset.bsTarget;
+    if (t==='#tab-orders') loadOrders();
+    else if (t==='#tab-decisions') loadDecisions();
+    else if (t==='#tab-rankings') loadRankings();
+    else if (t==='#tab-signals') loadSignals();
+    else if (t==='#tab-config') loadConfig();
+    else if (t==='#tab-data') loadDataQ();
+    else if (t==='#tab-system') loadSysEvents();
+    else if (t==='#tab-charges') loadCharges();
+  });
+});
+loadOrders();
+</script>
+{% endblock %}

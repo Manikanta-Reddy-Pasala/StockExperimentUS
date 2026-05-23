@@ -1,0 +1,1148 @@
+{% extends "v2/base.html" %}
+
+{% block title %}Admin Triggers{% endblock %}
+
+{% block page_title %}Admin Triggers{% endblock %}
+
+{% block content %}
+<style>
+    .task-card {
+        transition: transform 0.3s, box-shadow 0.3s;
+        border-left: 4px solid #667eea;
+    }
+
+    .task-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 40px rgba(0,0,0,0.1);
+    }
+
+    .btn-trigger {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+        padding: 10px 20px;
+        font-weight: 600;
+        transition: opacity 0.3s, transform 0.3s;
+    }
+
+    .btn-trigger:hover {
+        opacity: 0.9;
+        transform: scale(1.02);
+        color: white;
+    }
+
+    .btn-trigger:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .btn-danger-trigger {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+
+    .btn-success-trigger {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+
+    .stat-card {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        border-left: 4px solid #667eea;
+    }
+
+    .stat-label {
+        color: #666;
+        font-size: 12px;
+        text-transform: uppercase;
+        margin-bottom: 5px;
+    }
+
+    .stat-value {
+        color: #333;
+        font-size: 28px;
+        font-weight: 700;
+    }
+
+    .task-log {
+        background: #1e1e1e;
+        color: #00ff00;
+        padding: 20px;
+        border-radius: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 13px;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .log-entry {
+        margin-bottom: 5px;
+        padding: 5px;
+        border-left: 3px solid #00ff00;
+        padding-left: 10px;
+    }
+
+    .log-entry.error {
+        color: #ff4444;
+        border-left-color: #ff4444;
+    }
+
+    .log-entry.success {
+        color: #00ff00;
+        border-left-color: #00ff00;
+    }
+
+    .log-entry.info {
+        color: #4444ff;
+        border-left-color: #4444ff;
+    }
+
+    .log-entry.warning {
+        color: #ffa500;
+        border-left-color: #ffa500;
+    }
+
+    .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 3px solid rgba(255,255,255,.3);
+        border-radius: 50%;
+        border-top-color: #fff;
+        animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .badge-status {
+        padding: 6px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .badge-running {
+        background: #ffd93d;
+        color: #333;
+    }
+
+    .badge-completed {
+        background: #6bcf7f;
+        color: white;
+    }
+
+    .badge-failed {
+        background: #ff6b6b;
+        color: white;
+    }
+
+    .badge-pending {
+        background: #95a5a6;
+        color: white;
+    }
+
+    .step-item {
+        padding: 10px;
+        margin: 5px 0;
+        border-radius: 6px;
+        background: #f8f9fa;
+        border-left: 4px solid #ccc;
+    }
+
+    .step-item.running {
+        border-left-color: #ffd93d;
+        background: #fffef0;
+    }
+
+    .step-item.completed {
+        border-left-color: #6bcf7f;
+        background: #f0fff4;
+    }
+
+    .step-item.failed {
+        border-left-color: #ff6b6b;
+        background: #fff5f5;
+    }
+
+    .step-item.pending {
+        border-left-color: #95a5a6;
+        background: #f8f9fa;
+    }
+
+    .step-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        margin-right: 10px;
+        font-size: 12px;
+        font-weight: bold;
+    }
+
+    .step-icon.completed {
+        background: #6bcf7f;
+        color: white;
+    }
+
+    .step-icon.running {
+        background: #ffd93d;
+        color: #333;
+    }
+
+    .step-icon.failed {
+        background: #ff6b6b;
+        color: white;
+    }
+
+    .step-icon.pending {
+        background: #95a5a6;
+        color: white;
+    }
+
+    .step-progress-container {
+        margin-top: 15px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .step-description {
+        flex: 1;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .step-time {
+        font-size: 12px;
+        color: #666;
+        margin-left: 10px;
+    }
+
+    /* Wizard Progress Bar */
+    .wizard-container {
+        margin-top: 20px;
+        padding: 20px;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .wizard-progress-bar {
+        position: relative;
+        width: 100%;
+        height: 4px;
+        background: #e0e0e0;
+        border-radius: 2px;
+        margin: 30px 0 40px 0;
+    }
+
+    .wizard-progress-fill {
+        position: absolute;
+        height: 100%;
+        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        border-radius: 2px;
+        transition: width 0.5s ease;
+    }
+
+    .wizard-steps {
+        position: relative;
+        display: flex;
+        justify-content: space-between;
+        margin-top: -52px;
+        margin-bottom: 20px;
+    }
+
+    .wizard-step {
+        flex: 1;
+        text-align: center;
+        position: relative;
+    }
+
+    .wizard-step-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #e0e0e0;
+        color: #666;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 16px;
+        margin: 0 auto;
+        position: relative;
+        z-index: 2;
+        transition: all 0.3s ease;
+        border: 3px solid white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .wizard-step.completed .wizard-step-circle {
+        background: linear-gradient(135deg, #6bcf7f 0%, #4caf50 100%);
+        color: white;
+    }
+
+    .wizard-step.running .wizard-step-circle {
+        background: linear-gradient(135deg, #ffd93d 0%, #ffb300 100%);
+        color: #333;
+        animation: pulse 2s infinite;
+    }
+
+    .wizard-step.failed .wizard-step-circle {
+        background: linear-gradient(135deg, #ff6b6b 0%, #f44336 100%);
+        color: white;
+    }
+
+    .wizard-step.pending .wizard-step-circle {
+        background: #f5f5f5;
+        color: #999;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+
+    .wizard-step-label {
+        margin-top: 10px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #666;
+        line-height: 1.3;
+    }
+
+    .wizard-step.completed .wizard-step-label {
+        color: #4caf50;
+    }
+
+    .wizard-step.running .wizard-step-label {
+        color: #ffb300;
+    }
+
+    .wizard-step.failed .wizard-step-label {
+        color: #f44336;
+    }
+
+    .wizard-step-time {
+        font-size: 10px;
+        color: #999;
+        margin-top: 3px;
+    }
+
+    /* Step Details Table */
+    .step-details-table {
+        margin-top: 20px;
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .step-details-table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+
+    .step-details-table th {
+        padding: 12px 15px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .step-details-table th:first-child {
+        border-radius: 8px 0 0 0;
+    }
+
+    .step-details-table th:last-child {
+        border-radius: 0 8px 0 0;
+    }
+
+    .step-details-table tbody tr {
+        background: white;
+        border-bottom: 1px solid #f0f0f0;
+        transition: background 0.2s;
+    }
+
+    .step-details-table tbody tr:hover {
+        background: #f8f9ff;
+    }
+
+    .step-details-table tbody tr:last-child td:first-child {
+        border-radius: 0 0 0 8px;
+    }
+
+    .step-details-table tbody tr:last-child td:last-child {
+        border-radius: 0 0 8px 0;
+    }
+
+    .step-details-table td {
+        padding: 15px;
+        font-size: 13px;
+    }
+
+    .step-status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .step-status-badge.completed {
+        background: #e8f5e9;
+        color: #2e7d32;
+    }
+
+    .step-status-badge.running {
+        background: #fff9e6;
+        color: #f57c00;
+    }
+
+    .step-status-badge.failed {
+        background: #ffebee;
+        color: #c62828;
+    }
+
+    .step-status-badge.pending {
+        background: #f5f5f5;
+        color: #757575;
+    }
+
+    .step-error-detail {
+        font-size: 11px;
+        color: #d32f2f;
+        margin-top: 5px;
+        padding: 5px 10px;
+        background: #ffebee;
+        border-radius: 4px;
+        border-left: 3px solid #f44336;
+    }
+
+    .overall-progress {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding: 15px;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        border-radius: 8px;
+    }
+
+    .overall-progress-label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #333;
+    }
+
+    .overall-progress-value {
+        font-size: 18px;
+        font-weight: 700;
+        color: #667eea;
+    }
+</style>
+
+<!-- System Status -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card task-card">
+            <div class="card-header bg-gradient-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>System Status</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3" id="systemStatus">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-label">Total Stocks</div>
+                            <div class="stat-value" id="totalStocks">-</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-label">Historical Records</div>
+                            <div class="stat-value" id="historyRecords">-</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-label">Latest Data</div>
+                            <div class="stat-value" id="latestData">-</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="stat-card">
+                            <div class="stat-label">Daily Snapshots</div>
+                            <div class="stat-value" id="snapshots">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Per-Model Data Status -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card task-card">
+            <div class="card-header bg-gradient-success text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-bar-chart-line-fill me-2"></i>Per-Model Data Status</h5>
+                <button class="btn btn-sm btn-outline-light" onclick="loadModelStatus()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="modelStatusList" class="row g-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Log -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card task-card">
+            <div class="card-header bg-gradient-dark text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-terminal-fill me-2"></i>Task Log</h5>
+                <button class="btn btn-sm btn-outline-light" onclick="clearLog()">
+                    <i class="bi bi-trash3-fill"></i> Clear
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="task-log" id="taskLog">
+                    <div class="log-entry info">Ready to execute tasks...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let activeTasks = new Map();
+let taskTimers = new Map();
+
+// Load system status
+async function loadSystemStatus() {
+    try {
+        const response = await fetch('/admin/system/status');
+        const data = await response.json();
+
+        if (data.success) {
+            const status = data.status;
+            document.getElementById('totalStocks').textContent = status.stocks.total.toLocaleString();
+            document.getElementById('historyRecords').textContent = status.historical_data.records.toLocaleString();
+            document.getElementById('latestData').textContent = status.stocks.last_updated ? status.stocks.last_updated.split('T')[0] : '-';
+            document.getElementById('snapshots').textContent = status.daily_snapshots.total.toLocaleString();
+        }
+    } catch (error) {
+        console.error('Error loading status:', error);
+        addLog('Error loading system status: ' + error.message, 'error');
+    }
+}
+
+// Load per-model data status
+async function loadModelStatus() {
+    const root = document.getElementById('modelStatusList');
+    root.innerHTML = '<div class="col-12 text-muted">Loading…</div>';
+    try {
+        const response = await fetch('/admin/system/models-status');
+        const data = await response.json();
+        if (!data.success) {
+            root.innerHTML = '<div class="col-12 text-danger">Error: ' + (data.error || 'unknown') + '</div>';
+            return;
+        }
+        root.innerHTML = data.models.map(renderModelCard).join('');
+    } catch (error) {
+        root.innerHTML = '<div class="col-12 text-danger">Error: ' + error.message + '</div>';
+    }
+}
+
+function renderModelCard(m) {
+    const badge = m.data_sufficient
+        ? '<span class="badge bg-success">DATA OK</span>'
+        : '<span class="badge bg-warning text-dark">DATA STALE/MISSING</span>';
+    const wired = m.wired
+        ? '<span class="badge bg-primary ms-1">WIRED</span>'
+        : '<span class="badge bg-secondary ms-1">UNWIRED</span>';
+    const rows = (m.items || []).map(it => {
+        const icon = it.ok
+            ? '<i class="bi bi-check-circle-fill text-success"></i>'
+            : '<i class="bi bi-x-circle-fill text-danger"></i>';
+        const val = (typeof it.value === 'number') ? it.value.toLocaleString() : it.value;
+        const extra = it.extra ? `<span class="text-muted small ms-2">(${it.extra})</span>` : '';
+        return `<tr><td>${icon} ${it.label}</td><td class="text-end"><strong>${val}</strong>${extra}</td><td class="text-muted small">${it.required}</td></tr>`;
+    }).join('');
+    return `
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><strong>${m.name}</strong> <small class="text-muted">(${m.type})</small></span>
+                <span>${badge} ${wired}</span>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr><th>Check</th><th class="text-end">Value</th><th>Required</th></tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+            <div class="card-footer text-end">
+                <button class="btn btn-sm btn-primary" onclick="triggerModelDataPull('${m.name}')">
+                    <i class="bi bi-arrow-down-circle"></i> Pull Data Now
+                </button>
+            </div>
+        </div>
+    </div>`;
+}
+
+async function triggerModelDataPull(modelName) {
+    addLog('Starting data pull for ' + modelName + '...', 'info');
+    try {
+        const r = await fetch('/admin/trigger/model/' + encodeURIComponent(modelName), {method: 'POST'});
+        const d = await r.json();
+        if (d.success) {
+            addLog('✓ Data pull queued (task ' + d.task_id + '): ' + (d.jobs || []).join(', '), 'success');
+            setTimeout(loadModelStatus, 5000);
+        } else {
+            addLog('✗ Failed: ' + (d.error || 'unknown'), 'error');
+        }
+    } catch (e) {
+        addLog('✗ Error: ' + e.message, 'error');
+    }
+}
+
+// Add log entry
+function addLog(message, type = 'info') {
+    const log = document.getElementById('taskLog');
+    const entry = document.createElement('div');
+    entry.className = `log-entry ${type}`;
+    entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+    log.insertBefore(entry, log.firstChild);
+
+    // Keep only last 100 entries
+    while (log.children.length > 100) {
+        log.removeChild(log.lastChild);
+    }
+}
+
+// Clear log
+function clearLog() {
+    const log = document.getElementById('taskLog');
+    log.innerHTML = '<div class="log-entry info">[' + new Date().toLocaleTimeString() + '] Log cleared</div>';
+}
+
+// Trigger single task
+async function triggerTask(taskType, taskName) {
+    try {
+        addLog(`Starting ${taskName}...`, 'info');
+
+        const response = await fetch(`/admin/trigger/${taskType}`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            addLog(`✓ ${taskName} started (Task ID: ${data.task_id})`, 'success');
+            activeTasks.set(data.task_id, {name: taskName, type: taskType});
+            updateActiveTasks();
+            monitorTask(data.task_id, taskName);
+        } else {
+            addLog(`✗ Failed to start ${taskName}: ${data.error || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        addLog(`✗ Error starting ${taskName}: ${error.message}`, 'error');
+    }
+}
+
+// Trigger all tasks
+async function triggerAll() {
+    if (!confirm('This will run all tasks sequentially and may take 45-60 minutes. Continue?')) {
+        return;
+    }
+
+    document.getElementById('runAllBtn').disabled = true;
+
+    try {
+        addLog('Starting complete pipeline...', 'info');
+
+        const response = await fetch('/admin/trigger/all', {
+            method: 'POST'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            addLog(`✓ Complete pipeline started (Task ID: ${data.task_id})`, 'success');
+            activeTasks.set(data.task_id, {name: 'Complete Pipeline', type: 'all'});
+            updateActiveTasks();
+            monitorTask(data.task_id, 'Complete Pipeline');
+        } else {
+            addLog('✗ Failed to start complete pipeline: ' + (data.error || 'Unknown error'), 'error');
+            document.getElementById('runAllBtn').disabled = false;
+        }
+    } catch (error) {
+        addLog(`✗ Error starting complete pipeline: ${error.message}`, 'error');
+        document.getElementById('runAllBtn').disabled = false;
+    }
+}
+
+// Retry failed task
+async function retryTask(taskId, taskType, taskName) {
+    addLog(`Retrying ${taskName}...`, 'info');
+
+    // Remove old task from tracking
+    activeTasks.delete(taskId);
+    if (taskTimers.has(taskId)) {
+        clearInterval(taskTimers.get(taskId));
+        taskTimers.delete(taskId);
+    }
+
+    // Trigger the task again
+    triggerTask(taskType, taskName);
+}
+
+// Retry only failed steps
+async function retryFailedSteps(taskId) {
+    try {
+        addLog('Retrying failed steps...', 'info');
+
+        const response = await fetch(`/admin/task/${taskId}/retry-failed`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+
+        if (data.success) {
+            addLog(`✓ Failed steps retry started (Task ID: ${data.task_id})`, 'success');
+            activeTasks.set(data.task_id, {name: 'Retry Failed Steps', type: 'retry'});
+            updateActiveTasks();
+            monitorTask(data.task_id, 'Retry Failed Steps');
+        } else {
+            addLog(`✗ Failed to retry: ${data.error || 'Unknown error'}`, 'error');
+        }
+    } catch (error) {
+        addLog(`✗ Error retrying failed steps: ${error.message}`, 'error');
+    }
+}
+
+// Retry single step
+async function retrySingleStep(stepType, stepDescription) {
+    const taskTypeMap = {
+        'pipeline': 'pipeline',
+        'csv_export': 'csv-export'
+    };
+
+    const taskType = taskTypeMap[stepType] || stepType;
+    addLog(`Retrying step: ${stepDescription}...`, 'info');
+    triggerTask(taskType, stepDescription);
+}
+
+// Monitor task status
+async function monitorTask(taskId, taskName) {
+    let lastStepCount = 0;
+
+    const checkStatus = async () => {
+        try {
+            const response = await fetch(`/admin/task/${taskId}/status`);
+            const data = await response.json();
+
+            if (data.success) {
+                const task = data.task;
+
+                // Update task info with steps
+                const taskInfo = activeTasks.get(taskId);
+                if (taskInfo) {
+                    taskInfo.steps = task.steps || [];
+                    activeTasks.set(taskId, taskInfo);
+                }
+
+                if (task.status === 'running') {
+                    // Still running, show progress
+                    if (task.steps && task.steps.length > 0) {
+                        const completedSteps = task.steps.filter(s => s.status === 'completed').length;
+                        const failedSteps = task.steps.filter(s => s.status === 'failed').length;
+                        const runningStep = task.steps.find(s => s.status === 'running');
+
+                        // Only log step changes to avoid spam
+                        if (task.steps.length !== lastStepCount) {
+                            lastStepCount = task.steps.length;
+                            if (runningStep) {
+                                addLog(`⏳ Running: ${runningStep.description}`, 'info');
+                            }
+                        }
+
+                        // Update the visual progress
+                        updateActiveTasks();
+                    }
+                } else if (task.status === 'completed') {
+                    addLog(`✓ ${taskName} completed successfully`, 'success');
+
+                    // Mark task as completed but keep visible
+                    if (taskInfo) {
+                        taskInfo.steps = task.steps || [];
+                        taskInfo.completed = true;
+                        activeTasks.set(taskId, taskInfo);
+                        updateActiveTasks();
+                    }
+
+                    if (taskTimers.has(taskId)) {
+                        clearInterval(taskTimers.get(taskId));
+                        taskTimers.delete(taskId);
+                    }
+                    loadSystemStatus(); // Refresh stats
+                    document.getElementById('runAllBtn').disabled = false;
+                } else {
+                    const failedSteps = task.steps ? task.steps.filter(s => s.status === 'failed') : [];
+                    addLog(`✗ ${taskName} failed: ${task.error || 'Unknown error'}`, 'error');
+                    if (failedSteps.length > 0) {
+                        addLog(`  Failed steps: ${failedSteps.map(s => s.description).join(', ')}`, 'warning');
+                    }
+
+                    if (taskInfo) {
+                        taskInfo.failed = true;
+                        taskInfo.failedSteps = failedSteps;
+                        taskInfo.steps = task.steps || [];
+                        activeTasks.set(taskId, taskInfo);
+                    }
+
+                    if (taskTimers.has(taskId)) {
+                        clearInterval(taskTimers.get(taskId));
+                        taskTimers.delete(taskId);
+                    }
+                    updateActiveTasks();
+                    document.getElementById('runAllBtn').disabled = false;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking task status:', error);
+            addLog(`  Error monitoring ${taskName}: ${error.message}`, 'error');
+        }
+    };
+
+    // Start monitoring with interval
+    checkStatus(); // Check immediately
+    const timer = setInterval(checkStatus, 5000); // Check every 5 seconds
+    taskTimers.set(taskId, timer);
+}
+
+// Render step progress visually - Wizard Style
+function renderStepProgress(steps) {
+    if (!steps || steps.length === 0) {
+        return '';
+    }
+
+    // Calculate progress
+    const completedSteps = steps.filter(s => s.status === 'completed').length;
+    const failedSteps = steps.filter(s => s.status === 'failed').length;
+    const runningSteps = steps.filter(s => s.status === 'running').length;
+    const totalSteps = steps.length;
+    const progressPercent = (completedSteps / totalSteps) * 100;
+
+    let html = '<div class="wizard-container">';
+
+    // Overall Progress Summary
+    html += `
+        <div class="overall-progress">
+            <div class="overall-progress-label">
+                <i class="bi bi-speedometer2 me-2"></i>Overall Progress
+            </div>
+            <div class="overall-progress-value">
+                ${completedSteps} / ${totalSteps} Steps
+                ${failedSteps > 0 ? `<span style="color: #f44336; font-size: 14px; margin-left: 10px;">(${failedSteps} failed)</span>` : ''}
+            </div>
+        </div>
+    `;
+
+    // Wizard Progress Bar
+    html += `
+        <div class="wizard-progress-bar">
+            <div class="wizard-progress-fill" style="width: ${progressPercent}%"></div>
+        </div>
+    `;
+
+    // Wizard Steps (Visual Circles)
+    html += '<div class="wizard-steps">';
+    steps.forEach((step, index) => {
+        const stepNum = index + 1;
+        let stepClass = step.status || 'pending';
+        let iconContent = stepNum;
+
+        if (step.status === 'completed') {
+            iconContent = '✓';
+        } else if (step.status === 'running') {
+            iconContent = '<span class="spinner" style="width: 20px; height: 20px;"></span>';
+        } else if (step.status === 'failed') {
+            iconContent = '✗';
+        }
+
+        const stepLabel = step.description ? step.description.replace(/^(Run |Execute |Calculate |Train |Export )/i, '') : `Step ${stepNum}`;
+        const shortLabel = stepLabel.length > 20 ? stepLabel.substring(0, 17) + '...' : stepLabel;
+
+        const stepTime = step.start_time
+            ? `<div class="wizard-step-time">${new Date(step.start_time).toLocaleTimeString()}</div>`
+            : '';
+
+        html += `
+            <div class="wizard-step ${stepClass}">
+                <div class="wizard-step-circle">${iconContent}</div>
+                <div class="wizard-step-label" title="${stepLabel}">
+                    ${shortLabel}
+                    ${stepTime}
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+
+    // Step Details Table
+    html += `
+        <table class="step-details-table">
+            <thead>
+                <tr>
+                    <th style="width: 50px;">#</th>
+                    <th>Step Name</th>
+                    <th style="width: 120px;">Status</th>
+                    <th style="width: 120px;">Start Time</th>
+                    <th style="width: 120px;">Duration</th>
+                    <th style="width: 100px;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    steps.forEach((step, index) => {
+        const stepNum = index + 1;
+        const statusClass = step.status || 'pending';
+        const statusText = (step.status || 'pending').toUpperCase();
+
+        const startTime = step.start_time
+            ? new Date(step.start_time).toLocaleTimeString()
+            : '-';
+
+        let duration = '-';
+        if (step.start_time && step.end_time) {
+            const start = new Date(step.start_time);
+            const end = new Date(step.end_time);
+            const diffMs = end - start;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffSecs = Math.floor((diffMs % 60000) / 1000);
+            duration = `${diffMins}m ${diffSecs}s`;
+        } else if (step.start_time && step.status === 'running') {
+            const start = new Date(step.start_time);
+            const now = new Date();
+            const diffMs = now - start;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffSecs = Math.floor((diffMs % 60000) / 1000);
+            duration = `${diffMins}m ${diffSecs}s (ongoing)`;
+        }
+
+        let actionButton = '';
+        if (step.status === 'failed') {
+            actionButton = `
+                <button class="btn btn-sm btn-outline-danger" onclick="retrySingleStep('${step.name}', '${step.description}')">
+                    <i class="bi bi-arrow-clockwise"></i> Retry
+                </button>
+            `;
+        }
+
+        const errorDetail = step.error
+            ? `<div class="step-error-detail"><i class="bi bi-exclamation-triangle me-2"></i>${step.error}</div>`
+            : '';
+
+        html += `
+            <tr>
+                <td style="text-align: center; font-weight: bold; color: #666;">${stepNum}</td>
+                <td>
+                    <strong>${step.description}</strong>
+                    ${errorDetail}
+                </td>
+                <td>
+                    <span class="step-status-badge ${statusClass}">${statusText}</span>
+                </td>
+                <td style="color: #666;">${startTime}</td>
+                <td style="color: #666;">${duration}</td>
+                <td>${actionButton}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+            </tbody>
+        </table>
+    `;
+
+    html += '</div>';
+    return html;
+}
+
+// Render console output logs for a task
+function renderConsoleOutput(taskInfo) {
+    if (!taskInfo.output && !taskInfo.error) {
+        return '';
+    }
+
+    let html = '<div class="task-console" style="margin-top: 20px; background: #1e1e1e; color: #d4d4d4; border-radius: 8px; padding: 15px; font-family: \'Courier New\', monospace; font-size: 13px; max-height: 400px; overflow-y: auto;">';
+    html += '<div style="display: flex; justify-content: between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 10px;">';
+    html += '<div style="font-weight: bold; color: #4EC9B0;"><i class="bi bi-terminal-fill me-2"></i>Console Output</div>';
+    html += '</div>';
+
+    if (taskInfo.output) {
+        const lines = taskInfo.output.split('\n').slice(-50); // Last 50 lines
+        lines.forEach(line => {
+            let color = '#d4d4d4';
+            if (line.includes('ERROR') || line.includes('Failed')) color = '#f48771';
+            else if (line.includes('WARNING')) color = '#dcdcaa';
+            else if (line.includes('SUCCESS') || line.includes('✅')) color = '#4EC9B0';
+            else if (line.includes('INFO') || line.includes('ℹ️')) color = '#9cdcfe';
+
+            html += `<div style="color: ${color}; line-height: 1.6;">${escapeHtml(line)}</div>`;
+        });
+    }
+
+    if (taskInfo.error) {
+        html += `<div style="color: #f48771; font-weight: bold; margin-top: 10px; padding: 10px; background: rgba(244, 135, 113, 0.1); border-left: 3px solid #f48771;">`;
+        html += `<i class="bi bi-exclamation-triangle-fill me-2"></i>ERROR: ${escapeHtml(taskInfo.error)}`;
+        html += `</div>`;
+    }
+
+    html += '</div>';
+    return html;
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Close/dismiss a task
+function closeTask(taskId) {
+    activeTasks.delete(taskId);
+    if (taskTimers.has(taskId)) {
+        clearInterval(taskTimers.get(taskId));
+        taskTimers.delete(taskId);
+    }
+    updateActiveTasks();
+}
+
+// Update active tasks display — DOM removed. Kept as no-op so existing
+// callers don't error. Task progress is logged into Task Log instead.
+function updateActiveTasks() {
+    return;
+    /* legacy DOM render disabled
+    const container = document.getElementById('activeTasksContainer');
+    const list = document.getElementById('activeTasksList');
+
+    if (activeTasks.size === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+    list.innerHTML = '';
+
+    activeTasks.forEach((taskInfo, taskId) => {
+        const taskDiv = document.createElement('div');
+        taskDiv.className = 'mb-4';
+
+        let statusBadge = '';
+        let buttonsHtml = '';
+
+        if (taskInfo.completed) {
+            statusBadge = '<span class="badge-status badge-completed">Completed</span>';
+            buttonsHtml = `
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeTask('${taskId}')">
+                    <i class="bi bi-x-lg"></i> Close
+                </button>
+            `;
+        } else if (taskInfo.failed) {
+            statusBadge = '<span class="badge-status badge-failed">Failed</span>';
+            buttonsHtml = `
+                <button class="btn btn-sm btn-warning me-2" onclick="retryTask('${taskId}', '${taskInfo.type}', '${taskInfo.name}')">
+                    <i class="bi bi-arrow-clockwise"></i> Retry All
+                </button>
+            `;
+            if (taskInfo.failedSteps && taskInfo.failedSteps.length > 0) {
+                buttonsHtml += `
+                    <button class="btn btn-sm btn-info me-2" onclick="retryFailedSteps('${taskId}')">
+                        <i class="bi bi-arrow-repeat"></i> Retry Failed Steps Only
+                    </button>
+                `;
+            }
+            buttonsHtml += `
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeTask('${taskId}')">
+                    <i class="bi bi-x-lg"></i> Close
+                </button>
+            `;
+        } else {
+            statusBadge = '<span class="badge-status badge-running"><span class="spinner me-2"></span>Running</span>';
+        }
+
+        // Render step progress
+        const stepProgressHtml = taskInfo.steps ? renderStepProgress(taskInfo.steps) : '';
+
+        // Render console output
+        const consoleOutputHtml = renderConsoleOutput(taskInfo);
+
+        taskDiv.innerHTML = `
+            <div style="background: #f8f9fa; padding: 15px 20px; border-radius: 8px; margin-bottom: 20px;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong style="font-size: 16px; color: #333;">${taskInfo.name}</strong>
+                        <small class="text-muted ms-2" style="font-size: 11px;">(${taskId})</small>
+                        <span class="ms-3">${statusBadge}</span>
+                    </div>
+                    <div>
+                        ${buttonsHtml}
+                    </div>
+                </div>
+            </div>
+            ${stepProgressHtml}
+            ${consoleOutputHtml}
+        `;
+
+        list.appendChild(taskDiv);
+    });
+    */
+}
+
+// Load active tasks from database on page load — DOM removed, no-op.
+async function loadActiveTasks_legacy() {
+    try {
+        const response = await fetch('/admin/tasks/active');
+        const data = await response.json();
+
+        if (data.success && data.tasks) {
+            // Restore active tasks to the map
+            Object.entries(data.tasks).forEach(([taskId, taskInfo]) => {
+                activeTasks.set(taskId, taskInfo);
+
+                // Start monitoring if still running
+                if (taskInfo.status === 'running') {
+                    monitorTask(taskId, taskInfo.description || 'Task');
+                }
+            });
+
+            updateActiveTasks();
+        }
+    } catch (error) {
+        console.error('Error loading active tasks:', error);
+    }
+}
+
+// Auto-refresh system status + model status
+setInterval(loadSystemStatus, 30000);
+setInterval(loadModelStatus, 60000);
+
+// Initial load
+loadSystemStatus();
+loadModelStatus();
+</script>
+{% endblock %}

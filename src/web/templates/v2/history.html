@@ -1,0 +1,148 @@
+{% extends "v2/base.html" %}
+{% block title %}Trade History{% endblock %}
+{% block page_title %}Trade History{% endblock %}
+
+{% block content %}
+<style>
+  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <label class="form-label small mb-0 me-2">Model:</label>
+    <select id="model_sel" class="form-select form-select-sm d-inline-block" style="width:auto"
+            onchange="load()"></select>
+  </div>
+  <div class="small text-muted">Auto-refresh 30s</div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Closed Trades</div>
+      <div id="n_trades" class="fs-4 fw-bold">--</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Win Rate</div>
+      <div id="win_rate" class="fs-4 fw-bold">--</div>
+      <div id="w_l" class="small text-muted">--</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Realized P&amp;L</div>
+      <div id="realized" class="fs-4 fw-bold">--</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body py-3 text-center">
+      <div class="text-muted small mb-1">Best Trade</div>
+      <div id="best" class="fs-4 fw-bold pos">--</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><i class="bi bi-clock-history me-2"></i>Trades (Newest First)</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr>
+        <th>Timestamp</th><th>Side</th><th>Symbol</th>
+        <th class="text-end">Qty</th><th class="text-end">Price ₹</th>
+        <th class="text-end">Value ₹</th><th class="text-end">P&amp;L ₹</th>
+        <th>Reason</th>
+      </tr></thead>
+      <tbody id="hist"><tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
+const cls = n => n>0?"pos":(n<0?"neg":"neutral");
+
+async function loadModels() {
+  // Populate selector with enabled models only (authoritative via portfolio).
+  // Pre-select the first enabled model so the page lands on real data.
+  try {
+    const r = await fetch('/admin/models/portfolio');
+    const d = await r.json();
+    if (!d.success) return;
+    const sel = document.getElementById('model_sel');
+    sel.innerHTML = '';
+    const enabled = (d.models || []).filter(m => m.enabled);
+    if (enabled.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'No enabled models';
+      sel.appendChild(opt);
+      return;
+    }
+    enabled.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.model_name;
+      opt.textContent = m.model_name;
+      sel.appendChild(opt);
+    });
+    // Default to first enabled model.
+    sel.value = enabled[0].model_name;
+  } catch(e) { console.error(e); }
+}
+
+async function load() {
+  const model = document.getElementById('model_sel').value;
+  if (!model) {
+    document.getElementById('hist').innerHTML =
+      '<tr><td colspan="8" class="text-center text-muted py-3">No enabled model selected</td></tr>';
+    return;
+  }
+  try {
+    const r = await fetch(`/admin/${model}/trade-history`);
+    const d = await r.json();
+    if (!d.success) return;
+    const trades = d.trades || [];
+
+    const closed = trades.filter(t => t.side === 'SELL');
+    document.getElementById('n_trades').textContent = closed.length;
+    const wins = closed.filter(t => (t.pnl||0) > 0).length;
+    const losses = closed.filter(t => (t.pnl||0) < 0).length;
+    const wr = closed.length ? (wins/closed.length*100) : 0;
+    document.getElementById('win_rate').textContent = wr.toFixed(1) + '%';
+    document.getElementById('w_l').textContent = `${wins}W / ${losses}L`;
+    const total = closed.reduce((s,t)=>s+(t.pnl||0), 0);
+    document.getElementById('realized').textContent = fmtINR(total);
+    document.getElementById('realized').className = 'fs-4 fw-bold ' + cls(total);
+    const best = closed.reduce((b,t)=>Math.max(b, t.pnl||0), 0);
+    document.getElementById('best').textContent = fmtINR(best);
+
+    const body = document.getElementById('hist');
+    if (trades.length === 0) {
+      body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No trades yet for this model</td></tr>';
+    } else {
+      body.innerHTML = trades.map(t => `
+        <tr>
+          <td class="small text-muted">${window.fmtIST ? window.fmtIST(t.trade_at) : (t.trade_at||'').replace('T',' ').slice(0,19)}</td>
+          <td><span class="badge ${t.side==='BUY'?'bg-primary':'bg-warning text-dark'}">${t.side}</span></td>
+          <td><strong>${t.symbol}</strong></td>
+          <td class="text-end">${(t.qty||0).toLocaleString('en-IN')}</td>
+          <td class="text-end">${fmtINR(t.price)}</td>
+          <td class="text-end">${fmtINR(t.value)}</td>
+          <td class="text-end ${cls(t.pnl)}">${t.pnl !== null && t.pnl !== undefined ? fmtINR(t.pnl) : '—'}</td>
+          <td><span class="badge bg-secondary">${t.reason||''}</span></td>
+        </tr>
+      `).join('');
+    }
+  } catch(e) { console.error(e); }
+}
+
+(async () => {
+  await loadModels();
+  load();
+})();
+setInterval(load, 30000);
+</script>
+{% endblock %}

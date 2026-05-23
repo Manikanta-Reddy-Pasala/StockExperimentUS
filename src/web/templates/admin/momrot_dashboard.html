@@ -1,0 +1,844 @@
+{% extends "v2/base.html" %}
+
+{% block title %}Momentum Rotation{% endblock %}
+{% block page_title %}Momentum Rotation — Live Portfolio{% endblock %}
+
+{% block content %}
+<style>
+  .mr-card { border-left: 4px solid #5b8def; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.05); }
+  .mr-metric { font-size: 1.7rem; font-weight: 700; }
+  .mr-metric-sub { font-size: 0.78rem; color: #8b95a5; text-transform: uppercase; letter-spacing: 1px; }
+  .pos { color: #15a36b; }
+  .neg { color: #d4453a; }
+  .neutral { color: #4f5868; }
+  .badge-rank-1 { background: #ffd60a; color: #333; }
+  .table-momrot th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; }
+  .table-momrot td { vertical-align: middle; font-size: 0.92rem; }
+  .row-held { background: #fffbea !important; font-weight: 600; }
+  .log-tail { font-family: monospace; font-size: 0.78rem; background: #1a1a2e; color: #c0d8ff; padding: 10px; border-radius: 4px; white-space: pre-wrap; max-height: 350px; overflow-y: auto; }
+  .strategy-badge { background: linear-gradient(135deg,#667eea,#764ba2); color: white; padding: 4px 12px; border-radius: 16px; font-size: 0.75rem; font-weight: 600; }
+  .countdown { font-variant-numeric: tabular-nums; }
+  .small-mute { font-size: 0.78rem; color: #8b95a5; }
+</style>
+
+<div class="container-fluid pb-5">
+
+  <!-- Strategy badge + last update -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <span class="strategy-badge">Momentum Rotation</span>
+      <span class="ms-2 small-mute">N100 top-5 max-concurrent=1 — 60d momentum, monthly rotation</span>
+    </div>
+    <div class="small-mute">Updated: <span id="updated_at">–</span></div>
+  </div>
+
+  <!-- Portfolio summary -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Total NAV</div>
+        <div class="mr-metric" id="total_value">₹–</div>
+        <div class="small-mute">cash + holdings</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Invested</div>
+        <div class="mr-metric neutral" id="starting_capital">₹--</div>
+        <div class="small-mute">cost basis</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Market Value</div>
+        <div class="mr-metric neutral" id="market_value">₹–</div>
+        <div class="small-mute">live price × qty</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Wallet (Cash)</div>
+        <div class="mr-metric neutral" id="cash">₹–</div>
+        <div class="small-mute">Fyers available</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- P&L row -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-6">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Total P&amp;L</div>
+        <div class="mr-metric" id="total_pnl">₹–</div>
+        <div class="small-mute"><span id="total_pct">–</span>%</div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Unrealized / Realized</div>
+        <div class="mr-metric neutral" id="unrealized_pnl">₹–</div>
+        <div class="small-mute">Realized: <span id="realized_pnl">–</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Next rebalance + N100-specific quick actions -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-5">
+      <div class="card mr-card p-3">
+        <div class="mr-metric-sub">Next Rebalance</div>
+        <div class="mr-metric countdown" id="next_rebalance_date">–</div>
+        <div class="small-mute">in <span id="next_rebalance_days">–</span> days (<span id="next_rebalance_day">–</span>)</div>
+      </div>
+    </div>
+    <div class="col-md-7">
+      <div class="card mr-card p-3 d-flex flex-row align-items-center gap-2 flex-wrap">
+        <button class="btn btn-danger btn-sm flex-fill" id="btn_run_now">
+          <i class="bi bi-play-circle"></i> LIVE Rebalance (N100)
+        </button>
+        <button class="btn btn-success btn-sm flex-fill" id="btn_buy_now">
+          <i class="bi bi-cart-plus"></i> Buy Rank-1 (N100)
+        </button>
+        <button class="btn btn-outline-secondary btn-sm flex-fill" id="btn_rebuild">
+          <i class="bi bi-arrow-clockwise"></i> Rebuild N100
+        </button>
+        <button class="btn btn-outline-info btn-sm flex-fill" id="btn_refresh">
+          <i class="bi bi-arrow-repeat"></i> Refresh
+        </button>
+        <button class="btn btn-outline-success btn-sm flex-fill" id="btn_tg_test">
+          <i class="bi bi-send"></i> Test TG
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Triggers — per-model multi-model panel (T7) -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-toggles"></i> Admin Triggers — per-model</span>
+      <button class="btn btn-sm btn-outline-secondary" id="btn_triggers_refresh">
+        <i class="bi bi-arrow-repeat"></i> Refresh
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-momrot mb-0">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Enabled</th>
+            <th class="text-end">NAV</th>
+            <th class="text-end">P&amp;L %</th>
+            <th>Last Signal</th>
+            <th>Position</th>
+            <th class="text-end" style="min-width:240px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="triggers_body">
+          <tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Per-Model Data Status (all 5 models from /admin/models/portfolio) -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <span>
+        <i class="bi bi-database"></i> Per-Model Data Status
+        <span class="badge bg-secondary ms-2" id="datastatus_count">—</span>
+      </span>
+      <button class="btn btn-sm btn-outline-secondary" id="btn_datastatus_refresh">
+        <i class="bi bi-arrow-repeat"></i> Refresh
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-momrot mb-0">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Enabled</th>
+            <th>Wired</th>
+            <th>Data Pulled</th>
+            <th>Last Signal</th>
+            <th>Last Execution</th>
+            <th class="text-end">Universe</th>
+            <th class="text-end">Ranking</th>
+          </tr>
+        </thead>
+        <tbody id="datastatus_body">
+          <tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Live Fyers Account -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-bank"></i> Live Fyers Account</span>
+      <button class="btn btn-sm btn-outline-primary" id="btn_fyers_refresh"><i class="bi bi-arrow-repeat"></i> Pull</button>
+    </div>
+    <div class="card-body">
+      <div class="row g-3 mb-2" id="fyers_funds">
+        <div class="col text-muted small">Loading funds…</div>
+      </div>
+      <div class="mt-2">
+        <div class="small-mute mb-1">Holdings (real account)</div>
+        <table class="table table-momrot mb-0">
+          <thead><tr><th>Symbol</th><th class="text-end">Qty</th><th class="text-end">Avg</th><th class="text-end">LTP</th><th class="text-end">P&amp;L</th><th class="text-end">%</th></tr></thead>
+          <tbody id="fyers_holdings"><tr><td colspan="6" class="text-center text-muted">Loading…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="mt-3">
+        <div class="small-mute mb-1">Open positions (intraday)</div>
+        <div id="fyers_positions" class="small text-muted">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Open positions (momrot ledger) -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light"><i class="bi bi-briefcase"></i> Momrot Open Position(s)</div>
+    <div class="card-body p-0">
+      <table class="table table-momrot mb-0">
+        <thead>
+          <tr>
+            <th>Symbol</th><th>Qty</th><th class="text-end">Entry</th>
+            <th class="text-end">Live</th><th class="text-end">Cost</th>
+            <th class="text-end">Market Value</th><th class="text-end">Unrealized P&amp;L</th>
+            <th class="text-end">%</th>
+          </tr>
+        </thead>
+        <tbody id="positions_body">
+          <tr><td colspan="8" class="text-center text-muted">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Top-10 momentum ranking -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-trophy"></i> Current N100 Momentum Ranking — Top 10 (60d return)</span>
+      <span class="small-mute">Held stocks highlighted</span>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-momrot mb-0">
+        <thead>
+          <tr><th>#</th><th>Symbol</th><th>Name</th><th class="text-end">60d Return %</th><th class="text-end">Price ₹</th><th>Held</th></tr>
+        </thead>
+        <tbody id="ranking_body">
+          <tr><td colspan="6" class="text-center text-muted">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Closed trades history -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light"><i class="bi bi-clock-history"></i> Trade History</div>
+    <div class="card-body p-0">
+      <table class="table table-momrot mb-0">
+        <thead>
+          <tr>
+            <th>Symbol</th><th>Entry</th><th>Exit</th><th class="text-end">Qty</th>
+            <th class="text-end">P&amp;L ₹</th><th>Reason</th><th>Exit ts</th>
+          </tr>
+        </thead>
+        <tbody id="history_body">
+          <tr><td colspan="7" class="text-center text-muted">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Run logs -->
+  <div class="card mr-card mb-4">
+    <div class="card-header bg-light"><i class="bi bi-terminal"></i> Recent Daily-Run Logs</div>
+    <div class="card-body">
+      <div id="run_logs_container">Loading…</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const fmtINR = n => "₹" + Number(n || 0).toLocaleString('en-IN', {maximumFractionDigits: 2});
+const fmtPct = n => (n >= 0 ? "+" : "") + Number(n || 0).toFixed(2) + "%";
+const cls = n => n > 0 ? "pos" : (n < 0 ? "neg" : "neutral");
+
+async function loadSummary() {
+  try {
+    const r = await fetch('/admin/momrot/summary');
+    const data = await r.json();
+    if (!data.success) { console.error(data.error); return; }
+    renderState(data.state);
+    renderRanking(data.ranking, data.state.open_positions);
+    renderNextRebalance(data.next_rebalance);
+  } catch (e) { console.error(e); }
+}
+
+function renderState(s) {
+  document.getElementById('updated_at').textContent = s.ledger_updated_at || '–';
+  document.getElementById('starting_capital').textContent = fmtINR(s.position_cost || 0);
+  document.getElementById('total_value').textContent = fmtINR(s.total_value);
+  document.getElementById('total_pnl').textContent = fmtINR(s.total_pnl);
+  document.getElementById('total_pnl').className = 'mr-metric ' + cls(s.total_pnl);
+  document.getElementById('total_pct').textContent = fmtPct(s.total_pct);
+  document.getElementById('total_pct').className = cls(s.total_pct);
+  document.getElementById('market_value').textContent = fmtINR(s.market_value);
+  document.getElementById('unrealized_pnl').textContent = fmtINR(s.unrealized_pnl);
+  document.getElementById('unrealized_pnl').className = cls(s.unrealized_pnl);
+  document.getElementById('cash').textContent = fmtINR(s.cash);
+  document.getElementById('realized_pnl').textContent = fmtINR(s.realized_pnl);
+  document.getElementById('realized_pnl').className = cls(s.realized_pnl);
+
+  const body = document.getElementById('positions_body');
+  if (!s.open_positions || s.open_positions.length === 0) {
+    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No open positions</td></tr>';
+  } else {
+    body.innerHTML = s.open_positions.map(p => `
+      <tr>
+        <td><strong>${p.symbol}</strong></td>
+        <td>${p.qty.toLocaleString('en-IN')}</td>
+        <td class="text-end">${fmtINR(p.entry_price)}</td>
+        <td class="text-end">${fmtINR(p.live_price)}</td>
+        <td class="text-end">${fmtINR(p.cost)}</td>
+        <td class="text-end">${fmtINR(p.market_value)}</td>
+        <td class="text-end ${cls(p.unrealized_pnl)}">${fmtINR(p.unrealized_pnl)}</td>
+        <td class="text-end ${cls(p.unrealized_pct)}">${fmtPct(p.unrealized_pct)}</td>
+      </tr>
+    `).join('');
+  }
+}
+
+function renderRanking(ranking, openPositions) {
+  const held = new Set((openPositions || []).map(p => p.symbol));
+  const body = document.getElementById('ranking_body');
+  body.innerHTML = ranking.map((r, i) => `
+    <tr class="${held.has(r.symbol) ? 'row-held' : ''}">
+      <td>${i === 0 ? '<span class="badge badge-rank-1">★ 1</span>' : '#'+(i+1)}</td>
+      <td><strong>${r.symbol}</strong></td>
+      <td>${r.name || ''}</td>
+      <td class="text-end ${cls(r.return_60d)}">${fmtPct(r.return_60d)}</td>
+      <td class="text-end">${fmtINR(r.price)}</td>
+      <td>${held.has(r.symbol) ? '<span class="badge bg-success">HELD</span>' : ''}</td>
+    </tr>
+  `).join('');
+}
+
+function renderNextRebalance(n) {
+  document.getElementById('next_rebalance_date').textContent = n.date;
+  document.getElementById('next_rebalance_days').textContent = n.days_until;
+  document.getElementById('next_rebalance_day').textContent = n.weekday;
+}
+
+async function loadHistory() {
+  try {
+    const r = await fetch('/admin/momrot/history');
+    const d = await r.json();
+    const body = document.getElementById('history_body');
+    if (!d.trades || d.trades.length === 0) {
+      body.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No closed trades yet</td></tr>';
+      return;
+    }
+    body.innerHTML = d.trades.slice().reverse().map(t => `
+      <tr>
+        <td><strong>${t.symbol}</strong></td>
+        <td class="text-end">${fmtINR(t.entry_price)}</td>
+        <td class="text-end">${fmtINR(t.exit_price)}</td>
+        <td class="text-end">${(t.qty_closed||0).toLocaleString('en-IN')}</td>
+        <td class="text-end ${cls(t.pnl)}">${fmtINR(t.pnl)}</td>
+        <td><span class="badge bg-secondary">${t.reason}</span></td>
+        <td class="small-mute">${t.ts || ''}</td>
+      </tr>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function loadRunLogs() {
+  try {
+    const r = await fetch('/admin/momrot/run-logs?limit=5');
+    const d = await r.json();
+    const c = document.getElementById('run_logs_container');
+    if (!d.logs || d.logs.length === 0) {
+      c.innerHTML = '<div class="text-muted">No run logs yet.</div>';
+      return;
+    }
+    c.innerHTML = d.logs.map(l => `
+      <div class="mb-3">
+        <div class="d-flex justify-content-between mb-1">
+          <strong>${l.name}</strong>
+          <span class="small-mute">${window.fmtIST ? window.fmtIST(l.mtime) : new Date(l.mtime).toLocaleString()}</span>
+        </div>
+        <pre class="log-tail">${l.tail.join('\n')}</pre>
+      </div>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+document.getElementById('btn_run_now').addEventListener('click', async () => {
+  const pr = await fetch('/admin/momrot/rebalance-preview');
+  const p = await pr.json();
+  if (!p.success) { await appModal.alert('Preview Failed', p.error, 'danger'); return; }
+  if (p.already_holding_rank_member) {
+    await appModal.alert('No Action Needed',
+      `Already holding rank-1.<br>Rank-1: <strong>${p.rank1.symbol}</strong> (${fmtPct(p.rank1.return_60d)})`, 'info');
+    return;
+  }
+  let html = `<div class="mb-2"><span class="text-muted small">Rank-1:</span> <strong>${p.rank1.symbol}</strong> ${fmtPct(p.rank1.return_60d)} @ ${fmtINR(p.rank1.price)}</div>`;
+  html += '<table class="table table-sm mb-2"><tbody>';
+  if (p.sells && p.sells.length) {
+    p.sells.forEach(s => { html += `<tr><td><span class="badge bg-danger">SELL</span></td><td><strong>${s.symbol}</strong></td><td>qty ${s.qty}</td><td class="text-end">${fmtINR(s.proceeds)}</td></tr>`; });
+  } else { html += '<tr><td colspan="4" class="text-muted">No sells</td></tr>'; }
+  if (p.buy) {
+    html += `<tr><td><span class="badge bg-success">BUY</span></td><td><strong>${p.buy.symbol}</strong></td><td>qty ${p.buy.qty}</td><td class="text-end">${fmtINR(p.buy.deploy)}</td></tr>`;
+    if (p.buy.qty < 1) html += '<tr><td colspan="4" class="text-warning small">qty=0 insufficient cash — BUY skips</td></tr>';
+  }
+  html += '</tbody></table>';
+  const ok = await appModal.confirm('LIVE Rebalance', html,
+    {okLabel:'Execute', okClass:'btn-danger', headerCls:'bg-danger text-white'});
+  if (!ok) return;
+  const r = await fetch('/admin/momrot/run-now', {method:'POST'});
+  const d = await r.json();
+  if (d.success) {
+    const lines = (d.actions || []).map(a => `<li><span class="badge bg-secondary">${a.action}</span> ${a.symbol||''} ${a.qty?('qty='+a.qty):''} ${a.reason?('('+a.reason+')'):''}</li>`).join('');
+    await appModal.alert('Rebalance Executed', lines ? `<ul class="mb-0">${lines}</ul>` : 'No action', 'success');
+  } else {
+    await appModal.alert('Rebalance Failed', d.error, 'danger');
+  }
+  setTimeout(() => { loadSummary(); loadHistory(); loadRunLogs(); loadFyers(); }, 3000);
+});
+
+document.getElementById('btn_buy_now').addEventListener('click', async () => {
+  const pr = await fetch('/admin/momrot/rebalance-preview');
+  const p = await pr.json();
+  if (!p.success) { await appModal.alert('Preview Failed', p.error, 'danger'); return; }
+  const sym = p.rank1.symbol, price = p.rank1.price, cash = p.current_cash;
+  const maxQty = Math.floor((cash * 0.995) / price);  // 0.5% buffer
+  if (maxQty < 1) {
+    await appModal.alert('Insufficient Balance',
+      `Available: <strong>${fmtINR(cash)}</strong><br>Need ≥ <strong>${fmtINR(price)}</strong>/share for <strong>${sym}</strong>.<br><br>Please refill Fyers account.`, 'danger');
+    return;
+  }
+  const html = `<table class="table table-sm mb-2"><tbody>
+    <tr><td>Symbol</td><td class="text-end"><strong>${sym}</strong></td></tr>
+    <tr><td>Price</td><td class="text-end">${fmtINR(price)}</td></tr>
+    <tr><td>Available cash</td><td class="text-end">${fmtINR(cash)}</td></tr>
+    <tr><td>Max qty</td><td class="text-end"><strong>${maxQty}</strong></td></tr>
+  </tbody></table>`;
+  const input = await appModal.prompt('Buy ' + sym, html, maxQty, 'Quantity');
+  if (input === null) return;
+  const qty = parseInt(input);
+  if (!qty || qty < 1) { await appModal.alert('Invalid', 'Quantity must be positive', 'danger'); return; }
+  if (qty > maxQty) { await appModal.alert('Insufficient', `qty ${qty} > max ${maxQty}`, 'danger'); return; }
+  const ok = await appModal.confirm('LIVE BUY',
+    `Symbol: <strong>${sym}</strong><br>Qty: <strong>${qty}</strong> @ <strong>${fmtINR(price)}</strong><br>Total: <strong>${fmtINR(qty*price)}</strong>`,
+    {okLabel:'Place BUY', okClass:'btn-success', headerCls:'bg-success text-white'});
+  if (!ok) return;
+  const r = await fetch('/admin/momrot/buy-now', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({symbol: sym, qty})
+  });
+  const d = await r.json();
+  await appModal.alert(d.success ? 'Order Placed' : 'Failed',
+    d.success ? `BUY placed: <strong>${sym}</strong> qty=${qty}` : 'Error: ' + d.error,
+    d.success ? 'success' : 'danger');
+  setTimeout(() => { loadSummary(); loadFyers(); }, 3000);
+});
+
+document.getElementById('btn_rebuild').addEventListener('click', async () => {
+  const ok = await appModal.confirm('Rebuild N100 Universe', 'This rebuilds the universe by ADV ranking (~30s).', {okLabel:'Rebuild'});
+  if (!ok) return;
+  const r = await fetch('/admin/momrot/rebuild-universe', {method:'POST'});
+  const d = await r.json();
+  await appModal.alert(d.success ? 'Triggered' : 'Failed',
+    d.success ? 'Universe rebuild started in background.' : ('Error: ' + d.error),
+    d.success ? 'success' : 'danger');
+});
+
+document.getElementById('btn_refresh').addEventListener('click', () => {
+  loadSummary(); loadHistory(); loadRunLogs(); loadFyers();
+});
+
+async function loadFyers() {
+  try {
+    const r = await fetch('/admin/momrot/fyers/account');
+    const d = await r.json();
+    if (!d.success) {
+      document.getElementById('fyers_funds').innerHTML = `<div class="col text-danger small">${d.error || 'Failed to pull Fyers'}</div>`;
+      return;
+    }
+    const data = d.data || {};
+
+    // Funds — shape: data.funds.data.{available_cash, total_margin, utilized_margin}
+    const funds = (data.funds && data.funds.data) || {};
+    let fhtml = '';
+    if (Object.keys(funds).length > 0) {
+      const fields = [
+        ['Available Cash', funds.available_cash],
+        ['Total Margin', funds.total_margin],
+        ['Utilized Margin', funds.utilized_margin],
+      ];
+      fields.forEach(([k, v]) => {
+        fhtml += `<div class="col-md-3"><div class="card p-2"><div class="small-mute">${k}</div><div class="fw-bold">${fmtINR(parseFloat(v||0))}</div></div></div>`;
+      });
+    } else if (data.funds_error) {
+      fhtml = `<div class="col text-warning small">Funds API: ${data.funds_error}</div>`;
+    } else {
+      fhtml = `<div class="col text-muted small">No funds payload</div>`;
+    }
+    document.getElementById('fyers_funds').innerHTML = fhtml;
+
+    // Holdings — shape: data.holdings.data[] with {average_price, exchange, last_price, pnl, quantity, symbol}
+    const h = (data.holdings && data.holdings.data) || [];
+    const tb = document.getElementById('fyers_holdings');
+    if (!Array.isArray(h) || h.length === 0) {
+      tb.innerHTML = `<tr><td colspan="6" class="text-center text-muted">${data.holdings_error || 'No holdings'}</td></tr>`;
+    } else {
+      tb.innerHTML = h.map(p => {
+        const sym = (p.symbol || '').replace('NSE:','').replace('-EQ','');
+        const qty = parseFloat(p.quantity || 0);
+        const avg = parseFloat(p.average_price || 0);
+        const ltp = parseFloat(p.last_price || 0);
+        const pnl = parseFloat(p.pnl || (ltp - avg) * qty);
+        const pct = avg > 0 ? (ltp/avg - 1)*100 : 0;
+        return `<tr><td><strong>${sym}</strong></td>
+          <td class="text-end">${qty}</td>
+          <td class="text-end">${fmtINR(avg)}</td>
+          <td class="text-end">${fmtINR(ltp)}</td>
+          <td class="text-end ${cls(pnl)}">${fmtINR(pnl)}</td>
+          <td class="text-end ${cls(pct)}">${fmtPct(pct)}</td></tr>`;
+      }).join('');
+    }
+
+    // Positions — shape: data.positions.data[]
+    const pos = (data.positions && data.positions.data) || [];
+    const pdiv = document.getElementById('fyers_positions');
+    if (!Array.isArray(pos) || pos.length === 0) {
+      pdiv.innerHTML = data.positions_error || 'No open positions';
+    } else {
+      pdiv.innerHTML = pos.map(p => `<code>${p.symbol||''}: qty=${p.quantity||p.netQty||0} pnl=${fmtINR(p.pnl||p.pl||0)}</code>`).join(' &middot; ');
+    }
+  } catch(e) { console.error(e); }
+}
+
+document.getElementById('btn_fyers_refresh').addEventListener('click', loadFyers);
+loadFyers();
+
+document.getElementById('btn_tg_test').addEventListener('click', async () => {
+  const r = await fetch('/admin/momrot/telegram/test', {method: 'POST'});
+  const d = await r.json();
+  await appModal.alert(d.success ? 'Sent' : 'Failed',
+    d.success ? 'Telegram test message sent. Check group.' : ('Error: ' + (d.error || JSON.stringify(d.result))),
+    d.success ? 'success' : 'danger');
+});
+
+// ---------------------------------------------------------------------------
+// Admin Triggers — per-model panel (T7). Loads /admin/models/<m>/triggers/status
+// for each of the 4 equity models and lets ops run-signal / run-execute /
+// toggle-enabled. Does NOT touch /admin/momrot/* legacy routes used above.
+// ---------------------------------------------------------------------------
+
+// Label lookup. TRIGGER_MODELS list is now derived from /admin/models/portfolio
+// at load time so newly-added models surface automatically. This map only
+// provides nicer labels — falls back to model_name if missing.
+const MODEL_LABELS = {
+  'momentum_n100_top5_max1':    'N100 Top-5 (mc=1)',
+  'n20_daily_large_only':       'N20 Daily ADV ∩ N100',
+  'midcap_narrow_60d_breakout': 'Midcap 60d Breakout',
+  'momentum_pseudo_n100_adv':   'Pseudo-N100 ADV (mc=1)',
+  'finnifty_ic_otm4_w300_lots5': 'FinNifty Iron Condor',
+};
+
+function _ts(s) {
+  if (!s) return '<span class="small-mute">never</span>';
+  try {
+    return `<span title="${s}">${window.fmtIST ? window.fmtIST(s) : new Date(s).toLocaleString()}</span>`;
+  } catch (e) { return s; }
+}
+
+function _renderTriggerRow(m, st) {
+  if (!st || !st.success) {
+    const err = (st && st.error) || 'no response';
+    const isWiringErr = /Unknown model/i.test(err);
+    const cls = isWiringErr ? 'text-warning' : 'text-danger';
+    const tag = isWiringErr
+      ? '<span class="badge bg-warning text-dark">NOT WIRED</span>'
+      : '<span class="badge bg-danger">ERROR</span>';
+    return `<tr style="background:#fff8f0;">
+      <td><strong>${m.label}</strong><br><span class="small-mute">${m.key}</span></td>
+      <td colspan="6" class="small ${cls}">
+        ${tag}
+        ${isWiringErr ? 'Model has no live_signal/executor route (MODEL_PATHS).' : err}
+      </td></tr>`;
+  }
+  const enabledBadge = st.enabled
+    ? '<span class="badge bg-success">ON</span>'
+    : '<span class="badge bg-secondary">DISABLED</span>';
+  const rowStyle = st.enabled ? '' : ' style="opacity:0.55;background:#fafbfc;"';
+  const pnlCls = cls(st.pnl_pct);
+  const pos = st.current_position
+    ? `<code>${(st.current_position.sym||'').replace('NSE:','').replace('-EQ','')}</code>` +
+      ` <span class="small-mute">x${st.current_position.qty} @ ${fmtINR(st.current_position.entry_px)}</span>`
+    : '<span class="small-mute">flat</span>';
+
+  return `<tr${rowStyle}>
+    <td>
+      <strong>${m.label}</strong><br>
+      <span class="small-mute">${m.key}</span>
+    </td>
+    <td>${enabledBadge}</td>
+    <td class="text-end">${fmtINR(st.nav)}</td>
+    <td class="text-end ${pnlCls}">${fmtPct(st.pnl_pct)}</td>
+    <td class="small">${_ts(st.last_signal_at)}</td>
+    <td class="small">${pos}</td>
+    <td class="text-end">
+      <button class="btn btn-sm btn-outline-primary me-1"
+              onclick="triggerRunSignal('${m.key}')">
+        <i class="bi bi-broadcast"></i> Signal
+      </button>
+      <button class="btn btn-sm btn-outline-warning me-1"
+              onclick="triggerRunExecute('${m.key}')">
+        <i class="bi bi-play-fill"></i> Execute
+      </button>
+      <button class="btn btn-sm ${st.enabled ? 'btn-outline-danger' : 'btn-outline-success'}"
+              onclick="triggerToggleEnabled('${m.key}', ${!st.enabled})">
+        ${st.enabled ? '<i class="bi bi-pause"></i> Pause' : '<i class="bi bi-play"></i> Resume'}
+      </button>
+    </td>
+  </tr>`;
+}
+
+async function loadTriggers() {
+  const body = document.getElementById('triggers_body');
+  body.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr>`;
+  // Discover all models from portfolio endpoint (single source of truth).
+  // No hardcoded model list — finnifty options + future models surface
+  // automatically with NOT WIRED badge if triggers/status returns error.
+  let pfRes;
+  try {
+    pfRes = await (await fetch('/admin/models/portfolio')).json();
+  } catch (e) {
+    body.innerHTML = `<tr><td colspan="7" class="text-danger small">Failed to fetch /admin/models/portfolio: ${e.message}</td></tr>`;
+    return;
+  }
+  if (!pfRes || !pfRes.success) {
+    body.innerHTML = `<tr><td colspan="7" class="text-danger small">/admin/models/portfolio returned error: ${pfRes && pfRes.error || 'unknown'}</td></tr>`;
+    return;
+  }
+  const models = (pfRes.models || []).map(m => ({
+    key: m.model_name,
+    label: MODEL_LABELS[m.model_name] || m.model_name,
+  }));
+  if (models.length === 0) {
+    body.innerHTML = `<tr><td colspan="7" class="text-muted small">No models seeded — check ensure_models_seeded()</td></tr>`;
+    return;
+  }
+  const fetches = models.map(async m => {
+    try {
+      const r = await fetch(`/admin/models/${m.key}/triggers/status`);
+      return {m, st: await r.json()};
+    } catch (e) {
+      return {m, st: {success: false, error: e.message}};
+    }
+  });
+  const rows = await Promise.all(fetches);
+  body.innerHTML = rows.map(r => _renderTriggerRow(r.m, r.st)).join('');
+}
+
+async function triggerRunSignal(modelName) {
+  const ok = await appModal.confirm('Run Signal Now',
+    `Run <code>live_signal.py</code> for <strong>${modelName}</strong>?<br>` +
+    'Writes a /tmp/manual_*.json signal file. Does NOT place orders.',
+    {okLabel: 'Run Signal', okClass: 'btn-primary'});
+  if (!ok) return;
+  const r = await fetch(`/admin/${modelName}/run-signal`, {method: 'POST'});
+  const d = await r.json();
+  await appModal.alert(d.success ? 'Signal Run Started' : 'Failed',
+    d.success
+      ? `Task: <code>${d.task_id}</code><br>Signals out: <code>${d.signals_out}</code><br>` +
+        `<small>${d.cmd || ''}</small>`
+      : ('Error: ' + d.error),
+    d.success ? 'success' : 'danger');
+  setTimeout(loadTriggers, 5000);
+}
+
+async function triggerRunExecute(modelName) {
+  const ok = await appModal.confirm('Run Execute (DRY-RUN)',
+    `Run <code>fyers_executor.py --dry-run</code> for <strong>${modelName}</strong>?<br>` +
+    'Uses the newest signal file in the model\'s signals dir. NO real orders placed.',
+    {okLabel: 'Dry-Run Execute', okClass: 'btn-warning'});
+  if (!ok) return;
+  const r = await fetch(`/admin/${modelName}/run-execute`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({dry_run: true}),
+  });
+  const d = await r.json();
+  await appModal.alert(d.success ? 'Execute Started' : 'Failed',
+    d.success
+      ? `Task: <code>${d.task_id}</code><br>Signal file: <code>${d.signals_file}</code><br>dry_run=${d.dry_run}`
+      : ('Error: ' + d.error),
+    d.success ? 'success' : 'danger');
+  setTimeout(loadTriggers, 5000);
+}
+
+async function triggerToggleEnabled(modelName, newVal) {
+  const ok = await appModal.confirm(
+    newVal ? 'Resume Model' : 'Pause Model',
+    `Set <strong>${modelName}</strong> enabled = <strong>${newVal}</strong>?<br>` +
+    (newVal
+      ? 'Model will trade on next scheduled signal.'
+      : 'Model live_signal will short-circuit and emit no orders.'),
+    {okLabel: newVal ? 'Resume' : 'Pause',
+     okClass: newVal ? 'btn-success' : 'btn-danger'});
+  if (!ok) return;
+  const r = await fetch(`/admin/${modelName}/toggle-enabled`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({enabled: newVal}),
+  });
+  const d = await r.json();
+  await appModal.alert(d.success ? 'Updated' : 'Failed',
+    d.success
+      ? `<code>${modelName}</code> enabled = <strong>${d.settings.enabled}</strong>`
+      : ('Error: ' + d.error),
+    d.success ? 'success' : 'danger');
+  loadTriggers();
+}
+
+document.getElementById('btn_triggers_refresh').addEventListener('click', loadTriggers);
+
+// ---------------------------------------------------------------------------
+// Per-Model Data Status — iterates ALL models from /admin/models/portfolio
+// (currently 5 — 4 equity + 1 options). Shows last signal, last data pull,
+// universe size, ranking count. Resilient to missing triggers/ranking
+// endpoints for models not in MODEL_PATHS (e.g. options model).
+// ---------------------------------------------------------------------------
+
+function _dash(v) {
+  return (v === null || v === undefined || v === '' || (typeof v === 'number' && !isFinite(v)))
+    ? '<span class="small-mute">—</span>'
+    : v;
+}
+
+async function _fetchJson(url) {
+  try {
+    const r = await fetch(url, {cache: 'no-store'});
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+function _dataPulledBadge(lastSig, rankingCount) {
+  // Determine per-model "data pulled" state:
+  //   NO     — never ran (no signal file, no ranking)
+  //   STALE  — last signal > 2 days ago (model not running regularly)
+  //   YES    — signal in last 2 days AND ranking populated
+  if (!lastSig && (rankingCount == null || rankingCount === 0)) {
+    return '<span class="badge bg-danger" title="No signal file or ranking found">NO</span>';
+  }
+  if (lastSig) {
+    const ageMs = Date.now() - new Date(lastSig).getTime();
+    const ageDays = ageMs / 86400000;
+    if (ageDays > 2) {
+      return `<span class="badge bg-warning text-dark" title="Last signal ${ageDays.toFixed(1)}d ago">STALE</span>`;
+    }
+    return `<span class="badge bg-success" title="Fresh — last signal ${ageDays.toFixed(1)}d ago">YES</span>`;
+  }
+  // Ranking exists but no signal-file timestamp resolved
+  if (rankingCount && rankingCount > 0) {
+    return '<span class="badge bg-info" title="Ranking present, signal timestamp unresolved">PARTIAL</span>';
+  }
+  return '<span class="badge bg-danger">NO</span>';
+}
+
+async function _loadModelDataStatus(modelName, enabled) {
+  // triggers/status only succeeds for models in MODEL_PATHS (4 equity).
+  // Options model returns 400 — fall back to ranking endpoint alone.
+  // Use allSettled so a single failed endpoint never drops the model row.
+  const results = await Promise.allSettled([
+    _fetchJson(`/admin/models/${encodeURIComponent(modelName)}/triggers/status`),
+    _fetchJson(`/admin/${encodeURIComponent(modelName)}/ranking?top=999`),
+  ]);
+  const statusRes = results[0].status === 'fulfilled' ? results[0].value : null;
+  const rankingRes = results[1].status === 'fulfilled' ? results[1].value : null;
+
+  const statusOk = !!(statusRes && statusRes.success);
+  const wired = statusOk;  // triggers/status succeeds only for wired models
+  const lastSig = statusOk ? statusRes.last_signal_at : null;
+  const lastExec = statusOk ? statusRes.last_execution_at : null;
+  let universeSize = null;
+  let rankingCount = null;
+  let rankingGenAt = null;
+  if (rankingRes && rankingRes.success) {
+    universeSize = rankingRes.universe_size != null ? rankingRes.universe_size : null;
+    rankingCount = Array.isArray(rankingRes.ranking) ? rankingRes.ranking.length : null;
+    rankingGenAt = rankingRes.generated_at || rankingRes.date || null;
+  }
+  const effectiveLastSig = lastSig || rankingGenAt;
+  const enabledBadge = enabled
+    ? '<span class="badge bg-success">ON</span>'
+    : '<span class="badge bg-secondary">OFF</span>';
+  const wiredBadge = wired
+    ? '<span class="badge bg-info">WIRED</span>'
+    : '<span class="badge bg-warning text-dark" title="No live_signal/executor route in MODEL_PATHS">NOT WIRED</span>';
+  const dataPulledBadge = _dataPulledBadge(effectiveLastSig, rankingCount);
+  return `<tr${enabled ? '' : ' style="opacity:0.6;"'}>
+    <td><strong>${modelName}</strong></td>
+    <td>${enabledBadge}</td>
+    <td>${wiredBadge}</td>
+    <td>${dataPulledBadge}</td>
+    <td class="small">${_dash(effectiveLastSig ? _ts(effectiveLastSig) : null)}</td>
+    <td class="small">${_dash(lastExec ? _ts(lastExec) : null)}</td>
+    <td class="text-end">${_dash(universeSize)}</td>
+    <td class="text-end">${_dash(rankingCount)}</td>
+  </tr>`;
+}
+
+async function loadDataStatus() {
+  const body = document.getElementById('datastatus_body');
+  const countEl = document.getElementById('datastatus_count');
+  body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr>';
+  if (countEl) countEl.textContent = '…';
+  const pf = await _fetchJson('/admin/models/portfolio');
+  if (!pf || !pf.success) {
+    body.innerHTML = '<tr><td colspan="8" class="text-danger small">Failed to load /admin/models/portfolio</td></tr>';
+    if (countEl) countEl.textContent = 'error';
+    return;
+  }
+  const models = pf.models || [];
+  if (countEl) countEl.textContent = `${models.length} models`;
+  if (models.length === 0) {
+    body.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No models seeded.</td></tr>';
+    return;
+  }
+  // Iterate ALL models — enabled AND disabled, wired AND not — so operators see full picture.
+  // allSettled ensures a single bad model never drops the rest.
+  const settled = await Promise.allSettled(
+    models.map(m => _loadModelDataStatus(m.model_name, !!m.enabled))
+  );
+  const rows = settled.map((r, i) => {
+    if (r.status === 'fulfilled') return r.value;
+    const m = models[i];
+    return `<tr style="background:#fff8f0;">
+      <td><strong>${m.model_name}</strong></td>
+      <td colspan="7" class="text-danger small">render failed: ${String(r.reason || 'unknown').slice(0,200)}</td>
+    </tr>`;
+  });
+  body.innerHTML = rows.join('');
+  if (countEl) countEl.textContent = `${rows.length} models`;
+}
+
+document.getElementById('btn_datastatus_refresh').addEventListener('click', loadDataStatus);
+
+// Initial load + auto-refresh
+loadSummary(); loadHistory(); loadRunLogs(); loadTriggers(); loadDataStatus();
+setInterval(loadSummary, 30000);  // every 30s
+setInterval(loadTriggers, 60000); // every 60s
+setInterval(loadDataStatus, 60000); // every 60s
+</script>
+{% endblock %}

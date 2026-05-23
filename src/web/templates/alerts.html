@@ -1,0 +1,446 @@
+{% extends "base.html" %}
+
+{% block title %}Alerts{% endblock %}
+
+{% block content %}
+<!-- Modern Stats Cards -->
+<div class="row g-4 mb-5">
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.1s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Unread Alerts</h6>
+                        <h2 class="fw-bold mb-0" id="unread-alerts">0</h2>
+                        <small class="text-danger">
+                            <i class="bi bi-exclamation-triangle-fill"></i> Need attention
+                        </small>
+                    </div>
+                    <div class="bg-gradient-danger rounded-3 p-3">
+                        <i class="bi bi-exclamation-triangle-fill text-white fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.2s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Critical</h6>
+                        <h2 class="fw-bold mb-0" id="critical-alerts">0</h2>
+                        <small class="text-primary">
+                            <i class="bi bi-shield-exclamation-fill"></i> Urgent action
+                        </small>
+                    </div>
+                    <div class="bg-gradient-primary rounded-3 p-3">
+                        <i class="bi bi-exclamation-triangle-fill text-white fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.3s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Warnings</h6>
+                        <h2 class="fw-bold mb-0" id="warning-alerts">0</h2>
+                        <small class="text-warning">
+                            <i class="bi bi-exclamation-circle-fill"></i> Monitor closely
+                        </small>
+                    </div>
+                    <div class="bg-gradient-warning rounded-3 p-3">
+                        <i class="bi bi-exclamation-circle-fill text-white fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.4s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Info</h6>
+                        <h2 class="fw-bold mb-0" id="info-alerts">15</h2>
+                        <small class="text-info">
+                            <i class="bi bi-info-circle-fill"></i> Information
+                        </small>
+                    </div>
+                    <div class="bg-gradient-info rounded-3 p-3">
+                        <i class="bi bi-info-circle-fill text-white fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">Alerts</h5>
+        <div class="d-flex align-items-center">
+            <select class="form-select form-select-sm me-2" id="severity-filter">
+                <option value="all">All Severities</option>
+                <option value="critical">Critical</option>
+                <option value="warning">Warning</option>
+                <option value="info">Info</option>
+            </select>
+            <select class="form-select form-select-sm me-2" id="status-filter">
+                <option value="all">All Status</option>
+                <option value="new">Unread</option>
+                <option value="read">Read</option>
+            </select>
+            <button class="btn btn-sm btn-outline-primary me-2" id="refresh-alerts">
+                <i class="bi bi-arrow-repeat"></i>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" id="clear-alerts">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="alerts-table">
+                <thead class="table-light">
+                    <tr>
+                        <th>Time</th>
+                        <th>Type</th>
+                        <th>Message</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Alerts will be populated by JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-2">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">Alert Trends</h5>
+            </div>
+            <div class="card-body">
+                <div style="height: 200px;">
+                    <canvas id="alerts-trend-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm alert-card">
+            <div class="card-header bg-white">
+                <h5 class="card-title mb-0">Alert Distribution</h5>
+            </div>
+            <div class="card-body">
+                <div class="chart-wrapper">
+                    <div class="chart-container">
+                        <canvas id="alerts-distribution-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Fetch alerts
+    async function fetchAlerts() {
+        try {
+            const response = await fetch('/api/alerts');
+            const alerts = await response.json();
+            
+            // Update summary cards
+            document.getElementById('unread-alerts').textContent = alerts.filter(alert => alert.status === 'new').length;
+            document.getElementById('critical-alerts').textContent = alerts.filter(alert => alert.severity === 'critical').length;
+            document.getElementById('warning-alerts').textContent = alerts.filter(alert => alert.severity === 'warning').length;
+            document.getElementById('info-alerts').textContent = alerts.filter(alert => alert.severity === 'info').length;
+            
+            const table = document.getElementById('alerts-table').getElementsByTagName('tbody')[0];
+            table.innerHTML = '';
+            
+            // Sort alerts by time (newest first)
+            alerts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            
+            alerts.forEach(alert => {
+                const row = table.insertRow();
+                row.insertCell(0).textContent = new Date(alert.timestamp).toLocaleString();
+                row.insertCell(1).textContent = alert.type;
+                row.insertCell(2).textContent = alert.message;
+                
+                const severityCell = row.insertCell(3);
+                severityCell.textContent = alert.severity.charAt(0).toUpperCase() + alert.severity.slice(1);
+                severityCell.className = getSeverityClass(alert.severity);
+                
+                const statusCell = row.insertCell(4);
+                statusCell.textContent = alert.status.charAt(0).toUpperCase() + alert.status.slice(1);
+                statusCell.className = alert.status === 'new' ? 'text-danger fw-bold' : 'text-muted';
+                
+                // Action buttons
+                const actionCell = row.insertCell(5);
+                const markReadBtn = document.createElement('button');
+                markReadBtn.className = 'btn btn-sm btn-outline-primary me-1';
+                markReadBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
+                markReadBtn.title = 'Mark as Read';
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-sm btn-outline-danger';
+                deleteBtn.innerHTML = '<i class="bi bi-trash-fill"></i>';
+                deleteBtn.title = 'Delete';
+                
+                actionCell.appendChild(markReadBtn);
+                actionCell.appendChild(deleteBtn);
+            });
+        } catch (error) {
+            console.error('Error fetching alerts:', error);
+        }
+    }
+    
+    // Get CSS class for severity
+    function getSeverityClass(severity) {
+        switch (severity) {
+            case 'critical':
+                return 'text-danger fw-bold';
+            case 'warning':
+                return 'text-warning fw-bold';
+            case 'info':
+                return 'text-info';
+            default:
+                return '';
+        }
+    }
+    
+    // Initialize alerts trend chart
+    function initAlertsTrendChart() {
+        const ctx = document.getElementById('alerts-trend-chart').getContext('2d');
+        
+        // Check if dark mode is enabled
+        const isDarkMode = false;
+        
+        // Define colors based on theme
+        const criticalBorderColor = isDarkMode ? 'rgb(255, 107, 107)' : 'rgb(220, 53, 69)';
+        const criticalBgColor = isDarkMode ? 'rgba(255, 107, 107, 0.2)' : 'rgba(220, 53, 69, 0.1)';
+        const warningBorderColor = isDarkMode ? 'rgb(255, 215, 0)' : 'rgb(255, 193, 7)';
+        const warningBgColor = isDarkMode ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255, 193, 7, 0.1)';
+        const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+        const textColor = isDarkMode ? '#e0e0e0' : '#000';
+        const tooltipBgColor = isDarkMode ? 'rgba(40, 40, 40, 0.9)' : 'rgba(0, 0, 0, 0.8)';
+        
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                datasets: [{
+                    label: 'Critical Alerts',
+                    data: [1, 2, 0, 1, 3, 2, 1],
+                    borderColor: criticalBorderColor,
+                    backgroundColor: criticalBgColor,
+                    tension: 0.3,
+                    fill: true
+                }, {
+                    label: 'Warning Alerts',
+                    data: [2, 1, 3, 2, 1, 0, 2],
+                    borderColor: warningBorderColor,
+                    backgroundColor: warningBgColor,
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: textColor
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: tooltipBgColor,
+                        titleFont: {
+                            size: 12
+                        },
+                        bodyFont: {
+                            size: 11
+                        },
+                        padding: 8,
+                        titleColor: isDarkMode ? '#ffffff' : '#ffffff',
+                        bodyColor: isDarkMode ? '#e0e0e0' : '#ffffff'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Alerts',
+                            color: textColor
+                        },
+                        grid: {
+                            color: gridColor
+                        },
+                        ticks: {
+                            color: textColor
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Day',
+                            color: textColor
+                        },
+                        grid: {
+                            color: gridColor
+                        },
+                        ticks: {
+                            color: textColor
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Initialize alerts distribution chart
+    function initAlertsDistributionChart() {
+        const ctx = document.getElementById('alerts-distribution-chart').getContext('2d');
+        
+        // Check if dark mode is enabled
+        const isDarkMode = false;
+        
+        // Define colors based on theme
+        const backgroundColors = isDarkMode ? [
+            'rgba(37, 139, 255, 0.9)',    // Brighter blue
+            'rgba(76, 201, 100, 0.9)',    // Brighter green
+            'rgba(255, 215, 0, 0.9)',     // Brighter yellow
+            'rgba(169, 169, 169, 0.9)',   // Brighter gray
+            'rgba(255, 107, 107, 0.9)'    // Brighter red
+        ] : [
+            'rgba(13, 110, 253, 0.8)',
+            'rgba(40, 167, 69, 0.8)',
+            'rgba(255, 193, 7, 0.8)',
+            'rgba(108, 117, 125, 0.8)',
+            'rgba(220, 53, 69, 0.8)'
+        ];
+        
+        const borderColors = isDarkMode ? [
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)'
+        ] : [
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)',
+            'rgba(255, 255, 255, 1)'
+        ];
+        
+        const chart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Order Execution', 'Price Alerts', 'Risk Management', 'System', 'Data Quality'],
+                datasets: [{
+                    data: [35, 25, 20, 12, 8],
+                    backgroundColor: backgroundColors,
+                    borderColor: borderColors,
+                    borderWidth: 2,
+                    hoverOffset: 10,
+                    borderRadius: 3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 10,
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            font: {
+                                size: 10
+                            },
+                            color: isDarkMode ? '#e0e0e0' : '#000'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: isDarkMode ? 'rgba(40, 40, 40, 0.9)' : 'rgba(0, 0, 0, 0.8)',
+                        titleFont: {
+                            size: 12
+                        },
+                        bodyFont: {
+                            size: 11
+                        },
+                        padding: 8,
+                        callbacks: {
+                            label: function(context) {
+                                return context.label + ': ' + context.parsed + '%';
+                            }
+                        },
+                        titleColor: isDarkMode ? '#ffffff' : '#ffffff',
+                        bodyColor: isDarkMode ? '#e0e0e0' : '#ffffff'
+                    },
+                    datalabels: {
+                        color: isDarkMode ? '#ffffff' : '#fff',
+                        formatter: (value, ctx) => {
+                            let sum = 0;
+                            let dataArr = ctx.chart.data.datasets[0].data;
+                            dataArr.map(data => {
+                                sum += data;
+                            });
+                            let percentage = (value * 100 / sum).toFixed(1) + "%";
+                            return percentage;
+                        },
+                        font: {
+                            weight: 'bold',
+                            size: 12
+                        }
+                    }
+                },
+                animation: {
+                    animateRotate: true,
+                    animateScale: true,
+                    duration: 800
+                }
+            }
+        });
+    }
+    
+    // Event listeners
+    document.getElementById('severity-filter').addEventListener('change', fetchAlerts);
+    document.getElementById('status-filter').addEventListener('change', fetchAlerts);
+    document.getElementById('refresh-alerts').addEventListener('click', fetchAlerts);
+    
+    document.getElementById('clear-alerts').addEventListener('click', function() {
+        if (confirm('Are you sure you want to clear all alerts?')) {
+            // In a real implementation, this would make an API call to clear alerts
+            alert('Alerts cleared!');
+            fetchAlerts();
+        }
+    });
+    
+    // Fetch data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchAlerts();
+        initAlertsTrendChart();
+        initAlertsDistributionChart();
+        // Refresh every 30 seconds
+        setInterval(fetchAlerts, 30000);
+    });
+</script>
+{% endblock %}

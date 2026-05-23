@@ -1,0 +1,937 @@
+{% extends "v2/base.html" %}
+{% block title %}Settings{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Fyers Broker Credentials -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-shield-lock me-2"></i>Fyers Broker</span>
+                <span id="fyers-conn-badge" class="badge bg-secondary">Checking...</span>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label small">Client ID (App ID)</label>
+                    <input type="text" class="form-control form-control-sm" id="fyers-client-id" placeholder="e.g. ABCD1234-100">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Secret Key</label>
+                    <div class="input-group input-group-sm">
+                        <input type="password" class="form-control" id="fyers-secret-key" placeholder="Enter secret key">
+                        <button class="btn btn-outline-secondary" type="button" onclick="toggleSecret()"><i class="bi bi-eye"></i></button>
+                    </div>
+                    <div class="form-text">Only needed when setting up or changing credentials</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Redirect URI</label>
+                    <input type="text" class="form-control form-control-sm" id="fyers-redirect-uri" placeholder="https://stock.oneshell.in/api/brokers/fyers/exchange-token">
+                </div>
+                <!-- Token Status -->
+                <div id="token-status-section" class="mb-3 p-2 rounded border small" style="display:none;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-muted">Token Status</span>
+                        <span id="token-status-badge" class="badge bg-secondary">--</span>
+                    </div>
+                    <div id="token-expiry-info" class="text-muted"></div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button class="btn btn-primary btn-sm" onclick="saveFyersConfig()"><i class="bi bi-check me-1"></i> Save Credentials</button>
+                    <button class="btn btn-outline-success btn-sm" onclick="testFyersConnection()"><i class="bi bi-plug me-1"></i> Test Connection</button>
+                    <button class="btn btn-outline-info btn-sm" onclick="refreshFyersToken()"><i class="bi bi-arrow-repeat me-1"></i> Refresh Token</button>
+                    <button class="btn btn-outline-warning btn-sm" onclick="generateAuthUrl()"><i class="bi bi-key me-1"></i> Re-Auth</button>
+                </div>
+                <div id="fyers-auth-section" class="mt-3" style="display:none;">
+                    <div class="alert alert-info small mb-2">
+                        <i class="bi bi-info-circle me-1"></i> Complete authorization in the browser, then paste the auth code below:
+                    </div>
+                    <div class="input-group input-group-sm">
+                        <input type="text" class="form-control" id="fyers-auth-code" placeholder="Paste authorization code here">
+                        <button class="btn btn-success" onclick="exchangeAuthCode()"><i class="bi bi-check2"></i> Verify</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Capital (live from Fyers) -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header"><i class="bi bi-piggy-bank me-2"></i>Capital (Live from Fyers)</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label small">Available Cash + Holdings Value</label>
+                    <div class="input-group">
+                        <span class="input-group-text">&#8377;</span>
+                        <input type="text" class="form-control" id="virtual-capital" value="--" readonly>
+                    </div>
+                    <div class="form-text">Real Fyers account NAV. Rebalance + Buy buttons size orders using available cash.</div>
+                </div>
+                <div id="momrot-summary" class="mb-2 small">
+                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Portfolio Value (NAV):</span> <strong id="mr-value">--</strong></div>
+                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Available Cash:</span> <strong id="mr-cash">--</strong></div>
+                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Market Value (holdings):</span> <strong id="mr-mv">--</strong></div>
+                    <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Open Position:</span> <strong id="mr-pos">--</strong></div>
+                    <div class="d-flex justify-content-between"><span class="text-muted">Unrealized P&L:</span> <strong id="mr-pnl">--</strong></div>
+                </div>
+                <a href="/admin/momrot" class="btn btn-primary btn-sm"><i class="bi bi-graph-up-arrow me-1"></i> Open Trading Models Dashboard</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Per-Model Capital Allocations (multi-model) -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-wallet2 me-2"></i>Model Capital Allocations</div>
+            <div class="card-body">
+                <div class="text-muted small mb-2">
+                    Each model spends only its own cash. Deposits add to that model's pool; withdrawals pull from it. Profits + losses stay within the model. Other models are untouched.
+                </div>
+                <style>
+                  /* T8 alignment fix: keep numeric columns compact + nowrap,
+                     prevent action-button vertical stacking, lock column widths.
+                     Buttons are icon-only with tooltips to keep the row narrow
+                     on standard 1100-1400px viewports. */
+                  .alloc-table { table-layout: auto; }
+                  .alloc-table th, .alloc-table td { vertical-align: middle; }
+                  .alloc-table td.num, .alloc-table th.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+                  .alloc-table .col-model { min-width: 180px; max-width: 220px; }
+                  .alloc-table .col-position { min-width: 150px; }
+                  .alloc-table .col-actions { width: 1%; white-space: nowrap; }
+                  .alloc-table th, .alloc-table td { padding: 0.4rem 0.5rem; }
+                  .alloc-table .pnl-pct { display:block; font-size: 0.72rem; opacity: 0.85; margin-top: 2px; }
+                  .alloc-table .action-bar { display:flex; gap: 3px; flex-wrap: nowrap; justify-content: flex-end; align-items: center; }
+                  .alloc-table .action-bar .btn { padding: 0.2rem 0.45rem; font-size: 0.78rem; line-height: 1; min-width: 30px; }
+                  .alloc-table .action-bar .btn i { font-size: 0.85rem; }
+                  .alloc-table .lookahead-pill { font-size: 0.65rem; padding: 1px 6px; border-radius: 10px; background:#fff3cd; color:#856404; border:1px solid #ffeeba; margin-left:6px; vertical-align: middle; }
+                  .alloc-table .universe-tag { font-size: 0.7rem; color:#6c757d; display:block; }
+
+                  /* B1 fix v2: kebab dropdown menu is detached to <body> on
+                     show.bs.dropdown (see JS at bottom). That escapes ANY
+                     clipping ancestor (.table-responsive, .card-body,
+                     .col-12, etc.) regardless of overflow settings. While
+                     attached to body, it gets the .alloc-menu-floating class
+                     for opaque styling + z-index above everything. */
+                  .alloc-table .action-bar .dropdown-menu,
+                  .alloc-menu-floating {
+                    font-size: 0.88rem;
+                    min-width: 230px;
+                    padding: 6px 0;
+                    background: #ffffff;
+                    border: 1px solid #d6dae3;
+                    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.22);
+                    border-radius: 8px;
+                  }
+                  .alloc-menu-floating {
+                    position: absolute;        /* coordinates set by JS at show time */
+                    z-index: 3000;             /* above modal-backdrop (1050) + everything */
+                    margin: 0;
+                    list-style: none;
+                  }
+                  .alloc-table .action-bar .dropdown-item,
+                  .alloc-menu-floating .dropdown-item {
+                    padding: 8px 14px;
+                    white-space: nowrap;
+                    line-height: 1.3;
+                    display: block;
+                    color: #212529;
+                    text-decoration: none;
+                  }
+                  .alloc-table .action-bar .dropdown-item:hover,
+                  .alloc-menu-floating .dropdown-item:hover {
+                    background: #f3f5f9;
+                    color: #000;
+                  }
+                  .alloc-table .action-bar .dropdown-item.text-danger,
+                  .alloc-menu-floating .dropdown-item.text-danger { color: #d4453a; }
+                  .alloc-table .action-bar .dropdown-item.text-danger:hover,
+                  .alloc-menu-floating .dropdown-item.text-danger:hover {
+                    background: #fff0f0;
+                    color: #a82622;
+                  }
+                  .alloc-menu-floating .dropdown-divider {
+                    height: 0;
+                    margin: 4px 0;
+                    overflow: hidden;
+                    border-top: 1px solid #e3e6ef;
+                  }
+
+                  /* B3 fix: disabled-row styling. Mute non-action cells so the
+                     row reads as paused at a glance while keeping action
+                     buttons fully usable for re-enable / deposit / etc. */
+                  .alloc-table tr.row-disabled td.col-model,
+                  .alloc-table tr.row-disabled td.num,
+                  .alloc-table tr.row-disabled td.col-position { opacity: 0.55; }
+                  .alloc-table .disabled-badge {
+                    background: #6c757d; color: #fff;
+                    font-size: 0.62rem; padding: 2px 7px;
+                    border-radius: 10px; vertical-align: middle;
+                    margin-left: 6px; letter-spacing: 0.4px;
+                  }
+                </style>
+                <div class="table-responsive">
+                    <table class="table table-sm alloc-table mb-0">
+                        <thead><tr>
+                            <th class="col-model">Model</th>
+                            <th class="text-end num" title="Total Deposited (principal in)">Deposited</th>
+                            <th class="text-end num">Cash</th>
+                            <th class="col-position">Open Position</th>
+                            <th class="text-end num">NAV</th>
+                            <th class="text-end num">P&amp;L</th>
+                            <th class="text-center col-actions">Actions</th>
+                        </tr></thead>
+                        <tbody id="alloc_tbody"><tr><td colspan="7" class="text-center text-muted">Loading…</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deposit/Withdraw inline form (toggled per row) -->
+    <div class="col-12 d-none" id="cap_panel">
+        <div class="card border-info">
+            <div class="card-header bg-info bg-opacity-25">
+                <span id="cap_action_label">Deposit</span> for <strong id="cap_model_name">--</strong>
+            </div>
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-4">
+                        <label class="form-label small mb-0">Amount ₹</label>
+                        <input class="form-control form-control-sm" id="cap_amount" type="number" step="100" placeholder="e.g. 29000">
+                    </div>
+                    <div class="col-md-8">
+                        <button class="btn btn-primary btn-sm" id="cap_submit" onclick="submitCap()">Confirm</button>
+                        <button class="btn btn-link btn-sm" onclick="document.getElementById('cap_panel').classList.add('d-none')">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Seed Position modal-like inline form (toggled per row) -->
+    <div class="col-12 d-none" id="seed_panel">
+        <div class="card border-warning">
+            <div class="card-header bg-warning bg-opacity-25">Bootstrap an existing position for <strong id="seed_model_name">--</strong></div>
+            <div class="card-body">
+                <div class="text-muted small mb-2">No Fyers order is placed. Use this only to import an existing live position into the model's ledger so live executor and NAV reflect reality.</div>
+                <div class="row g-2">
+                    <div class="col-md-3"><input class="form-control form-control-sm" id="seed_symbol" placeholder="NSE:RELIANCE-EQ"></div>
+                    <div class="col-md-2"><input class="form-control form-control-sm" id="seed_qty" type="number" placeholder="Qty"></div>
+                    <div class="col-md-2"><input class="form-control form-control-sm" id="seed_entry_px" type="number" step="0.01" placeholder="Entry ₹"></div>
+                    <div class="col-md-2"><input class="form-control form-control-sm" id="seed_entry_date" type="date"></div>
+                    <div class="col-md-3">
+                        <button class="btn btn-warning btn-sm" onclick="submitSeed()">Seed Position</button>
+                        <button class="btn btn-link btn-sm" onclick="document.getElementById('seed_panel').classList.add('d-none')">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rotation Rules — per-model -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-arrow-repeat me-2"></i>Rotation Rules — All Models</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr>
+                            <th>Model</th>
+                            <th>Universe</th>
+                            <th class="text-center">Top-N</th>
+                            <th class="text-center">Max Conc</th>
+                            <th class="text-center">Lookback</th>
+                            <th>Rebalance</th>
+                            <th>Stop / Target</th>
+                            <th>Exit</th>
+                        </tr></thead>
+                        <tbody id="rotation_rules_tbody"></tbody>
+                    </table>
+                </div>
+                <div class="alert alert-warning py-1 px-2 small mb-0 mt-2">
+                    Rotation runs automatically per model. Use the Portfolio page's per-model Rebalance button to force a live rebalance.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Strategy info — per-model -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-info-circle me-2"></i>Strategy: Trading Models</div>
+            <div class="card-body">
+                <div class="row g-3" id="strategy_info_container"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadSettings() {
+    const fyers = await Trading.api('/brokers/fyers/api/info');
+
+    // Fyers broker + token status
+    if (fyers.success) {
+        document.getElementById('fyers-client-id').value = fyers.client_id || '';
+        document.getElementById('fyers-redirect-uri').value = fyers.redirect_uri || '';
+        const badge = document.getElementById('fyers-conn-badge');
+        if (fyers.access_token) {
+            badge.className = 'badge bg-success';
+            badge.textContent = 'Connected';
+        } else if (fyers.client_id) {
+            badge.className = 'badge bg-warning';
+            badge.textContent = 'Needs Auth';
+        } else {
+            badge.className = 'badge bg-secondary';
+            badge.textContent = 'Not Configured';
+        }
+
+        // Token expiry status
+        if (fyers.access_token) {
+            const tokenSection = document.getElementById('token-status-section');
+            tokenSection.style.display = '';
+            const tokenBadge = document.getElementById('token-status-badge');
+            const tokenInfo = document.getElementById('token-expiry-info');
+
+            if (fyers.token_is_expired) {
+                tokenBadge.className = 'badge bg-danger';
+                tokenBadge.textContent = 'Expired';
+                tokenInfo.innerHTML = 'Token has expired. Click <strong>Refresh Token</strong> or <strong>Re-Auth</strong>.';
+            } else if (fyers.token_expiring_soon) {
+                tokenBadge.className = 'badge bg-warning';
+                tokenBadge.textContent = 'Expiring Soon';
+                const hrs = fyers.token_expires_in_hours;
+                tokenInfo.textContent = hrs != null ? `Expires in ${hrs} hours` : 'Expiring soon';
+            } else if (fyers.token_expiry) {
+                tokenBadge.className = 'badge bg-success';
+                tokenBadge.textContent = 'Valid';
+                const hrs = fyers.token_expires_in_hours;
+                tokenInfo.textContent = hrs != null ? `Expires in ${hrs} hours` : `Expires: ${fyers.token_expiry}`;
+            } else {
+                tokenBadge.className = 'badge bg-info';
+                tokenBadge.textContent = 'Active';
+                tokenInfo.textContent = 'Token active (expiry unknown)';
+            }
+        }
+    }
+
+    // Momentum rotation summary - live from Fyers
+    try {
+        const mrR = await fetch('/admin/momrot/state');
+        const mr = await mrR.json();
+        if (mr.success) {
+            const s = mr.data;
+            const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
+            const pnlCls = n => n>0?'text-success':(n<0?'text-danger':'text-muted');
+            document.getElementById('virtual-capital').value = fmtINR(s.total_value).replace('₹','');
+            document.getElementById('mr-value').textContent = fmtINR(s.total_value);
+            document.getElementById('mr-cash').textContent = fmtINR(s.cash);
+            document.getElementById('mr-mv').textContent = fmtINR(s.market_value);
+            document.getElementById('mr-pos').textContent = (s.open_positions && s.open_positions[0])
+                ? `${s.open_positions[0].symbol} (${s.open_positions[0].qty} @ ${fmtINR(s.open_positions[0].entry_price)})`
+                : 'None';
+            const pnlEl = document.getElementById('mr-pnl');
+            pnlEl.textContent = fmtINR(s.total_pnl) + ' (' + (s.total_pct>=0?'+':'') + s.total_pct.toFixed(2) + '%)';
+            pnlEl.className = pnlCls(s.total_pnl);
+        }
+    } catch(e) { console.error(e); }
+}
+
+
+function toggleSecret() {
+    const input = document.getElementById('fyers-secret-key');
+    input.type = input.type === 'password' ? 'text' : 'password';
+}
+
+async function saveFyersConfig() {
+    const clientId = document.getElementById('fyers-client-id').value.trim();
+    const secretKey = document.getElementById('fyers-secret-key').value.trim();
+    const redirectUri = document.getElementById('fyers-redirect-uri').value.trim();
+    if (!clientId) { Trading.toast('Client ID is required', 'warning'); return; }
+    const body = { client_id: clientId, redirect_uri: redirectUri };
+    if (secretKey) body.secret_key = secretKey;
+    const res = await Trading.api('/api/brokers/fyers/config', { method: 'POST', body });
+    if (res.success) {
+        Trading.toast('Fyers credentials saved', 'success');
+        const badge = document.getElementById('fyers-conn-badge');
+        badge.className = 'badge bg-warning'; badge.textContent = 'Needs Auth';
+        if (res.auth_url) {
+            window.open(res.auth_url, '_blank');
+            document.getElementById('fyers-auth-section').style.display = '';
+        }
+    } else {
+        Trading.toast(res.error || 'Failed to save', 'danger');
+    }
+}
+
+async function testFyersConnection() {
+    Trading.toast('Testing connection...', 'info');
+    const res = await Trading.api('/api/brokers/fyers/test', { method: 'POST' });
+    if (res.success) {
+        Trading.toast('Fyers connection successful!', 'success');
+        document.getElementById('fyers-conn-badge').className = 'badge bg-success';
+        document.getElementById('fyers-conn-badge').textContent = 'Connected';
+    } else {
+        Trading.toast(res.error || 'Connection failed', 'danger');
+    }
+}
+
+async function refreshFyersToken() {
+    Trading.toast('Refreshing token via v3 API...', 'info');
+    const res = await Trading.api('/brokers/fyers/api/refresh-token', { method: 'POST' });
+    if (res.success) {
+        Trading.toast('Token refreshed successfully!', 'success');
+        document.getElementById('fyers-conn-badge').className = 'badge bg-success';
+        document.getElementById('fyers-conn-badge').textContent = 'Connected';
+        // Reload to update token status
+        loadSettings();
+    } else {
+        Trading.toast(res.error || 'Token refresh failed. Try Re-Auth.', 'danger');
+    }
+}
+
+async function generateAuthUrl() {
+    const res = await Trading.api('/api/brokers/fyers/auth-url', { method: 'POST' });
+    if (res.success && res.auth_url) {
+        window.open(res.auth_url, '_blank');
+        document.getElementById('fyers-auth-section').style.display = '';
+        Trading.toast('Auth URL opened. Complete login, then paste the code.', 'info');
+    } else {
+        Trading.toast(res.error || 'Failed to generate auth URL. Save credentials first.', 'danger');
+    }
+}
+
+async function exchangeAuthCode() {
+    const authCode = document.getElementById('fyers-auth-code').value.trim();
+    if (!authCode) { Trading.toast('Paste the auth code first', 'warning'); return; }
+    const res = await Trading.api('/api/brokers/fyers/exchange-token', { method: 'POST', body: { auth_code: authCode } });
+    if (res.success) {
+        Trading.toast('Fyers authenticated successfully!', 'success');
+        document.getElementById('fyers-conn-badge').className = 'badge bg-success';
+        document.getElementById('fyers-conn-badge').textContent = 'Connected';
+        document.getElementById('fyers-auth-section').style.display = 'none';
+    } else {
+        Trading.toast(res.error || 'Auth code exchange failed', 'danger');
+    }
+}
+
+loadSettings();
+
+// ---- Per-model capital allocations ----
+const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
+const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
+
+// Per-model metadata: universe label + rotation rules + strategy info.
+// Drives the Capital Allocations table, Rotation Rules table, and Strategy cards.
+const MODEL_META = {
+  'momentum_n100_top5_max1': {
+    universe: 'Nifty 100 (live)', kind: 'equity',
+    title: 'N100 Top-5 (mc=1) + mid-month',
+    rules: { top_n: 5, max_concurrent: 1, lookback: '30d',
+             rebalance: '1st weekday/mo + day-15 (5pp lead)',
+             stop: 'None', target: 'None',
+             exit: 'Rank drop-out OR mid-month rotation' },
+    strategy: [
+      ['Ranker', '30-day return descending across live Nifty 100'],
+      ['Universe', 'Official NSE Nifty 100 (104 stocks)'],
+      ['Selection', 'Hold rank-1, max 1 concurrent position'],
+      ['Entry (monthly)', '1st weekday of month — unconditional rotate'],
+      ['Entry (mid-month)', 'Day-15 weekday — rotate only if rank-1 leads held by ≥5pp'],
+      ['Exit', 'Rotate on either check OR rank-1 changes mid-cycle'],
+      ['Backtest 2023-26 (honest costs)', '+81.4% CAGR / -46.5% DD / Calmar 1.75'],
+      ['Vs plain monthly', '+19.7pp CAGR improvement from mid-month'],
+      ['Realistic live', '40-60% CAGR after slippage + STT + brokerage + STCG'],
+    ],
+  },
+  'momentum_pseudo_n100_adv': {
+    universe: 'Pseudo-N100 ADV', kind: 'equity',
+    title: 'Pseudo-N100 ADV (mc=1)',
+    rules: { top_n: 5, max_concurrent: 1, lookback: '30d',
+             rebalance: '1st weekday/mo (no mid-month)',
+             stop: 'None', target: 'None',
+             exit: 'Rank drop-out' },
+    strategy: [
+      ['Ranker', '30-day return descending'],
+      ['Universe', 'Top-100 ADV from N500 (yearly PIT rebuild)'],
+      ['Smallcap filter', 'Drop NSE Nifty Smallcap 250 members'],
+      ['MAX_PRICE filter', '₹3K cap at entry'],
+      ['Selection', 'Hold rank-1, max 1 concurrent'],
+      ['Entry', '1st weekday/month — no mid-month check (tested, hurt CAGR)'],
+      ['Exit', 'Drop-out of top-5 → rotate'],
+      ['Backtest 2023-26 (honest costs)', '+96.98% CAGR / -26.72% DD / Calmar 3.63'],
+      ['Realistic live', '50-80% CAGR after slippage + STT + brokerage + STCG'],
+    ],
+  },
+  'midcap_narrow_60d_breakout': {
+    universe: 'Midcap-narrow (60d HH)', kind: 'equity',
+    title: 'Midcap 60d Breakout',
+    rules: { top_n: 5, max_concurrent: 1, lookback: '60d high',
+             rebalance: 'Event-driven', stop: 'None', target: 'None',
+             exit: '< 200d SMA' },
+    strategy: [
+      ['Ranker', '60-day high + vol surge + above 200d SMA'],
+      ['Universe', 'Midcap narrow basket'],
+      ['Entry', 'Event-driven on breakout'],
+      ['Exit', 'Close below 200d SMA'],
+      ['Style', 'Swing trend-following'],
+    ],
+  },
+  'n20_daily_large_only': {
+    universe: 'Top-20 ADV ∩ N100', kind: 'equity',
+    title: 'N20 Daily ADV ∩ N100',
+    rules: { top_n: 1, max_concurrent: 1, lookback: '30d',
+             rebalance: 'Daily', stop: 'None', target: 'None',
+             exit: 'Rank-1 changes' },
+    strategy: [
+      ['Ranker', '30d return descending'],
+      ['Universe', 'Top-20 ADV ∩ N100 (PIT each run)'],
+      ['Entry', 'Daily rotation if rank-1 changes'],
+      ['Selection', 'Hold rank-1 only, max 1 concurrent'],
+      ['MAX_PRICE filter', '₹2.5K cap'],
+    ],
+  },
+  'finnifty_ic_otm4_w300_lots5': {
+    universe: 'FinNifty Options', kind: 'options',
+    title: 'FinNifty Iron Condor',
+    rules: { top_n: '—', max_concurrent: 1, lookback: '—',
+             rebalance: 'Monthly expiry', stop: 'None', target: 'None',
+             exit: 'Expiry / breach' },
+    strategy: [
+      ['Strategy', 'Iron Condor on FinNifty monthly'],
+      ['Strikes', 'OTM 4% / wings 300pt'],
+      ['Size', '5 lots'],
+      ['Cycle', 'Monthly expiry'],
+    ],
+  },
+};
+
+async function loadAllocations() {
+  try {
+    const r = await fetch('/admin/models/portfolio', {cache: 'no-store'});
+    const d = await r.json();
+    if (!d.success) return;
+    renderRotationRules(d.models || []);
+    renderStrategyInfo(d.models || []);
+    const tbody = document.getElementById('alloc_tbody');
+    tbody.innerHTML = '';
+    (d.models||[]).forEach(m => {
+      const meta = MODEL_META[m.model_name] || { universe: '—', kind: 'unknown' };
+      const tr = document.createElement('tr');
+      const posHtml = m.open_symbol
+        ? `<div><strong>${m.open_symbol}</strong> <span class="text-muted small">x${m.open_qty} @ ${fmtINR(m.open_entry_px)}</span></div>
+           <div class="text-muted small">${m.open_entry_date||''}</div>`
+        : '<span class="text-muted">flat</span>';
+      const pnlCls = m.pnl_total > 0 ? 'pos' : (m.pnl_total < 0 ? 'neg' : 'neutral');
+      const enabledBadge = m.enabled ? '' : ' <span class="disabled-badge">DISABLED</span>';
+      if (!m.enabled) tr.classList.add('row-disabled');
+      const warnBadge = meta.warn ? ` <span class="lookahead-pill" title="Strategy note">${meta.warn}</span>` : '';
+      // Position-state-dependent button: clear/sell-mark if holding, seed if flat.
+      const posBtn = m.open_symbol
+        ? `<button class="btn btn-outline-danger" onclick="resetPos('${m.model_name}')" title="Mark flat (no Fyers order)" aria-label="Clear position"><i class="bi bi-x-circle"></i></button>`
+        : `<button class="btn btn-outline-primary" onclick="openSeed('${m.model_name}')" title="Seed existing position into ledger" aria-label="Seed position"><i class="bi bi-bookmark-plus"></i></button>`;
+      const dropdownId = `act_${m.model_name}`;
+      // B1 fix v2: build menu HTML separately. Markup is appended to <body>
+      // on click (see openKebabMenu) to escape the .table-responsive clip box.
+      const menuHtml = `
+        <li><a class="dropdown-item" href="#" data-action="bootstrap" data-model="${m.model_name}"><i class="bi bi-arrow-down-square me-2"></i>Bootstrap from legacy ledger</a></li>
+        <li><a class="dropdown-item" href="#" data-action="toggle" data-model="${m.model_name}" data-enabled="${m.enabled ? '1' : '0'}"><i class="bi ${m.enabled ? 'bi-pause-circle text-warning' : 'bi-play-circle text-success'} me-2"></i>${m.enabled ? 'Disable model' : 'Enable model'}</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item text-danger" href="#" data-action="reset" data-model="${m.model_name}"><i class="bi bi-trash me-2"></i>Hard reset (zero all)</a></li>
+      `;
+      tr.innerHTML = `
+        <td class="col-model">
+          <strong>${m.model_name}</strong>${enabledBadge}${warnBadge}
+          <span class="universe-tag">${meta.universe} · ${meta.kind}</span>
+        </td>
+        <td class="text-end num">${fmtINR(m.allocated_capital)}</td>
+        <td class="text-end num">${fmtINR(m.cash)}</td>
+        <td class="col-position">${posHtml}</td>
+        <td class="text-end num"><strong>${fmtINR(m.nav)}</strong></td>
+        <td class="text-end num ${pnlCls}">
+          ${fmtINR(m.pnl_total)}
+          <span class="pnl-pct">${fmtPct(m.return_pct)}</span>
+        </td>
+        <td class="text-end col-actions">
+          <div class="action-bar" role="group" aria-label="Capital actions for ${m.model_name}">
+            <button class="btn btn-success" onclick="openCap('${m.model_name}','deposit')" title="Deposit cash" aria-label="Deposit"><i class="bi bi-plus-lg"></i></button>
+            <button class="btn btn-warning" onclick="openCap('${m.model_name}','withdraw')" title="Withdraw cash" aria-label="Withdraw"><i class="bi bi-dash-lg"></i></button>
+            ${posBtn}
+            <button class="btn btn-outline-secondary kebab-btn" type="button" id="${dropdownId}" data-menu='${menuHtml.replace(/'/g, "&#39;")}' aria-expanded="false" title="More actions" aria-label="More actions">
+              <i class="bi bi-three-dots-vertical"></i>
+            </button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  } catch(e) { console.error('alloc load failed', e); }
+}
+
+function openCap(model, action) {
+  document.getElementById('cap_model_name').textContent = model;
+  document.getElementById('cap_action_label').textContent = action === 'deposit' ? '+ Deposit' : '- Withdraw';
+  document.getElementById('cap_panel').classList.remove('d-none');
+  document.getElementById('cap_panel').dataset.model = model;
+  document.getElementById('cap_panel').dataset.action = action;
+  document.getElementById('cap_amount').value = '';
+  document.getElementById('cap_amount').focus();
+}
+
+async function submitCap() {
+  const panel = document.getElementById('cap_panel');
+  const model = panel.dataset.model;
+  const action = panel.dataset.action;
+  const amount = parseFloat(document.getElementById('cap_amount').value);
+  if (!amount || amount <= 0) {
+    await appModal.alert('Invalid amount', 'Enter an amount greater than 0.', 'warning');
+    return;
+  }
+  const submitBtn = document.getElementById('cap_submit');
+  const origLabel = submitBtn ? submitBtn.innerHTML : null;
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing…';
+  }
+  try {
+    const r = await fetch(`/admin/models/${model}/${action}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({amount})
+    });
+    const d = await r.json();
+    if (!d.success) {
+      await appModal.alert(`${action} Failed`, d.error || `${action} failed`, 'danger');
+      return;
+    }
+    // 1. Close the panel
+    panel.classList.add('d-none');
+    // 2. Re-render the table with fresh server data
+    await loadAllocations();
+    // 3. Flash the affected row green
+    flashRow(model);
+    // 4. Confirm to the user with the NEW values from the server response
+    const cash = d.ledger ? d.ledger.cash : null;
+    const invested = d.settings ? d.settings.invested_amount : null;
+    const msg =
+      `<div class="mb-2"><strong>${model}</strong></div>` +
+      `<div class="mb-2"><span class="badge bg-${action==='deposit'?'success':'warning text-dark'}">` +
+      `${action === 'deposit' ? '+ Deposit' : '- Withdraw'}</span> ` +
+      `₹${amount.toLocaleString('en-IN')}</div>` +
+      (invested != null ? `<div class="small">Allocated: <strong>₹${Number(invested).toLocaleString('en-IN')}</strong></div>` : '') +
+      (cash != null ? `<div class="small">Available cash: <strong>₹${Number(cash).toLocaleString('en-IN')}</strong></div>` : '');
+    await appModal.alert(`${action[0].toUpperCase()+action.slice(1)} successful`, msg, 'success');
+  } catch (e) {
+    await appModal.alert('Network Error', e.message, 'danger');
+  } finally {
+    if (submitBtn && origLabel) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origLabel;
+    }
+  }
+}
+
+// Flash a row green so user visually catches the change
+function flashRow(modelName) {
+  const tbody = document.getElementById('alloc_tbody');
+  if (!tbody) return;
+  for (const tr of tbody.querySelectorAll('tr')) {
+    const td = tr.querySelector('.col-model strong');
+    if (td && td.textContent.trim() === modelName) {
+      tr.style.transition = 'background-color 1.5s ease';
+      tr.style.backgroundColor = '#d4edda';
+      setTimeout(() => { tr.style.backgroundColor = ''; }, 1800);
+      tr.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+      return;
+    }
+  }
+}
+
+async function resetModel(model) {
+  const ok = await appModal.confirm('Hard Reset Model',
+    `Hard reset <strong>${model}</strong>?<br><br>` +
+    'Zeros allocated, cash, realized P&L, and position.<br>' +
+    'Audit trail is kept. Use to start fresh.',
+    {okLabel: 'Hard Reset', okClass: 'btn-danger', headerCls: 'bg-danger text-white'});
+  if (!ok) return;
+  const r = await fetch(`/admin/models/${model}/reset`, {method: 'POST'});
+  const d = await r.json();
+  if (d.success) {
+    await loadAllocations();
+    flashRow(model);
+    await appModal.alert('Reset complete',
+      `<strong>${model}</strong> hard-reset.<br>Allocated, cash, realized P&L, and position all zeroed.`,
+      'success');
+  } else {
+    await appModal.alert('Reset Failed', d.error || 'reset failed', 'danger');
+  }
+}
+
+async function bootstrap(model) {
+  const cash = await appModal.prompt(`Bootstrap ${model}`,
+    `Auto-import <strong>${model}</strong> from legacy JSON ledger.<br>` +
+    'Enter extra cash buffer (idle cash beyond position cost), or 0 if none.',
+    '0', 'Cash buffer ₹');
+  if (cash === null) return;
+  const r = await fetch(`/admin/models/${model}/bootstrap`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({cash_buffer: parseFloat(cash) || 0})
+  });
+  const d = await r.json();
+  if (d.success) {
+    const p = d.bootstrapped_position || {};
+    await loadAllocations();
+    flashRow(model);
+    await appModal.alert('Bootstrap successful',
+      `<strong>${model}</strong> imported.<br>Position: <strong>${p.symbol||'flat'}</strong> x${p.qty||0} cost ₹${(p.cost||0).toLocaleString('en-IN')}`,
+      'success');
+  } else {
+    await appModal.alert('Bootstrap Failed', d.error || 'bootstrap failed', 'danger');
+  }
+}
+
+async function toggleEnabled(model, enabled) {
+  if (!enabled) {
+    const ok = await appModal.confirm(`Disable ${model}`,
+      `Stops scheduled signal + execute jobs for <strong>${model}</strong>.<br>` +
+      'Open positions are <strong>NOT</strong> closed. Capital stays allocated.<br>' +
+      'You can re-enable any time.',
+      {okLabel: 'Disable', okClass: 'btn-warning'});
+    if (!ok) return;
+  }
+  try {
+    const r = await fetch(`/admin/models/${model}/enabled`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({enabled})
+    });
+    const d = await r.json();
+    if (d.success) {
+      await loadAllocations();
+      flashRow(model);
+      await appModal.alert(
+        enabled ? 'Model enabled' : 'Model disabled',
+        `<strong>${model}</strong> is now <strong>${enabled ? 'ENABLED' : 'DISABLED'}</strong>.<br>` +
+        (enabled ? 'Scheduled signal + execute jobs will fire at next cron.'
+                 : 'Cron jobs paused. Open positions untouched.'),
+        enabled ? 'success' : 'warning');
+    } else {
+      await appModal.alert('Toggle Failed', d.error || 'toggle failed', 'danger');
+    }
+  } catch (e) {
+    await appModal.alert('Network Error', e.message, 'danger');
+  }
+}
+
+async function resetPos(model) {
+  const ok = await appModal.confirm('Mark Position Flat',
+    `Mark <strong>${model}</strong> as flat in the ledger?<br><br>` +
+    'This does <strong>NOT</strong> place a Fyers sell. Manual reconcile only.',
+    {okLabel: 'Mark Flat', okClass: 'btn-warning'});
+  if (!ok) return;
+  const r = await fetch(`/admin/models/${model}/reset-position`, {method: 'POST'});
+  const d = await r.json();
+  if (d.success) {
+    await loadAllocations();
+    flashRow(model);
+    await appModal.alert('Position marked flat',
+      `<strong>${model}</strong> position cleared in ledger.<br>No Fyers order placed.`,
+      'success');
+  } else {
+    await appModal.alert('Reset Failed', d.error || 'reset failed', 'danger');
+  }
+}
+
+function openSeed(model) {
+  document.getElementById('seed_model_name').textContent = model;
+  document.getElementById('seed_panel').classList.remove('d-none');
+  document.getElementById('seed_panel').dataset.model = model;
+  document.getElementById('seed_symbol').value = '';
+  document.getElementById('seed_qty').value = '';
+  document.getElementById('seed_entry_px').value = '';
+  document.getElementById('seed_entry_date').value = new Date().toISOString().slice(0,10);
+}
+
+async function submitSeed() {
+  const model = document.getElementById('seed_panel').dataset.model;
+  const body = {
+    symbol: document.getElementById('seed_symbol').value.trim(),
+    qty: parseInt(document.getElementById('seed_qty').value, 10),
+    entry_px: parseFloat(document.getElementById('seed_entry_px').value),
+    entry_date: document.getElementById('seed_entry_date').value,
+  };
+  if (!body.symbol || !body.qty || !body.entry_px || !body.entry_date) {
+    await appModal.alert('Missing fields', 'Symbol, qty, entry price, and entry date are all required.', 'warning');
+    return;
+  }
+  const r = await fetch(`/admin/models/${model}/seed-position`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  const d = await r.json();
+  if (d.success) {
+    document.getElementById('seed_panel').classList.add('d-none');
+    await loadAllocations();
+    flashRow(model);
+    await appModal.alert('Position seeded',
+      `<strong>${model}</strong> ledger now holds <strong>${body.symbol}</strong> x${body.qty} @ ₹${body.entry_px}.<br>Entry date: ${body.entry_date}.`,
+      'success');
+  } else {
+    await appModal.alert('Seed Failed', d.error || 'seed failed', 'danger');
+  }
+}
+
+// ---- T5/T6: Per-model Rotation Rules + Strategy Info ---------------------
+function renderRotationRules(models) {
+  const tbody = document.getElementById('rotation_rules_tbody');
+  if (!tbody) return;
+  tbody.innerHTML = (models||[]).map(m => {
+    const meta = MODEL_META[m.model_name];
+    if (!meta) return '';
+    const r = meta.rules || {};
+    const disabledCls = m.enabled ? '' : ' style="opacity:0.55;"';
+    const badge = m.enabled
+      ? '<span class="badge bg-success ms-1">ON</span>'
+      : '<span class="badge bg-secondary ms-1">OFF</span>';
+    return `<tr${disabledCls}>
+      <td><strong>${meta.title || m.model_name}</strong>${badge}<br>
+          <span class="text-muted small">${m.model_name}</span></td>
+      <td>${meta.universe || '—'}</td>
+      <td class="text-center">${r.top_n ?? '—'}</td>
+      <td class="text-center">${r.max_concurrent ?? '—'}</td>
+      <td class="text-center">${r.lookback || '—'}</td>
+      <td>${r.rebalance || '—'}</td>
+      <td><span class="text-muted">SL:</span> ${r.stop || 'None'} ·
+          <span class="text-muted">PT:</span> ${r.target || 'None'}</td>
+      <td>${r.exit || '—'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" class="text-center text-muted">No models.</td></tr>';
+}
+
+function renderStrategyInfo(models) {
+  const container = document.getElementById('strategy_info_container');
+  if (!container) return;
+  container.innerHTML = (models||[]).map(m => {
+    const meta = MODEL_META[m.model_name];
+    if (!meta) return '';
+    const disabledCls = m.enabled ? '' : ' style="opacity:0.6;"';
+    const badge = m.enabled
+      ? '<span class="badge bg-success ms-1">ON</span>'
+      : '<span class="badge bg-secondary ms-1">DISABLED</span>';
+    const rows = (meta.strategy || []).map(([k, v]) =>
+      `<li><strong>${k}:</strong> ${v}</li>`).join('');
+    return `<div class="col-lg-6"${disabledCls}>
+      <div class="card h-100">
+        <div class="card-header small">
+          <i class="bi bi-graph-up me-1"></i><strong>${meta.title || m.model_name}</strong>${badge}
+          <span class="text-muted ms-2">${meta.kind}</span>
+        </div>
+        <div class="card-body small">
+          <ul class="mb-0">${rows}</ul>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+loadAllocations();
+
+// ---- B1 fix v2: body-attached kebab menu --------------------------------
+// Bootstrap dropdown + Popper get clipped by ANY ancestor with overflow set
+// (even `visible` sometimes regresses under sticky-header + transformed
+// .card-body parents). Reliable fix: own the open/close + render the menu
+// directly in <body> using fixed-ish absolute positioning relative to the
+// kebab button rect. Single floating element is reused across rows.
+
+let _floatingMenu = null;
+let _floatingOwner = null;  // the kebab button that opened the current menu
+
+function closeKebabMenu() {
+  if (_floatingMenu && _floatingMenu.parentNode) {
+    _floatingMenu.parentNode.removeChild(_floatingMenu);
+  }
+  if (_floatingOwner) _floatingOwner.setAttribute('aria-expanded', 'false');
+  _floatingMenu = null;
+  _floatingOwner = null;
+}
+
+function openKebabMenu(btn) {
+  closeKebabMenu();
+  const menuHtml = btn.getAttribute('data-menu') || '';
+  const ul = document.createElement('ul');
+  ul.className = 'alloc-menu-floating';
+  ul.innerHTML = menuHtml;
+  document.body.appendChild(ul);
+
+  // Position: align menu's RIGHT edge to button's right edge, drop below.
+  // Use scroll-adjusted page coords so it stays glued when user scrolls.
+  const r = btn.getBoundingClientRect();
+  const menuWidth = ul.offsetWidth || 230;
+  const menuHeight = ul.offsetHeight || 160;
+  const pad = 4;
+
+  // Default: drop below + right-aligned.
+  let top = r.bottom + window.scrollY + pad;
+  let left = r.right + window.scrollX - menuWidth;
+
+  // Flip up if not enough room below.
+  if (r.bottom + menuHeight + pad > window.innerHeight && r.top > menuHeight) {
+    top = r.top + window.scrollY - menuHeight - pad;
+  }
+  // Clamp left so menu doesn't go off-screen on narrow viewports.
+  const minLeft = window.scrollX + 8;
+  if (left < minLeft) left = minLeft;
+
+  ul.style.top = top + 'px';
+  ul.style.left = left + 'px';
+
+  btn.setAttribute('aria-expanded', 'true');
+  _floatingMenu = ul;
+  _floatingOwner = btn;
+}
+
+// Toggle on kebab click; outside-click + Escape + resize/scroll close.
+document.addEventListener('click', function(ev) {
+  const kebab = ev.target.closest('.kebab-btn');
+  if (kebab) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (_floatingOwner === kebab) closeKebabMenu();
+    else openKebabMenu(kebab);
+    return;
+  }
+  // If click landed inside the floating menu, item handler below runs and
+  // we still want the menu to close after.
+  if (_floatingMenu && _floatingMenu.contains(ev.target)) return;
+  closeKebabMenu();
+});
+document.addEventListener('keydown', function(ev) {
+  if (ev.key === 'Escape') closeKebabMenu();
+});
+window.addEventListener('resize', closeKebabMenu);
+window.addEventListener('scroll', closeKebabMenu, true);
+
+// ---- Delegated handler for menu items (data-action attrs) ---------------
+// Bound once on document so it survives re-renders of #alloc_tbody AND
+// works for menus mounted in <body> by openKebabMenu.
+document.addEventListener('click', function(ev) {
+  const el = ev.target.closest('[data-action]');
+  if (!el) return;
+  if (!el.classList.contains('dropdown-item')) return;
+  ev.preventDefault();
+  const action = el.dataset.action;
+  const model = el.dataset.model;
+  closeKebabMenu();  // dismiss before running action (modals/prompts can race)
+  if (!action || !model) return;
+  if (action === 'bootstrap') {
+    bootstrap(model);
+  } else if (action === 'toggle') {
+    const wasEnabled = el.dataset.enabled === '1';
+    toggleEnabled(model, !wasEnabled);
+  } else if (action === 'reset') {
+    resetModel(model);
+  }
+});
+</script>
+{% endblock %}

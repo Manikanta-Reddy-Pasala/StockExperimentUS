@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Trading Models{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}?v=20260523b">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icon.svg') }}?v=2">
+    <link rel="alternate icon" type="image/png" href="{{ url_for('static', filename='icon-192.png') }}?v=2">
+    <!-- PWA: installable on Android / iOS. Manifest cache-busted so
+         Chrome refetches it when icon URLs change. -->
+    <link rel="manifest" href="/manifest.json?v=2">
+    <meta name="theme-color" content="#15a36b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Trading">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v=2">
+    <script>
+      // SW registration with auto-update. On any new SW activating
+      // (controllerchange), reload the page so the user sees fresh
+      // assets immediately — no manual cache-clear required.
+      if ('serviceWorker' in navigator) {
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (refreshing) return;
+          refreshing = true;
+          window.location.reload();
+        });
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
+            .then((reg) => {
+              // Force an immediate update check on every page load.
+              reg.update().catch(() => {});
+              // If a waiting worker exists, tell it to take over.
+              if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+              reg.addEventListener('updatefound', () => {
+                const nw = reg.installing;
+                if (!nw) return;
+                nw.addEventListener('statechange', () => {
+                  if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                    nw.postMessage({ type: 'SKIP_WAITING' });
+                  }
+                });
+              });
+            })
+            .catch((e) => console.warn('SW register failed', e));
+        });
+      }
+    </script>
+    <style>
+      /* Global P&L colour classes — applied to any numeric span/td/div
+         showing return %, P&L, or unrealized values. !important so they
+         beat Bootstrap table cell colour, .v cell rules, .fs-* utilities,
+         etc. Used as: pos (gain) / neg (loss) / neutral (zero / N/A). */
+      .pos, .pos * { color: #15a36b !important; }
+      .neg, .neg * { color: #d4453a !important; }
+      .neutral { color: #4f5868 !important; }
+      /* Treat Bootstrap text-success / text-danger the same so a few legacy
+         templates (settings.html) that still emit those classes match the
+         rest of the UI exactly. */
+      .text-success { color: #15a36b !important; }
+      .text-danger  { color: #d4453a !important; }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Mobile navbar -->
+            <nav class="navbar navbar-light bg-white border-bottom d-md-none px-3 py-2 w-100">
+                <a class="navbar-brand d-flex align-items-center" href="/">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" width="32" height="32" class="me-2" style="object-fit:contain;">
+                    <span class="fw-semibold">Trading Journal</span>
+                </a>
+                <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar">
+                    <i class="bi bi-list fs-5"></i>
+                </button>
+            </nav>
+
+            <!-- Mobile offcanvas sidebar -->
+            <div class="offcanvas offcanvas-start" tabindex="-1" id="mobileSidebar">
+                <div class="offcanvas-header border-bottom">
+                    <h5 class="offcanvas-title">Menu</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+                </div>
+                <div class="offcanvas-body p-0">
+                    <ul class="nav flex-column p-3" id="mobile-nav">
+                        <li class="nav-item"><a class="nav-link" href="/"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/picks"><i class="bi bi-lightbulb"></i> Today's Picks</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/portfolio"><i class="bi bi-journal-text"></i> Portfolio</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/history"><i class="bi bi-clock-history"></i> History</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/settings"><i class="bi bi-gear"></i> Settings</a></li>
+                        {% if current_user.is_admin %}
+                        <li class="nav-item"><a class="nav-link" href="/admin"><i class="bi bi-sliders"></i> Admin Triggers</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/audit"><i class="bi bi-journal-check"></i> Audit</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/users"><i class="bi bi-people-fill"></i> Manage Users</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Desktop sidebar -->
+            <nav class="col-md-3 col-lg-2 d-none d-md-block sidebar collapse">
+                <div class="position-sticky pt-3">
+                    <a href="/" class="d-flex align-items-center pb-3 mb-3 link-dark text-decoration-none border-bottom">
+                        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" width="48" height="48" class="me-2" style="object-fit:contain;">
+                        <span class="fs-6 fw-semibold">Trading Journal</span>
+                    </a>
+
+                    <ul class="nav flex-column" id="sidebar-nav">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/"><i class="bi bi-speedometer2"></i> Dashboard</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/picks"><i class="bi bi-lightbulb"></i> Today's Picks</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/portfolio"><i class="bi bi-journal-text"></i> Portfolio</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/history"><i class="bi bi-clock-history"></i> History</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/settings"><i class="bi bi-gear"></i> Settings</a>
+                        </li>
+                        {% if current_user.is_admin %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin"><i class="bi bi-sliders"></i> Admin Triggers</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/audit"><i class="bi bi-journal-check"></i> Audit</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/admin/users"><i class="bi bi-people-fill"></i> Manage Users</a>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                    <h1 class="h2">{% block page_title %}Dashboard{% endblock %}</h1>
+                    <div class="btn-toolbar mb-2 mb-md-0 d-none d-md-flex">
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-person-circle"></i> {{ current_user.username }}
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="/settings"><i class="bi bi-gear me-2"></i>Settings</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Pull-to-refresh indicator (mobile only) -->
+    <div id="ptr-indicator" class="d-md-none" aria-hidden="true">
+        <span id="ptr-spinner">↓</span>
+        <span id="ptr-text">Pull to refresh</span>
+    </div>
+
+    <!-- Mobile bottom tab bar (visible on small screens only) — inline Lucide SVGs.
+         Icon picks tuned for trader semantics:
+           Dashboard → home (universal "home base")
+           Picks     → target/bullseye ("today's targets to hit")
+           Portfolio → briefcase (standard portfolio glyph)
+           History   → clock-history (clock with refresh arrow = past activity)
+           Settings  → settings (universal gear)
+         All 24×24, stroke-width 2 for thumb-friendly clarity at ~1.55rem. -->
+    <nav class="mobile-bottom-nav d-md-none" id="mobile-bottom-nav" aria-label="Primary">
+        <a href="/dashboard" data-route="/dashboard" class="bn-item" aria-label="Dashboard">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </a>
+        <a href="/picks" data-route="/picks" class="bn-item" aria-label="Picks">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        </a>
+        <a href="/portfolio" data-route="/portfolio" class="bn-item" aria-label="Portfolio">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg>
+        </a>
+        <a href="/history" data-route="/history" class="bn-item" aria-label="History">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+        </a>
+        <a href="/settings" data-route="/settings" class="bn-item" aria-label="Settings">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </a>
+    </nav>
+    <script>
+      (function highlightActiveBottomNav() {
+        const path = window.location.pathname;
+        document.querySelectorAll('#mobile-bottom-nav .bn-item').forEach(a => {
+          const r = a.getAttribute('data-route');
+          if (r && (path === r || path.startsWith(r + '/'))) a.classList.add('active');
+        });
+      })();
+
+      // Pull-to-refresh: vertical drag at top of page reloads the page.
+      // PWA standalone mode disables browser-native pull-to-refresh, so
+      // implement it ourselves with a clear visual indicator.
+      (function pullToRefresh() {
+        if (!('ontouchstart' in window)) return;  // skip on desktop
+        const indicator = document.getElementById('ptr-indicator');
+        const spinner = document.getElementById('ptr-spinner');
+        const text = document.getElementById('ptr-text');
+        if (!indicator) return;
+        const THRESHOLD = 70;  // px to trigger
+        const MAX_PULL = 120;
+        let startY = 0, pulling = false, triggered = false;
+        let lastPull = 0, rafPending = false;
+
+        function reset() {
+          indicator.style.transform = 'translateY(-100%)';
+          indicator.style.opacity = '0';
+          spinner.style.transform = 'rotate(0deg)';
+          text.textContent = 'Pull to refresh';
+          pulling = false;
+          triggered = false;
+          lastPull = 0;
+        }
+        reset();
+
+        document.addEventListener('touchstart', (e) => {
+          if (window.scrollY > 5) return;
+          startY = e.touches[0].clientY;
+          pulling = true;
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+          if (!pulling) return;
+          const delta = e.touches[0].clientY - startY;
+          if (delta <= 0) return;
+          lastPull = Math.min(delta, MAX_PULL);
+          if (rafPending) return;
+          rafPending = true;
+          requestAnimationFrame(() => {
+            rafPending = false;
+            const pull = lastPull;
+            indicator.style.transform = `translateY(${pull - 50}px)`;
+            indicator.style.opacity = String(Math.min(1, pull / THRESHOLD));
+            spinner.style.transform = `rotate(${pull * 3}deg)`;
+            const t = pull >= THRESHOLD;
+            if (t !== triggered) {
+              triggered = t;
+              text.textContent = t ? 'Release to refresh' : 'Pull to refresh';
+            }
+          });
+        }, { passive: true });
+
+        document.addEventListener('touchend', () => {
+          if (!pulling) return;
+          if (triggered) {
+            text.textContent = 'Refreshing…';
+            spinner.textContent = '⟳';
+            indicator.style.transform = 'translateY(20px)';
+            window.location.reload();
+          } else {
+            reset();
+          }
+        }, { passive: true });
+      })();
+    </script>
+
+    <!-- Toast container -->
+    <div id="toast-container" class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index:1080;"></div>
+
+    <!-- App modal (replaces native alert/confirm/prompt) -->
+    <div class="modal fade" id="app-modal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content shadow-lg border-0">
+          <div class="modal-header" id="app-modal-header">
+            <h5 class="modal-title" id="app-modal-title">Confirm</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" id="app-modal-body"></div>
+          <div class="modal-footer" id="app-modal-footer">
+            <button type="button" class="btn btn-outline-secondary" id="app-modal-cancel" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-primary" id="app-modal-ok">Confirm</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Modal helpers — replace native alert/confirm/prompt with styled UI
+      window.appModal = (function() {
+        let modal, resolver, currentResolve, kind;
+        function init() {
+          if (!modal) modal = new bootstrap.Modal(document.getElementById('app-modal'));
+        }
+        function show({title, html, kind: k='confirm', okLabel='Confirm', okClass='btn-primary', cancelLabel='Cancel', headerCls=''} = {}) {
+          init();
+          kind = k;
+          document.getElementById('app-modal-title').textContent = title || (k === 'alert' ? 'Notice' : 'Confirm');
+          document.getElementById('app-modal-body').innerHTML = html || '';
+          const header = document.getElementById('app-modal-header');
+          header.className = 'modal-header ' + headerCls;
+          const okBtn = document.getElementById('app-modal-ok');
+          const cancelBtn = document.getElementById('app-modal-cancel');
+          okBtn.className = 'btn ' + okClass;
+          okBtn.textContent = okLabel;
+          cancelBtn.textContent = cancelLabel;
+          cancelBtn.style.display = (k === 'alert') ? 'none' : '';
+
+          return new Promise(resolve => {
+            currentResolve = resolve;
+            okBtn.onclick = () => {
+              const inp = document.getElementById('app-modal-input');
+              const val = inp ? inp.value : true;
+              modal.hide();
+              resolve(val);
+              currentResolve = null;
+            };
+            cancelBtn.onclick = () => { modal.hide(); resolve(null); currentResolve = null; };
+            document.getElementById('app-modal').addEventListener('hidden.bs.modal', () => {
+              if (currentResolve) { currentResolve(null); currentResolve = null; }
+            }, {once: true});
+            modal.show();
+            setTimeout(() => {
+              const inp = document.getElementById('app-modal-input');
+              if (inp) inp.focus();
+            }, 200);
+          });
+        }
+        return {
+          alert: (title, html, type='info') => show({
+            title, html, kind:'alert',
+            okLabel:'OK', okClass: type === 'danger' ? 'btn-danger' : (type === 'success' ? 'btn-success' : 'btn-primary'),
+            headerCls: type === 'danger' ? 'bg-danger text-white' : (type === 'success' ? 'bg-success text-white' : ''),
+          }),
+          confirm: (title, html, opts={}) => show({
+            title, html, kind:'confirm',
+            okLabel: opts.okLabel || 'Confirm',
+            okClass: opts.okClass || 'btn-primary',
+            cancelLabel: opts.cancelLabel || 'Cancel',
+            headerCls: opts.headerCls || '',
+          }),
+          prompt: (title, html, defaultVal='', inputLabel='Value') => {
+            const body = (html ? `<div class="mb-3">${html}</div>` : '') +
+              `<label class="form-label small">${inputLabel}</label>` +
+              `<input id="app-modal-input" type="text" class="form-control" value="${String(defaultVal).replace(/"/g,'&quot;')}">`;
+            return show({title, html: body, kind:'prompt', okLabel:'OK'});
+          },
+          /* Open a non-dismissible progress modal. Returns a controller:
+             - update(html)        — replace body content
+             - finish(html, type)  — replace body, show OK button (type=info|success|danger), returns promise that resolves when user closes
+          */
+          progress: async (title, html='', headerCls='') => {
+            init();
+            const modalEl = document.getElementById('app-modal');
+            // If the modal is currently showing (e.g. previous confirm just
+            // returned and bootstrap is still in 'hiding' transition), wait
+            // for the hidden event before re-showing — otherwise the new
+            // show() races with the in-flight hide and the modal flashes
+            // closed.
+            if (modalEl.classList.contains('show')) {
+              await new Promise(r => modalEl.addEventListener('hidden.bs.modal', r, {once:true}));
+            }
+            // Clear any stale resolver from a prior confirm() so the
+            // `hidden.bs.modal` listener doesn't accidentally re-resolve.
+            currentResolve = null;
+            document.getElementById('app-modal-title').textContent = title || 'Working';
+            document.getElementById('app-modal-body').innerHTML = html;
+            document.getElementById('app-modal-header').className = 'modal-header ' + headerCls;
+            const okBtn = document.getElementById('app-modal-ok');
+            const cancelBtn = document.getElementById('app-modal-cancel');
+            // Detach any old click handlers so they don't fire stale promises.
+            okBtn.onclick = null;
+            cancelBtn.onclick = null;
+            okBtn.style.display = 'none';
+            cancelBtn.style.display = 'none';
+            // Disable backdrop + esc dismissal while running so the user
+            // can't accidentally kill the modal mid-trade.
+            modalEl.setAttribute('data-bs-backdrop', 'static');
+            modalEl.setAttribute('data-bs-keyboard', 'false');
+            modal.show();
+            return {
+              update: (h) => { document.getElementById('app-modal-body').innerHTML = h; },
+              setTitle: (t) => { document.getElementById('app-modal-title').textContent = t; },
+              setHeader: (cls) => { document.getElementById('app-modal-header').className = 'modal-header ' + cls; },
+              finish: (h, type='info') => {
+                document.getElementById('app-modal-body').innerHTML = h;
+                const cls = type === 'danger' ? 'bg-danger text-white' : (type === 'success' ? 'bg-success text-white' : '');
+                document.getElementById('app-modal-header').className = 'modal-header ' + cls;
+                okBtn.className = 'btn ' + (type === 'danger' ? 'btn-danger' : (type === 'success' ? 'btn-success' : 'btn-primary'));
+                okBtn.textContent = 'OK';
+                okBtn.style.display = '';
+                cancelBtn.style.display = 'none';
+                // Re-enable normal dismissal for the result modal.
+                modalEl.setAttribute('data-bs-backdrop', 'true');
+                modalEl.setAttribute('data-bs-keyboard', 'true');
+                return new Promise(resolve => {
+                  let done = false;
+                  const finishOnce = () => { if (!done) { done = true; resolve(true); } };
+                  okBtn.onclick = () => { modal.hide(); finishOnce(); };
+                  modalEl.addEventListener('hidden.bs.modal', finishOnce, {once:true});
+                });
+              },
+              close: () => modal.hide(),
+            };
+          },
+        };
+      })();
+
+      /* Global IST timestamp formatters. Backend containers run TZ=Asia/Kolkata,
+         so naive-ISO timestamps (no Z, no ±HH:MM offset) emitted by
+         datetime.now().isoformat() are ALREADY IST. Passing them through
+         `new Date(...)` makes JS reinterpret them in the viewer's browser TZ
+         and shift again — that bug rendered '15:15 IST' as '11:35 IST' for
+         a user in GMT+4.
+
+         Strategy:
+           - Naive ISO ("YYYY-MM-DDTHH:MM[:SS][.fff]") → already IST, format
+             the parts directly with no Date() conversion.
+           - ISO with Z or offset → trustworthy absolute time, Intl converts. */
+      const _ISO_NAIVE_RE = /^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/;
+      const _ISO_DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+      window.fmtIST = function(iso) {
+        if (!iso) return '—';
+        const s = String(iso);
+        const m = _ISO_NAIVE_RE.exec(s);
+        if (m) {
+          const [, y, mo, d, h, mi] = m;
+          return `${d}/${mo}/${y}, ${h}:${mi} IST`;
+        }
+        if (_ISO_DATE_RE.test(s)) {
+          const [y, mo, d] = s.split('-');
+          return `${d}/${mo}/${y}`;
+        }
+        try {
+          const d2 = new Date(s);
+          if (Number.isNaN(d2.getTime())) return s;
+          return new Intl.DateTimeFormat('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: false,
+          }).format(d2).replace(',', ',') + ' IST';
+        } catch (_) { return s; }
+      };
+      window.fmtISTDate = function(iso) {
+        if (!iso) return '—';
+        const s = String(iso);
+        if (_ISO_DATE_RE.test(s)) {
+          const [y, mo, d] = s.split('-');
+          return `${d}/${mo}/${y}`;
+        }
+        const m = _ISO_NAIVE_RE.exec(s);
+        if (m) {
+          const [, y, mo, d] = m;
+          return `${d}/${mo}/${y}`;
+        }
+        try {
+          const d2 = new Date(s);
+          if (Number.isNaN(d2.getTime())) return s;
+          return new Intl.DateTimeFormat('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+          }).format(d2);
+        } catch (_) { return s; }
+      };
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/trading.js') }}"></script>
+    <script>
+        // Active nav link — pick longest matching href.
+        // /admin (Admin Triggers) only matches /admin and /admin/momrot* —
+        // NOT /admin/models/*/detail (Balance Sheet pages get no sidebar match).
+        document.addEventListener('DOMContentLoaded', function() {
+            const path = window.location.pathname;
+            const groups = ['#sidebar-nav', '#mobile-nav'];
+            groups.forEach(sel => {
+                const links = document.querySelectorAll(sel + ' .nav-link');
+                links.forEach(l => l.classList.remove('active'));
+                let best = null, bestLen = -1;
+                links.forEach(link => {
+                    const href = link.getAttribute('href');
+                    if (!href) return;
+                    let matches = false;
+                    if (href === '/') {
+                        matches = (path === '/' || path === '/dashboard');
+                    } else if (href === '/admin') {
+                        // Admin Triggers nav — only match dashboard paths, not
+                        // per-model detail/balance-sheet URLs under /admin/.
+                        matches = (path === '/admin' || path.startsWith('/admin/momrot'));
+                    } else if (path === href || path.startsWith(href + '/')) {
+                        matches = true;
+                    }
+                    if (matches && href.length > bestLen) {
+                        best = link;
+                        bestLen = href.length;
+                    }
+                });
+                if (best) best.classList.add('active');
+            });
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

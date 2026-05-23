@@ -1,0 +1,125 @@
+{% extends "v2/base.html" %}
+{% block title %}Signals — {{ model_key }}{% endblock %}
+{% block page_title %}Signal History — <code>{{ model_key }}</code>{% endblock %}
+
+{% block content %}
+<style>
+  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
+  .small-mute { font-size: 0.78rem; color: #8b95a5; }
+  th.sticky { position: sticky; top: 0; background: #fff; z-index: 2; }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <div>
+    <a href="/picks" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Back to Picks
+    </a>
+    <span class="ms-2">
+      <strong>Model:</strong> <code>{{ model_key }}</code>
+    </span>
+  </div>
+  <div>
+    <label class="small-mute me-1">Window:</label>
+    <select id="days" class="form-select form-select-sm d-inline-block w-auto"
+            onchange="loadSignals()">
+      <option value="7">Last 7 days</option>
+      <option value="30" selected>Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="365">Last 365 days</option>
+    </select>
+    <div class="form-check form-check-inline ms-2">
+      <input class="form-check-input" type="checkbox" id="show_holds" onchange="loadSignals()">
+      <label class="form-check-label small" for="show_holds">Show HOLD (noise)</label>
+    </div>
+    <span class="badge bg-secondary ms-2" id="sig_count">…</span>
+  </div>
+</div>
+
+<div class="alert alert-info py-2 small mb-2">
+  <i class="bi bi-info-circle me-1"></i>
+  Scheduled cron emissions only. Manual <em>Re-calculate</em> previews are NOT stored.
+  Default view = actionable signals only (ENTRY / EXIT / STOP / TARGET). HOLD rows hidden.
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-sm table-striped align-middle mb-0">
+      <thead>
+        <tr>
+          <th class="sticky">When (IST)</th>
+          <th class="sticky">Type</th>
+          <th class="sticky">Symbol</th>
+          <th class="sticky">Side</th>
+          <th class="sticky text-end">Price</th>
+          <th class="sticky">Reason</th>
+        </tr>
+      </thead>
+      <tbody id="signals_tbody">
+        <tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const MODEL_KEY = {{ model_key|tojson }};
+
+async function loadSignals() {
+  const days = document.getElementById('days').value;
+  const showHolds = document.getElementById('show_holds').checked;
+  const tbody = document.getElementById('signals_tbody');
+  const count = document.getElementById('sig_count');
+  tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr>';
+  count.textContent = '…';
+  try {
+    const r = await fetch('/admin/audit/signals?days=' + days +
+                          '&model=' + encodeURIComponent(MODEL_KEY),
+                          {cache: 'no-store'});
+    const d = await r.json();
+    if (!d.success) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-danger small">Failed: ' +
+                        (d.error || 'unknown') + '</td></tr>';
+      count.textContent = 'err';
+      return;
+    }
+    let sigs = d.signals || [];
+    const totalRaw = sigs.length;
+    if (!showHolds) {
+      sigs = sigs.filter(s => s.signal_type && s.signal_type !== 'HOLD');
+    }
+    count.textContent = showHolds ? sigs.length : (sigs.length + ' / ' + totalRaw);
+    if (sigs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No actionable signals in last ' + days + ' days' + (showHolds ? '.' : ' (HOLDs hidden).') + '</td></tr>';
+      return;
+    }
+    const tsFmt = window.fmtIST || (s => s);
+    tbody.innerHTML = sigs.map(s => {
+      const sideCls = s.side === 'BUY' ? 'pos' : (s.side === 'SELL' ? 'neg' : 'neutral');
+      const typeBadge = s.signal_type === 'HOLD'
+        ? '<span class="badge bg-secondary">HOLD</span>'
+        : s.signal_type && s.signal_type.startsWith('ENTRY')
+          ? '<span class="badge bg-primary">' + s.signal_type + '</span>'
+          : s.signal_type && (s.signal_type.includes('STOP') || s.signal_type.includes('TARGET') || s.signal_type.includes('EXIT'))
+            ? '<span class="badge bg-warning text-dark">' + s.signal_type + '</span>'
+            : '<span class="badge bg-light text-dark">' + (s.signal_type || '—') + '</span>';
+      const px = s.price ? '₹' + Number(s.price).toLocaleString('en-IN', {maximumFractionDigits: 2}) : '—';
+      return '<tr>' +
+        '<td class="small">' + tsFmt(s.emitted_at) + '</td>' +
+        '<td>' + typeBadge + '</td>' +
+        '<td>' + (s.symbol || '—') + '</td>' +
+        '<td class="' + sideCls + '">' + (s.side || '—') + '</td>' +
+        '<td class="text-end">' + px + '</td>' +
+        '<td class="small text-muted">' + (s.reason || '—') + '</td>' +
+        '</tr>';
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="6" class="text-danger small">' + String(e) + '</td></tr>';
+    count.textContent = 'err';
+  }
+}
+
+loadSignals();
+</script>
+{% endblock %}

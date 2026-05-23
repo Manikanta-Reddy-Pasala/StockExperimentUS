@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="StockExperiment">
+  <title>StockExperiment</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#15a36b"/>
+      <stop offset="100%" stop-color="#0e7a4f"/>
+    </linearGradient>
+  </defs>
+  <!-- Maskable safe-zone: keep content inside center 80 % = inset of 51 px on all sides -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <!-- Upward step chart (5 candles, ascending) -->
+  <g fill="#ffffff" opacity="0.95">
+    <rect x="118" y="320" width="44" height="80"  rx="6"/>
+    <rect x="182" y="270" width="44" height="130" rx="6"/>
+    <rect x="246" y="220" width="44" height="180" rx="6"/>
+    <rect x="310" y="170" width="44" height="230" rx="6"/>
+    <rect x="374" y="120" width="44" height="280" rx="6"/>
+  </g>
+  <!-- Trend arrow over candles -->
+  <polyline points="118,300 182,250 246,200 310,150 418,100"
+            fill="none" stroke="#ffffff" stroke-width="14"
+            stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
+  <polygon points="380,80 432,86 418,134" fill="#ffffff" opacity="0.95"/>
+</svg>

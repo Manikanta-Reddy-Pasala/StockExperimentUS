@@ -1,0 +1,25 @@
+{
+  "model": "momentum_n100_top5_max1",
+  "start": "2023-05-15",
+  "end": "2026-05-12",
+  "years": 2.992,
+  "capital": 1000000.0,
+  "final_nav": 4483692.0,
+  "total_return_pct": 348.37,
+  "cagr_pct": 65.1,
+  "max_dd_pct": 37.3,
+  "calmar": 1.75,
+  "trades": 31,
+  "wins": 22,
+  "losses": 9,
+  "win_rate_pct": 71.0,
+  "open_position": {
+    "sym": "ADANIGREEN",
+    "qty": 3427,
+    "entry_px": 1290.7,
+    "entry_date": "2026-05-04",
+    "last_px": 1308.0,
+    "mtm_value": 4482516.0,
+    "unrealized_pnl": 59287.0
+  }
+}

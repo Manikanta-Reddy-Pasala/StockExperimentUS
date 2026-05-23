@@ -1,0 +1,675 @@
+{% extends "base.html" %}
+
+{% block title %}FYERS Broker{% endblock %}
+
+{% block content %}
+<style>
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+</style>
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card hover-lift animate-fade-in-up">
+            <div class="card-header bg-gradient-primary text-white">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="bi bi-building me-2"></i>FYERS Broker Configuration
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- FYERS Broker Card -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card h-100 broker-card">
+                            <div class="card-header bg-light">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="card-title mb-0">
+                                        <i class="bi bi-building text-primary me-2"></i>FYERS
+                                    </h6>
+                                    <span class="badge bg-success" id="fyers-status">Connected</span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <small class="text-muted">Client ID</small>
+                                        <div class="fw-bold" id="fyers-client-id">Loading...</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">API Version</small>
+                                        <div class="fw-bold">v3.1.7</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <small class="text-muted">App Secret</small>
+                                        <div class="d-flex align-items-center">
+                                            <div class="fw-bold text-truncate me-2" id="fyers-app-secret" style="max-width: 200px;">••••••••••••••••</div>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" id="toggle-app-secret" title="Show/Hide App Secret">
+                                                <i class="bi bi-eye" id="toggle-app-secret-icon"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Last Updated</small>
+                                        <div class="fw-bold" id="fyers-last-updated">-</div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <small class="text-muted">Access Token</small>
+                                        <div class="fw-bold text-truncate" id="fyers-token-status">
+                                            <i class="bi bi-check-circle text-success"></i> Active
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Connection Status</small>
+                                        <div class="d-flex align-items-center">
+                                            <div class="spinner-border spinner-border-sm text-success me-2" role="status" id="fyers-spinner" style="display: none;">
+                                                <span class="visually-hidden">Loading...</span>
+                                            </div>
+                                            <span class="badge bg-success" id="fyers-connection-status">Connected</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-3">
+                                    <div class="col-6">
+                                        <small class="text-muted">Token Expires</small>
+                                        <div class="fw-bold" id="fyers-token-expiry">
+                                            <i class="bi bi-clock"></i> -
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted">Time Remaining</small>
+                                        <div class="fw-bold" id="fyers-token-remaining">
+                                            -
+                                        </div>
+                                    </div>
+                                </div>
+
+
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-outline-primary btn-sm" id="test-fyers-connection">
+                                        <i class="bi bi-wifi"></i> Test Connection
+                                    </button>
+                                    <button class="btn btn-outline-secondary btn-sm" id="refresh-fyers-token">
+                                        <i class="bi bi-arrow-clockwise"></i> Refresh Token
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Broker Statistics -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card h-100 broker-stats-card">
+                            <div class="card-header bg-light">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="card-title mb-0">
+                                        <i class="bi bi-graph-up me-2"></i>FYERS Statistics
+                                    </h6>
+                                    <button class="btn btn-outline-primary btn-sm" id="refresh-stats">
+                                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-6 mb-3">
+                                        <div class="border-end">
+                                            <h4 class="text-primary mb-1 broker-stats-number" id="total-orders">0</h4>
+                                            <small class="text-muted">Total Orders</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6 mb-3">
+                                        <h4 class="text-success mb-1 broker-stats-number" id="successful-orders">0</h4>
+                                        <small class="text-muted">Successful</small>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="border-end">
+                                            <h4 class="text-warning mb-1 broker-stats-number" id="pending-orders">0</h4>
+                                            <small class="text-muted">Pending</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <h4 class="text-danger mb-1 broker-stats-number" id="failed-orders">0</h4>
+                                        <small class="text-muted">Failed</small>
+                                    </div>
+                                </div>
+                                
+                                <hr>
+                                
+                                <div class="mb-2">
+                                    <small class="text-muted">Last Order</small>
+                                    <div class="fw-bold" id="last-order-time">-</div>
+                                </div>
+                                
+                                <div class="mb-2">
+                                    <small class="text-muted">API Response Time</small>
+                                    <div class="fw-bold" id="api-response-time">-</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FYERS Configuration Section -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card broker-config-section">
+                            <div class="card-header bg-light">
+                                <h6 class="card-title mb-0">
+                                    <i class="bi bi-gear me-2"></i>FYERS Configuration
+                                </h6>
+                            </div>
+                            <div class="card-body">
+                                <!-- Token Expiration Warnings -->
+                                <div id="token-expired-warning" class="alert alert-danger d-none" role="alert">
+                                    <i class="bi bi-x-circle me-2"></i>
+                                    <strong>Token Expired!</strong> Your FYERS access token has expired.
+                                    Please refresh your token to continue using the API.
+                                    <button type="button" class="btn btn-danger btn-sm ms-2" id="refresh-expired-token">
+                                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh Token Now
+                                    </button>
+                                </div>
+
+                                <div id="token-expiring-warning" class="alert alert-warning d-none" role="alert">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    <strong>Token Expiring Soon!</strong> Your FYERS access token will expire in less than 12 hours.
+                                    Please refresh your token to avoid interruption.
+                                    <button type="button" class="btn btn-warning btn-sm ms-2" id="refresh-expiring-token">
+                                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh Token
+                                    </button>
+                                </div>
+                                
+                                <!-- FYERS OAuth2 Configuration -->
+                                <div class="mb-4">
+                                    <form id="fyers-oauth-form">
+                                        <div class="row">
+                                            <div class="col-md-4 mb-3">
+                                                <label for="fyers-oauth-client-id" class="form-label">
+                                                    <i class="bi bi-person-badge me-1"></i>App ID (Client ID)
+                                                </label>
+                                                <input type="text" class="form-control" id="fyers-oauth-client-id" 
+                                                       placeholder="Enter your FYERS App ID" required>
+                                                <div class="form-text">Your FYERS App ID from API dashboard</div>
+                                            </div>
+                                            <div class="col-md-4 mb-3">
+                                                <label for="fyers-oauth-secret-key" class="form-label">
+                                                    <i class="bi bi-key me-1"></i>App Secret
+                                                </label>
+                                                <input type="password" class="form-control" id="fyers-oauth-secret-key" 
+                                                       placeholder="Enter your FYERS App Secret" required>
+                                                <div class="form-text">Your FYERS App Secret from API dashboard</div>
+                                            </div>
+                                            <div class="col-md-4 mb-3">
+                                                <label for="fyers-oauth-redirect-uri" class="form-label">
+                                                    <i class="bi bi-link-45deg me-1"></i>Redirect URI
+                                                </label>
+                                                <input type="url" class="form-control" id="fyers-oauth-redirect-uri" 
+                                                       placeholder="Loading default redirect URI..." required>
+                                                <div class="form-text">Your App's Redirect URI from API dashboard</div>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <button type="button" class="btn btn-primary" id="save-oauth-config">
+                                                <i class="bi bi-save me-2"></i> Save Configuration
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Notification function to replace alert popups
+    function showNotification(message, type = 'info') {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
+        notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        // Add to page
+        document.body.appendChild(notification);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.remove();
+            }
+        }, 5000);
+    }
+    
+    // Set default redirect URI placeholder
+    function setDefaultRedirectUri() {
+        const redirectUriInput = document.getElementById('fyers-oauth-redirect-uri');
+        if (redirectUriInput && !redirectUriInput.value) {
+            redirectUriInput.placeholder = 'Enter your FYERS redirect URI (e.g., https://trade.fyers.in/api-login/redirect-uri/index.html)';
+        }
+    }
+
+    // Fetch FYERS broker information
+    async function fetchFyersInfo() {
+        try {
+            const response = await fetch('/brokers/fyers/api/info', {
+                credentials: 'same-origin'
+            });
+            
+            // Check if response is a redirect (authentication required)
+            if (response.redirected || response.status === 302) {
+                console.log('Authentication required - user needs to login');
+                return;
+            }
+            
+            // Check if response is not ok
+            if (!response.ok) {
+                console.log('Response not ok:', response.status);
+                try {
+                    const errorData = await response.json();
+                    console.error('API Error:', errorData);
+                } catch (e) {
+                    console.error('Network Error:', response.statusText);
+                }
+                return;
+            }
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // Update FYERS information from database
+                document.getElementById('fyers-client-id').textContent = data.client_id || 'Not configured';
+                document.getElementById('fyers-token-status').innerHTML = 
+                    data.access_token ? '<i class="bi bi-check-circle text-success"></i> Active' : 
+                    '<i class="bi bi-x-circle text-danger"></i> Not configured';
+                document.getElementById('fyers-last-updated').textContent = data.last_updated || '-';
+                
+                // Update App Secret display
+                const appSecretElement = document.getElementById('fyers-app-secret');
+                if (data.api_secret) {
+                    appSecretElement.textContent = '••••••••••••••••';
+                    appSecretElement.setAttribute('data-secret', data.api_secret);
+                    appSecretElement.setAttribute('data-visible', 'false');
+                } else {
+                    appSecretElement.textContent = 'Not configured';
+                    appSecretElement.removeAttribute('data-secret');
+                }
+                
+                // Update connection status from database
+                const connectionStatus = data.connection_status || 'unknown';
+                const isConnected = data.is_connected || false;
+                const isTokenExpired = data.is_token_expired || false;
+                
+                // Update token expiry information
+                const tokenExpiry = data.token_expiry;
+                const tokenExpiresInHours = data.token_expires_in_hours;
+                const tokenExpiringSoon = data.token_expiring_soon;
+                const tokenIsExpired = data.token_is_expired;
+
+                // Update token expiry display
+                const expiryElement = document.getElementById('fyers-token-expiry');
+                const remainingElement = document.getElementById('fyers-token-remaining');
+
+                if (tokenExpiry) {
+                    // Format expiry time
+                    const expiryDate = new Date(tokenExpiry);
+                    const expiryStr = expiryDate.toLocaleString('en-IN', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    expiryElement.innerHTML = `<i class="bi bi-clock"></i> ${expiryStr}`;
+
+                    // Format time remaining with color coding
+                    let remainingHTML = '';
+                    let iconClass = 'bi bi-hourglass-split';
+                    let textClass = '';
+
+                    if (tokenIsExpired) {
+                        remainingHTML = `<i class="${iconClass} text-danger"></i> <span class="text-danger">Expired</span>`;
+                    } else if (tokenExpiringSoon) {
+                        remainingHTML = `<i class="${iconClass} text-warning"></i> <span class="text-warning">${tokenExpiresInHours}h remaining</span>`;
+                    } else {
+                        remainingHTML = `<i class="${iconClass} text-success"></i> <span class="text-success">${tokenExpiresInHours}h remaining</span>`;
+                    }
+
+                    remainingElement.innerHTML = remainingHTML;
+                } else {
+                    expiryElement.innerHTML = '<i class="bi bi-clock"></i> -';
+                    remainingElement.innerHTML = '-';
+                }
+
+                // Handle token expiration warnings
+                const expiredWarning = document.getElementById('token-expired-warning');
+                const expiringWarning = document.getElementById('token-expiring-warning');
+
+                if (tokenIsExpired) {
+                    document.getElementById('fyers-connection-status').textContent = 'Token Expired';
+                    document.getElementById('fyers-connection-status').className = 'badge bg-danger';
+                    document.getElementById('fyers-status').textContent = 'Token Expired';
+                    document.getElementById('fyers-status').className = 'badge bg-danger';
+
+                    // Show expired warning, hide expiring warning
+                    expiredWarning.classList.remove('d-none');
+                    expiringWarning.classList.add('d-none');
+                } else if (tokenExpiringSoon) {
+                    document.getElementById('fyers-connection-status').textContent = 'Token Expiring Soon';
+                    document.getElementById('fyers-connection-status').className = 'badge bg-warning';
+                    document.getElementById('fyers-status').textContent = 'Connected';
+                    document.getElementById('fyers-status').className = 'badge bg-warning';
+
+                    // Show expiring warning, hide expired warning
+                    expiredWarning.classList.add('d-none');
+                    expiringWarning.classList.remove('d-none');
+                } else {
+                    document.getElementById('fyers-connection-status').textContent = connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1);
+                    document.getElementById('fyers-connection-status').className =
+                        isConnected ? 'badge bg-success' : 'badge bg-danger';
+                    document.getElementById('fyers-status').textContent = connectionStatus.charAt(0).toUpperCase() + connectionStatus.slice(1);
+                    document.getElementById('fyers-status').className =
+                        isConnected ? 'badge bg-success' : 'badge bg-danger';
+
+                    // Hide all warnings
+                    expiredWarning.classList.add('d-none');
+                    expiringWarning.classList.add('d-none');
+                }
+                
+                // Update last connection test time
+                if (data.last_connection_test && data.last_connection_test !== '-') {
+                    document.getElementById('fyers-last-updated').textContent = data.last_connection_test;
+                }
+                
+                // Update statistics
+                document.getElementById('total-orders').textContent = data.stats?.total_orders || 0;
+                document.getElementById('successful-orders').textContent = data.stats?.successful_orders || 0;
+                document.getElementById('pending-orders').textContent = data.stats?.pending_orders || 0;
+                document.getElementById('failed-orders').textContent = data.stats?.failed_orders || 0;
+                document.getElementById('last-order-time').textContent = data.stats?.last_order_time || '-';
+                document.getElementById('api-response-time').textContent = data.stats?.api_response_time || '-';
+                
+                // Update OAuth form fields from database
+                document.getElementById('fyers-oauth-client-id').value = data.client_id || '';
+                // Show placeholder for secret key if it exists, empty if not
+                document.getElementById('fyers-oauth-secret-key').value = data.api_secret ? '••••••••••••••••' : '';
+                document.getElementById('fyers-oauth-secret-key').placeholder = data.api_secret ? 'Secret key is saved' : 'Enter your App Secret';
+                // Set redirect URI from database
+                const redirectUriInput = document.getElementById('fyers-oauth-redirect-uri');
+                if (data.redirect_url) {
+                    redirectUriInput.value = data.redirect_url;
+                }
+                
+                // Show error message if there's one
+                if (data.error_message) {
+                    console.warn('FYERS connection error:', data.error_message);
+                }
+            } else {
+                console.error('API returned success=false:', data);
+            }
+        } catch (error) {
+            console.error('Error fetching FYERS broker info:', error);
+            // Show error state
+            document.getElementById('fyers-status').textContent = 'Error';
+            document.getElementById('fyers-status').className = 'badge bg-danger';
+        }
+    }
+    
+    // Test FYERS connection
+    document.getElementById('test-fyers-connection').addEventListener('click', async function() {
+        const spinner = document.getElementById('fyers-spinner');
+        const status = document.getElementById('fyers-connection-status');
+        
+        spinner.style.display = 'inline-block';
+        status.textContent = 'Testing...';
+        status.className = 'badge bg-warning';
+        
+        try {
+            const response = await fetch('/brokers/fyers/api/test', {
+                method: 'POST'
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                status.textContent = 'Connected';
+                status.className = 'badge bg-success';
+                // Update the main status badge as well
+                document.getElementById('fyers-status').textContent = 'Connected';
+                document.getElementById('fyers-status').className = 'badge bg-success';
+            } else {
+                status.textContent = 'Connection Failed';
+                status.className = 'badge bg-danger';
+                // Update the main status badge as well
+                document.getElementById('fyers-status').textContent = 'Disconnected';
+                document.getElementById('fyers-status').className = 'badge bg-danger';
+            }
+            
+            // Refresh the broker info to get updated database status
+            fetchFyersInfo();
+        } catch (error) {
+            status.textContent = 'Connection Failed';
+            status.className = 'badge bg-danger';
+        } finally {
+            spinner.style.display = 'none';
+        }
+    });
+    
+    // Refresh FYERS token
+    document.getElementById('refresh-fyers-token').addEventListener('click', async function() {
+        if (confirm('Are you sure you want to refresh the FYERS access token? This will require re-authentication.')) {
+            try {
+                const response = await fetch('/brokers/fyers/api/refresh-token', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    // If we have an auth URL, open it for re-authentication
+                    if (data.auth_url) {
+                        showNotification('Re-authentication required. Please complete the authorization in the new window.', 'info');
+                        const authWindow = window.open(data.auth_url, '_blank', 'width=800,height=600');
+                        
+                        // Check for window close and refresh data
+                        const checkClosed = setInterval(() => {
+                            if (authWindow.closed) {
+                                clearInterval(checkClosed);
+                                showNotification('Authorization completed. Refreshing data...', 'info');
+                                fetchFyersInfo();
+                            }
+                        }, 1000);
+                    } else {
+                        showNotification('Token refresh initiated successfully!', 'success');
+                        fetchFyersInfo(); // Refresh the page data
+                    }
+                } else {
+                    showNotification('Token refresh failed: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showNotification('Token refresh failed: ' + error.message, 'error');
+            }
+        }
+    });
+    
+    // OAuth2 Flow Functions
+    async function saveOAuthConfig() {
+        const clientId = document.getElementById('fyers-oauth-client-id').value;
+        const secretKey = document.getElementById('fyers-oauth-secret-key').value;
+        const redirectUri = document.getElementById('fyers-oauth-redirect-uri').value;
+        
+        if (!clientId || !secretKey || !redirectUri) {
+            showNotification('Please fill in all OAuth2 fields', 'error');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/brokers/fyers/api/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    client_id: clientId,
+                    secret_key: secretKey,
+                    redirect_uri: redirectUri
+                })
+            });
+            
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error('Unexpected response. Please ensure you are logged in.');
+            }
+            const result = await response.json();
+            
+            if (result.success) {
+                showNotification('Configuration saved successfully!', 'success');
+                
+                // If auth URL was automatically generated, open it
+                if (result.auth_url) {
+                    showNotification('Opening FYERS authorization page...', 'info');
+                    
+                    // Open the authorization URL in a new window
+                    const authWindow = window.open(result.auth_url, '_blank', 'width=800,height=600');
+                    
+                    // Show success message about automated flow
+                    showNotification('Please complete the authorization in the new window. The access token will be automatically saved!', 'info');
+                    
+                    // Check for window close and refresh data
+                    const checkClosed = setInterval(() => {
+                        if (authWindow.closed) {
+                            clearInterval(checkClosed);
+                            showNotification('Authorization window closed. Refreshing data...', 'info');
+                            setTimeout(() => {
+                                fetchFyersInfo();
+                            }, 2000);
+                        }
+                    }, 1000);
+                }
+                
+                // Refresh broker info to show updated status
+                fetchFyersInfo();
+            } else {
+                showNotification('Failed to save configuration: ' + (result.error || 'Unknown error'), 'error');
+            }
+        } catch (error) {
+            console.error('Error saving OAuth config:', error);
+            showNotification('Error saving configuration: ' + error.message, 'error');
+        }
+    }
+
+    // Refresh detailed statistics
+    async function refreshDetailedStats() {
+        const refreshBtn = document.getElementById('refresh-stats');
+        const originalText = refreshBtn.innerHTML;
+        
+        try {
+            refreshBtn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Loading...';
+            refreshBtn.disabled = true;
+            
+            const response = await fetch('/brokers/fyers/api/stats/detailed', {
+                credentials: 'same-origin'
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.stats) {
+                    // Update statistics with detailed data
+                    document.getElementById('total-orders').textContent = data.stats.total_orders || 0;
+                    document.getElementById('successful-orders').textContent = data.stats.successful_orders || 0;
+                    document.getElementById('pending-orders').textContent = data.stats.pending_orders || 0;
+                    document.getElementById('failed-orders').textContent = data.stats.failed_orders || 0;
+                    document.getElementById('last-order-time').textContent = data.stats.last_order_time || '-';
+                    document.getElementById('api-response-time').textContent = data.stats.api_response_time || '-';
+                    
+                    // Show success message
+                    showNotification('Statistics refreshed successfully!', 'success');
+                } else {
+                    showNotification('Failed to refresh statistics', 'error');
+                }
+            } else {
+                showNotification('Failed to refresh statistics', 'error');
+            }
+        } catch (error) {
+            console.error('Error refreshing detailed stats:', error);
+            showNotification('Error refreshing statistics', 'error');
+        } finally {
+            refreshBtn.innerHTML = originalText;
+            refreshBtn.disabled = false;
+        }
+    }
+
+    // Toggle App Secret visibility
+    function toggleAppSecretVisibility() {
+        const appSecretElement = document.getElementById('fyers-app-secret');
+        const toggleIcon = document.getElementById('toggle-app-secret-icon');
+        const isVisible = appSecretElement.getAttribute('data-visible') === 'true';
+        const secretValue = appSecretElement.getAttribute('data-secret');
+        
+        if (secretValue) {
+            if (isVisible) {
+                // Hide the secret
+                appSecretElement.textContent = '••••••••••••••••';
+                appSecretElement.setAttribute('data-visible', 'false');
+                toggleIcon.className = 'bi bi-eye';
+            } else {
+                // Show the secret
+                appSecretElement.textContent = secretValue;
+                appSecretElement.setAttribute('data-visible', 'true');
+                toggleIcon.className = 'bi bi-eye-slash';
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set default redirect URI and fetch broker info
+        setDefaultRedirectUri();
+        fetchFyersInfo();
+        
+        // OAuth2 event listeners
+        document.getElementById('save-oauth-config').addEventListener('click', saveOAuthConfig);
+        
+        // Token refresh event listeners
+        document.getElementById('refresh-expired-token').addEventListener('click', function() {
+            // Trigger the refresh token process
+            document.getElementById('refresh-fyers-token').click();
+        });
+
+        document.getElementById('refresh-expiring-token').addEventListener('click', function() {
+            // Trigger the refresh token process
+            document.getElementById('refresh-fyers-token').click();
+        });
+        
+        // Refresh stats button
+        document.getElementById('refresh-stats').addEventListener('click', refreshDetailedStats);
+        
+        // App Secret toggle button
+        document.getElementById('toggle-app-secret').addEventListener('click', toggleAppSecretVisibility);
+        
+        // Refresh data every 30 seconds (but not the detailed stats)
+        setInterval(function() {
+            // Only refresh if the page is visible to avoid unnecessary API calls
+            if (!document.hidden) {
+                fetchFyersInfo();
+            }
+        }, 30000);
+    });
+</script>
+{% endblock %}

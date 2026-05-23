@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+
+{% block title %}Reports{% endblock %}
+
+{% block content %}
+<!-- Modern Stats Cards -->
+<div class="row g-4 mb-5">
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.1s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Total P&L</h6>
+                        <h2 class="fw-bold mb-0" id="total-pnl">₹0.00</h2>
+                        <small class="text-success">
+                            <i class="bi bi-graph-up"></i> Profit/Loss
+                        </small>
+                    </div>
+                    <div class="bg-gradient-success rounded-3 p-3">
+                        <i class="bi bi-graph-up text-white fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.2s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Win Rate</h6>
+                        <h2 class="fw-bold mb-0" id="win-rate">0%</h2>
+                        <small class="text-primary">
+                            <i class="bi bi-trophy"></i> Success rate
+                        </small>
+                    </div>
+                    <div class="bg-gradient-primary rounded-3 p-3">
+                        <i class="bi bi-trophy text-white fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card hover-lift animate-fade-in-up" style="animation-delay: 0.3s;">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="text-muted mb-2 fw-semibold">Total Trades</h6>
+                        <h2 class="fw-bold mb-0" id="total-trades">0</h2>
+                        <small class="text-info">
+                            <i class="bi bi-graph-up-arrow"></i> Executed trades
+                        </small>
+                    </div>
+                    <div class="bg-gradient-info rounded-3 p-3">
+                        <i class="bi bi-graph-up-arrow text-white fs-3"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs" id="reports-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="performance-tab" data-bs-toggle="tab" data-bs-target="#performance" type="button" role="tab">
+            <i class="bi bi-speedometer2"></i> Performance
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="reports-tab-content">
+    <div class="tab-pane fade show active" id="performance" role="tabpanel">
+        
+        <!-- Performance Summary Section -->
+        <div class="row g-4 mt-2">
+            <div class="col-md-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="card-title mb-0">
+                            <i class="bi bi-speedometer2 me-2"></i>Performance Summary
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="performance-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Period</th>
+                                        <th>P&L</th>
+                                        <th>Trades</th>
+                                        <th>Win Rate</th>
+                                        <th>Avg Win</th>
+                                        <th>Avg Loss</th>
+                                        <th>Max Drawdown</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Performance data will be loaded dynamically -->
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted">
+                                            <i class="bi bi-hourglass-split me-2"></i>Loading performance data...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Performers Section -->
+        <div class="row g-4 mt-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm border-success">
+                    <div class="card-header bg-light border-success">
+                        <h5 class="card-title mb-0 text-success">
+                            <i class="bi bi-trophy me-2"></i>Top Performers
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="top-performers-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Symbol</th>
+                                        <th>Quantity</th>
+                                        <th>P&L</th>
+                                        <th>Return %</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Top performers data will be loaded dynamically -->
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">
+                                            <i class="bi bi-hourglass-split me-2"></i>Loading top performers...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card shadow-sm border-danger">
+                    <div class="card-header bg-light border-danger">
+                        <h5 class="card-title mb-0 text-danger">
+                            <i class="bi bi-arrow-down-circle me-2"></i>Worst Performers
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="worst-performers-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Rank</th>
+                                        <th>Symbol</th>
+                                        <th>Quantity</th>
+                                        <th>P&L</th>
+                                        <th>Return %</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Worst performers data will be loaded dynamically -->
+                                    <tr>
+                                        <td colspan="6" class="text-center text-muted">
+                                            <i class="bi bi-hourglass-split me-2"></i>Loading worst performers...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Fetch reports summary data for cards
+    async function fetchReportsSummary() {
+        try {
+            const response = await fetch('/api/reports/summary');
+            const data = await response.json();
+
+            // Update summary cards
+            document.getElementById('total-pnl').textContent = `₹${data.total_pnl?.toFixed(2) || '0.00'}`;
+            document.getElementById('total-trades').textContent = data.total_trades || '0';
+            document.getElementById('win-rate').textContent = `${data.win_rate?.toFixed(1) || '0.0'}%`;
+
+            // Update P&L card color based on profit/loss
+            const pnlElement = document.getElementById('total-pnl');
+            const pnlCard = pnlElement.closest('.card-body');
+            const pnlValue = data.total_pnl || 0;
+
+            if (pnlValue > 0) {
+                pnlCard.className = pnlCard.className.replace('text-danger', 'text-success');
+            } else if (pnlValue < 0) {
+                pnlCard.className = pnlCard.className.replace('text-success', 'text-danger');
+            }
+
+        } catch (error) {
+            console.error('Error fetching reports summary:', error);
+        }
+    }
+
+    // Fetch performance summary data for performance table
+    async function fetchPerformanceSummary() {
+        try {
+            const response = await fetch('/api/reports/performance');
+            const data = await response.json();
+
+            const tableBody = document.querySelector('#performance-table tbody');
+
+            if (data.performance_summary && data.performance_summary.length > 0) {
+                const rows = data.performance_summary.map(period => `
+                    <tr>
+                        <td><strong>${period.period}</strong></td>
+                        <td class="${period.pnl >= 0 ? 'text-success' : 'text-danger'}">
+                            ₹${period.pnl?.toFixed(2) || '0.00'}
+                        </td>
+                        <td>${period.trades || 0}</td>
+                        <td>${period.win_rate?.toFixed(1) || '0.0'}%</td>
+                        <td class="text-success">₹${period.avg_win?.toFixed(2) || '0.00'}</td>
+                        <td class="text-danger">₹${Math.abs(period.avg_loss || 0).toFixed(2)}</td>
+                        <td class="text-danger">₹${period.max_drawdown?.toFixed(2) || '0.00'}</td>
+                    </tr>
+                `).join('');
+                tableBody.innerHTML = rows;
+            } else {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">
+                            <i class="bi bi-info-circle me-2"></i>No performance data available
+                        </td>
+                    </tr>
+                `;
+            }
+
+        } catch (error) {
+            console.error('Error fetching performance summary:', error);
+        }
+    }
+
+    // Fetch top and worst performers
+    async function fetchPerformers() {
+        try {
+            const response = await fetch('/api/reports/top-performers');
+            const data = await response.json();
+
+            // Update top performers table
+            const topTableBody = document.querySelector('#top-performers-table tbody');
+            if (data.top_performers && data.top_performers.length > 0) {
+                const topRows = data.top_performers.map((performer, index) => `
+                    <tr>
+                        <td><span class="badge bg-warning text-dark">${index + 1}</span></td>
+                        <td><strong>${performer.symbol}</strong></td>
+                        <td>${performer.quantity || 0}</td>
+                        <td class="text-success">
+                            <strong>₹${performer.pnl?.toFixed(2) || '0.00'}</strong>
+                        </td>
+                        <td class="text-success">
+                            <strong>+${performer.return_pct?.toFixed(2) || '0.00'}%</strong>
+                        </td>
+                        <td>
+                            <span class="badge bg-success">
+                                <i class="bi bi-arrow-up me-1"></i>Profit
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+                topTableBody.innerHTML = topRows;
+            } else {
+                topTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">
+                            <i class="bi bi-info-circle me-2"></i>No top performers data
+                        </td>
+                    </tr>
+                `;
+            }
+
+            // Update worst performers table
+            const worstTableBody = document.querySelector('#worst-performers-table tbody');
+            if (data.worst_performers && data.worst_performers.length > 0) {
+                const worstRows = data.worst_performers.map((performer, index) => `
+                    <tr>
+                        <td><span class="badge bg-secondary">${index + 1}</span></td>
+                        <td><strong>${performer.symbol}</strong></td>
+                        <td>${performer.quantity || 0}</td>
+                        <td class="text-danger">
+                            <strong>₹${performer.pnl?.toFixed(2) || '0.00'}</strong>
+                        </td>
+                        <td class="text-danger">
+                            <strong>${performer.return_pct?.toFixed(2) || '0.00'}%</strong>
+                        </td>
+                        <td>
+                            <span class="badge bg-danger">
+                                <i class="bi bi-arrow-down me-1"></i>Loss
+                            </span>
+                        </td>
+                    </tr>
+                `).join('');
+                worstTableBody.innerHTML = worstRows;
+            } else {
+                worstTableBody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">
+                            <i class="bi bi-info-circle me-2"></i>No worst performers data
+                        </td>
+                    </tr>
+                `;
+            }
+
+        } catch (error) {
+            console.error('Error fetching performers:', error);
+        }
+    }
+
+    // Main function to fetch all reports data
+    async function fetchReportsData() {
+        try {
+            console.log('Fetching updated reports data...');
+            await Promise.all([
+                fetchReportsSummary(),
+                fetchPerformanceSummary(),
+                fetchPerformers()
+            ]);
+            console.log('Reports data updated successfully');
+        } catch (error) {
+            console.error('Error fetching reports data:', error);
+        }
+    }
+
+    // Fetch data when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initial load
+        fetchReportsData();
+
+        // Refresh every 30 seconds
+        setInterval(fetchReportsData, 30000);
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,39 @@
+venv/
+__pycache__/
+*.py[cod]
+.DS_Store
+*.log
+logs/
+*.db
+:memory:*
+
+# Runtime CSV exports (regenerated daily by data_scheduler)
+exports/*.csv
+
+# Environment files (contain secrets)
+.env
+.env.production
+.env.local
+.env.*.local
+
+# Cookie files and debug files
+*.txt
+cookies.txt
+debug_*.txt
+test_*.txt
+raw_*.txt
+*.cookie
+
+ml_models/ADMIN_CREDENTIALS.md
+
+# Ensure old scripts don't come back
+deploy.sh
+deploy_docker_image.sh
+deploy_to_germany.sh
+deploy_test.sh
+venv/
+__pycache__/
+*.pyc
+logs/
+.env
+*.log
