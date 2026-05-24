@@ -185,3 +185,63 @@ PYTHONPATH=. python3 tools/analysis/blend_models.py \
 
 Each model writes `summary.json` + `equity_curve.csv` to its `--out` dir; sweeps write
 `sweep.json`. Per-model details in each model directory's `README.md`.
+
+---
+
+## Addendum — the 4th sleeve: a truly-uncorrelated diversifier (the real upgrade)
+
+The three core sleeves are all long US tech beta (correlations 0.5-0.6), so blending
+only modestly cut drawdown. The fix is a **non-equity** sleeve. `sector_rotation` run
+over a **diversifier basket** — managed-futures ETFs (DBMF, KMLM, CTA) + gold (GLD) +
+long bonds (TLT) + commodities (DBC) + dollar (UUP) — rotates by 3/6-month momentum and
+holds whatever is trending across asset classes.
+
+Standalone (3yr) it is modest: **~13.7% CAGR / 10.4% DD / Calmar 1.32**. But its daily
+returns are **near-uncorrelated with the equity sleeves**:
+
+|      | MOM  | TQQQ | BRK  | DIV  |
+|------|-----:|-----:|-----:|-----:|
+| MOM  | 1.00 | 0.51 | 0.61 | **0.07** |
+| TQQQ | 0.51 | 1.00 | 0.52 | **0.08** |
+| BRK  | 0.61 | 0.52 | 1.00 | **0.09** |
+| DIV  | 0.07 | 0.08 | 0.09 | 1.00 |
+
+That ~0.08 correlation (vs 0.4-0.6 for the failed equity-only sector rotation) is what
+makes it work: it earns its weight by slashing portfolio drawdown.
+
+### Weight optimization (grid search, `tools/analysis/blend_optimize.py`, 3yr)
+
+| Book / objective | Weights (MOM/TQQQ/BRK/DIV) | CAGR | MaxDD | Calmar |
+|------------------|---------------------------|-----:|------:|-------:|
+| 3-model, max Calmar | 1.00 / 0 / 0 / – | 114.77% | 29.61% | 3.88 |
+| 4-model, **max Calmar** | 0.35 / 0 / 0 / 0.65 | 45.86% | **9.94%** | **4.61** |
+| 4-model, min DD | 0.05 / 0 / 0.10 / 0.85 | 22.24% | 7.11% | 3.13 |
+
+### Recommended menu (4-model book, 3yr)
+
+| Profile | Weights (MOM/TQQQ/BRK/DIV) | CAGR | MaxDD | Calmar |
+|---------|---------------------------|-----:|------:|-------:|
+| **High CAGR, DD-controlled** | 0.50 / 0.15 / 0.15 / 0.20 | **78.66%** | 20.96% | 3.75 |
+| Balanced | 0.50 / 0 / 0.20 / 0.30 | 70.91% | 17.50% | 4.05 |
+| Smooth (high Calmar) | 0.60 / 0 / 0 / 0.40 | 71.22% | **16.57%** | 4.30 |
+| Max Calmar | 0.35 / 0 / 0 / 0.65 | 45.86% | 9.94% | 4.61 |
+
+**Takeaway:** adding the uncorrelated diversifier lets the book hold **~70-79% CAGR at
+17-21% drawdown** (vs the 3-model 88%/26%) — a materially better risk-adjusted result,
+and the part that is *most* likely to survive out-of-sample (the diversification is
+structural, not a curve-fit). The MOM survivorship discount still applies to the CAGR.
+
+Data: managed-futures/diversifier ETFs in `src/data/symbols/diversifier_etfs.csv` +
+`diversifier_universe.csv`; run via
+`tools/models/sector_rotation/backtest.py --etf-csv src/data/symbols/diversifier_universe.csv`.
+DBMF history starts 2019-05, KMLM 2020-12, CTA 2022-03 — so this sleeve is only
+fully populated from ~2022 onward (no long-cycle test yet).
+
+### Candidates that did NOT beat the book
+
+| Candidate | Why not |
+|-----------|---------|
+| `meanrev_rsi2_n100` | 12% CAGR; US mega-caps trended, dips didn't revert |
+| equity-only `sector_rotation` (XLK/XLE/…) | corr 0.4-0.6, too weak; dropped blend Calmar 3.40→3.29 |
+| `momentum_n500_regime_top5` | more CAGR (up to 193%) but DD 42-75%, Calmar < MOM's 3.88; high corr w/ MOM |
+| SOXL gated | ≥60% CAGR on bulls but 43-82% DD, ~0.9 corr w/ TQQQ |

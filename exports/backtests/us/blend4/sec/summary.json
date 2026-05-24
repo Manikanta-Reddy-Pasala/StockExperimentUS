@@ -1,0 +1,14 @@
+{
+  "label": "sector top4 absgate bil",
+  "top": 4,
+  "abs_gate": true,
+  "riskoff": "bil",
+  "start": "2023-05-24",
+  "end": "2026-05-22",
+  "years": 3.0,
+  "final_nav": 1674989.0,
+  "cagr_pct": 18.79,
+  "max_dd_pct_daily": 15.31,
+  "calmar": 1.23,
+  "avg_names_held": 4.0
+}
