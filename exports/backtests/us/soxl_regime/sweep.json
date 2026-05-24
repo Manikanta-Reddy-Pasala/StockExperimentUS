@@ -1,0 +1,250 @@
+[
+  {
+    "label": "base 200d (all-in)",
+    "lev": "SOXL",
+    "index": "QQQ",
+    "start": "2023-05-24",
+    "end": "2026-05-22",
+    "years": 3.0,
+    "capital": 100000.0,
+    "final_nav": 1024653.0,
+    "cagr_pct": 117.47,
+    "max_dd_pct": 74.18,
+    "calmar": 1.58,
+    "switches": 6,
+    "time_in_market_pct": 92.2,
+    "params": {
+      "sma": 200,
+      "second_sma": 0,
+      "partial": 1.0,
+      "buffer_pct": 0.0,
+      "confirm_days": 1,
+      "riskoff": "cash"
+    },
+    "bench_buyhold_lev": {
+      "cagr_pct": 130.08,
+      "max_dd_pct": 87.88
+    },
+    "bench_buyhold_index": {
+      "cagr_pct": 30.15,
+      "max_dd_pct": 22.77
+    }
+  },
+  {
+    "label": "200d + 50d gate",
+    "lev": "SOXL",
+    "index": "QQQ",
+    "start": "2023-05-24",
+    "end": "2026-05-22",
+    "years": 3.0,
+    "capital": 100000.0,
+    "final_nav": 741167.0,
+    "cagr_pct": 95.18,
+    "max_dd_pct": 73.69,
+    "calmar": 1.29,
+    "switches": 48,
+    "time_in_market_pct": 73.0,
+    "params": {
+      "sma": 200,
+      "second_sma": 50,
+      "partial": 1.0,
+      "buffer_pct": 0.0,
+      "confirm_days": 1,
+      "riskoff": "cash"
+    },
+    "bench_buyhold_lev": {
+      "cagr_pct": 130.08,
+      "max_dd_pct": 87.88
+    },
+    "bench_buyhold_index": {
+      "cagr_pct": 30.15,
+      "max_dd_pct": 22.77
+    }
+  },
+  {
+    "label": "200d + 50d + 3d confirm",
+    "lev": "SOXL",
+    "index": "QQQ",
+    "start": "2023-05-24",
+    "end": "2026-05-22",
+    "years": 3.0,
+    "capital": 100000.0,
+    "final_nav": 620603.0,
+    "cagr_pct": 83.95,
+    "max_dd_pct": 67.59,
+    "calmar": 1.24,
+    "switches": 28,
+    "time_in_market_pct": 78.1,
+    "params": {
+      "sma": 200,
+      "second_sma": 50,
+      "partial": 1.0,
+      "buffer_pct": 0.0,
+      "confirm_days": 3,
+      "riskoff": "cash"
+    },
+    "bench_buyhold_lev": {
+      "cagr_pct": 130.08,
+      "max_dd_pct": 87.88
+    },
+    "bench_buyhold_index": {
+      "cagr_pct": 30.15,
+      "max_dd_pct": 22.77
+    }
+  },
+  {
+    "label": "200d, 2% buffer, 3d cf",
+    "lev": "SOXL",
+    "index": "QQQ",
+    "start": "2023-05-24",
+    "end": "2026-05-22",
+    "years": 3.0,
+    "capital": 100000.0,
+    "final_nav": 1082626.0,
+    "cagr_pct": 121.5,
+    "max_dd_pct": 79.53,
+    "calmar": 1.53,
+    "switches": 8,
+    "time_in_market_pct": 95.5,
+    "params": {
+      "sma": 200,
+      "second_sma": 0,
+      "partial": 1.0,
+      "buffer_pct": 2.0,
+      "confirm_days": 3,
+      "riskoff": "cash"
+    },
+    "bench_buyhold_lev": {
+      "cagr_pct": 130.08,
+      "max_dd_pct": 87.88
+    },
+    "bench_buyhold_index": {
+      "cagr_pct": 30.15,
+      "max_dd_pct": 22.77
+    }
+  },
+  {
+    "label": "200d partial 0.66 (~2x)",
+    "lev": "SOXL",
+    "index": "QQQ",
+    "start": "2023-05-24",
+    "end": "2026-05-22",
+    "years": 3.0,
+    "capital": 100000.0,
+    "final_nav": 622501.0,
+    "cagr_pct": 84.14,
+    "max_dd_pct": 54.52,
+    "calmar": 1.54,
+    "switches": 6,
+    "time_in_market_pct": 92.2,
+    "params": {
+      "sma": 200,
+      "second_sma": 0,
+      "partial": 0.66,
+      "buffer_pct": 0.0,
+      "confirm_days": 1,
+      "riskoff": "cash"
+    },
+    "bench_buyhold_lev": {
+      "cagr_pct": 130.08,
+      "max_dd_pct": 87.88
+    },
+    "bench_buyhold_index": {
+      "cagr_pct": 30.15,
+      "max_dd_pct": 22.77
+    }
+  },
+  {
+    "label": "200d partial 0.5 (~1.5x)",
+    "lev": "SOXL",
+    "index": "QQQ",
+    "start": "2023-05-24",
+    "end": "2026-05-22",
+    "years": 3.0,
+    "capital": 100000.0,
+    "final_nav": 443133.0,
+    "cagr_pct": 64.38,
+    "max_dd_pct": 42.9,
+    "calmar": 1.5,
+    "switches": 6,
+    "time_in_market_pct": 92.2,
+    "params": {
+      "sma": 200,
+      "second_sma": 0,
+      "partial": 0.5,
+      "buffer_pct": 0.0,
+      "confirm_days": 1,
+      "riskoff": "cash"
+    },
+    "bench_buyhold_lev": {
+      "cagr_pct": 130.08,
+      "max_dd_pct": 87.88
+    },
+    "bench_buyhold_index": {
+      "cagr_pct": 30.15,
+      "max_dd_pct": 22.77
+    }
+  },
+  {
+    "label": "200d+50d partial 0.66",
+    "lev": "SOXL",
+    "index": "QQQ",
+    "start": "2023-05-24",
+    "end": "2026-05-22",
+    "years": 3.0,
+    "capital": 100000.0,
+    "final_nav": 460752.0,
+    "cagr_pct": 66.54,
+    "max_dd_pct": 55.75,
+    "calmar": 1.19,
+    "switches": 48,
+    "time_in_market_pct": 73.0,
+    "params": {
+      "sma": 200,
+      "second_sma": 50,
+      "partial": 0.66,
+      "buffer_pct": 0.0,
+      "confirm_days": 1,
+      "riskoff": "cash"
+    },
+    "bench_buyhold_lev": {
+      "cagr_pct": 130.08,
+      "max_dd_pct": 87.88
+    },
+    "bench_buyhold_index": {
+      "cagr_pct": 30.15,
+      "max_dd_pct": 22.77
+    }
+  },
+  {
+    "label": "200d+50d p0.66 BIL",
+    "lev": "SOXL",
+    "index": "QQQ",
+    "start": "2023-05-24",
+    "end": "2026-05-22",
+    "years": 3.0,
+    "capital": 100000.0,
+    "final_nav": 493784.0,
+    "cagr_pct": 70.43,
+    "max_dd_pct": 54.72,
+    "calmar": 1.29,
+    "switches": 48,
+    "time_in_market_pct": 73.0,
+    "params": {
+      "sma": 200,
+      "second_sma": 50,
+      "partial": 0.66,
+      "buffer_pct": 0.0,
+      "confirm_days": 1,
+      "riskoff": "bil"
+    },
+    "bench_buyhold_lev": {
+      "cagr_pct": 130.08,
+      "max_dd_pct": 87.88
+    },
+    "bench_buyhold_index": {
+      "cagr_pct": 30.15,
+      "max_dd_pct": 22.77
+    }
+  }
+]

@@ -1,0 +1,18 @@
+{
+  "label": "rsi2 N=10 e10/70",
+  "maxn": 10,
+  "entry_rsi": 10.0,
+  "exit_rsi": 70.0,
+  "max_hold": 6,
+  "regime": false,
+  "start": "2023-05-24",
+  "end": "2026-05-22",
+  "years": 3.0,
+  "final_nav": 1442250.0,
+  "cagr_pct": 13.01,
+  "max_dd_pct_daily": 25.06,
+  "calmar": 0.52,
+  "trades": 2308,
+  "win_rate_pct": 68.6,
+  "avg_hold_days": 2.9
+}

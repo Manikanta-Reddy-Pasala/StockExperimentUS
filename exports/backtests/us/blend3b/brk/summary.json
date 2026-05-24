@@ -1,0 +1,17 @@
+{
+  "label": "breakout D50 trail20 N5",
+  "donchian": 50,
+  "trail": 20.0,
+  "maxn": 5,
+  "mom": 60,
+  "regime": false,
+  "start": "2023-05-24",
+  "end": "2026-05-22",
+  "years": 3.0,
+  "final_nav": 3828606.0,
+  "cagr_pct": 56.55,
+  "max_dd_pct_daily": 25.04,
+  "calmar": 2.26,
+  "trades": 40,
+  "win_rate_pct": 45.0
+}
