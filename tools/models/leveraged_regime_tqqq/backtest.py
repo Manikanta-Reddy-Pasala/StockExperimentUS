@@ -83,7 +83,7 @@ def max_drawdown(equity: pd.Series) -> float:
 def run(start: date, end: date, capital: float,
         lev: str = "TQQQ", index_sym: str = "QQQ",
         sma: int = 200, second_sma: int = 0, partial: float = 1.0,
-        buffer_pct: float = 0.0, confirm_days: int = 1,
+        buffer_pct: float = 0.0, confirm_days: int = 1, target_vol: float = 0.0,
         riskoff: str = "cash", label: str | None = None,
         out_dir: Path | None = None, quiet: bool = False) -> dict:
     eng = get_engine()
@@ -134,6 +134,12 @@ def run(start: date, end: date, capital: float,
         ro_ret = pd.Series(0.0, index=cal)  # plain cash
 
     w_lev = held.astype(float) * partial
+    if target_vol > 0:
+        # volatility targeting: scale leveraged exposure down when its vol spikes.
+        # scale = target / realized (annualized 20d), capped at 1 (never lever beyond `partial`).
+        rv = (lev_ret.rolling(20).std() * (252 ** 0.5)).replace(0, pd.NA)
+        scale = (target_vol / 100.0 / rv).clip(upper=1.0).shift(1).fillna(1.0)
+        w_lev = w_lev * scale
     w_ro  = 1.0 - w_lev
     port_ret = w_lev * lev_ret + w_ro * ro_ret
 
@@ -235,6 +241,7 @@ def main():
     ap.add_argument("--partial", type=float, default=1.0)
     ap.add_argument("--buffer-pct", type=float, default=0.0)
     ap.add_argument("--confirm-days", type=int, default=1)
+    ap.add_argument("--target-vol", type=float, default=0.0, help="annualized vol target %% (0=off); scales exposure down when vol spikes")
     ap.add_argument("--riskoff", choices=["cash", "bil"], default="cash")
     ap.add_argument("--out", default=None)
     ap.add_argument("--sweep", action="store_true", help="Run the preset DD-reduction grid + print a table")
@@ -262,7 +269,7 @@ def main():
     else:
         run(s, e, a.capital, lev=a.lev, index_sym=a.index, sma=a.sma,
             second_sma=a.second_sma, partial=a.partial, buffer_pct=a.buffer_pct,
-            confirm_days=a.confirm_days, riskoff=a.riskoff,
+            confirm_days=a.confirm_days, target_vol=a.target_vol, riskoff=a.riskoff,
             out_dir=Path(a.out) if a.out else None)
 
 
