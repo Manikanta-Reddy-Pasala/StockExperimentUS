@@ -97,9 +97,14 @@ def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
     pos: dict[str, float] = {}        # sym -> shares
     entry_px: dict[str, float] = {}
     peak_px: dict[str, float] = {}
-    equity, trades = [], []
+    equity, trades, txns = [], [], []
     slip = SLIPPAGE_BPS / 1e4
     trail_f = trail / 100.0
+
+    def log(d, action, s, px, shares):
+        txns.append({"date": d.date().isoformat(), "action": action, "symbol": s,
+                     "price": round(px, 4), "shares": round(shares, 4),
+                     "value": round(shares * px, 2)})
 
     for d in run_dates:
         di = dates.get_loc(d)
@@ -115,6 +120,7 @@ def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
             stop = peak_px[s] * (1 - trail_f)
             if px <= stop or px < float(sma100.iloc[di][s]):
                 cash += pos[s] * px * (1 - slip)
+                log(d, "SELL", s, px, pos[s])
                 trades.append({"sym": s, "ret_pct": round((px / entry_px[s] - 1) * 100, 2)})
                 pos.pop(s); entry_px.pop(s); peak_px.pop(s, None)
 
@@ -143,6 +149,7 @@ def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
                 if cost <= cash and sh > 0:
                     cash -= cost
                     pos[s] = sh; entry_px[s] = px; peak_px[s] = px
+                    log(d, "BUY", s, px, sh)
 
         val = cash + sum(sh * float(px_row[s]) for s, sh in pos.items() if pd.notna(px_row[s]))
         equity.append(val)
@@ -171,6 +178,8 @@ def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
         out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "summary.json").write_text(json.dumps(res, indent=2))
         eq.rename("equity").to_csv(out_dir / "equity_curve.csv")
+        if txns:
+            pd.DataFrame(txns).to_csv(out_dir / "transactions.csv", index=False)
     return res
 
 

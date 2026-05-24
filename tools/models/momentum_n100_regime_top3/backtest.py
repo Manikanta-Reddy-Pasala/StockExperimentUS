@@ -144,8 +144,14 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
     peak_px: dict[str, float] = {}        # for per-position trailing stop
     equity = []
     trades = []
+    txns = []
     slip = SLIPPAGE_BPS / 1e4
     trail_f = trail / 100.0
+
+    def log(d, action, s, px, shares):
+        txns.append({"date": d.date().isoformat(), "action": action, "symbol": s,
+                     "price": round(px, 4), "shares": round(shares, 4),
+                     "value": round(shares * px, 2)})
 
     for d in run_dates:
         di = dates.get_loc(d)
@@ -159,6 +165,7 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
                 peak_px[s] = max(peak_px.get(s, px), px)
                 if px <= peak_px[s] * (1 - trail_f):
                     cash += pos[s] * px * (1 - slip)
+                    log(d, "SELL_TRAIL", s, px, pos[s])
                     if s in entry_px:
                         trades.append({"sym": s, "exit_date": d.date().isoformat(),
                                        "ret_pct": round((px / entry_px[s] - 1) * 100, 2)})
@@ -193,11 +200,13 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
                 if dsh < 0:  # sell
                     sh = -dsh
                     cash += sh * px * (1 - slip)
+                    log(d, "SELL", s, px, sh)
                     if s in entry_px:
                         trades.append({"sym": s, "exit_date": d.date().isoformat(),
                                        "ret_pct": round((px / entry_px[s] - 1) * 100, 2)})
                 else:        # buy
                     cash -= dsh * px * (1 + slip)
+                    log(d, "BUY", s, px, dsh)
                 if tgt <= 1e-9:
                     pos.pop(s, None); entry_px.pop(s, None); peak_px.pop(s, None)
                 else:
@@ -235,6 +244,8 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
         out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "summary.json").write_text(json.dumps(res, indent=2))
         eq.rename("equity").to_csv(out_dir / "equity_curve.csv")
+        if txns:
+            pd.DataFrame(txns).to_csv(out_dir / "transactions.csv", index=False)
     return res
 
 

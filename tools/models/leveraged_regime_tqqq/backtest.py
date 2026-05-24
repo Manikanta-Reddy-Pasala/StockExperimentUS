@@ -192,6 +192,21 @@ def run(start: date, end: date, capital: float,
         out_dir = Path(out_dir); out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "summary.json").write_text(json.dumps(res, indent=2))
         equity.rename("equity").to_frame().assign(held=held.astype(int)).to_csv(out_dir / "equity_curve.csv")
+        # transaction log = regime switches (buy/sell the leveraged ETF)
+        levpx = levdf["close"].reindex(cal).ffill()
+        txns, prev = [], False
+        for dt in cal:
+            h = bool(held.loc[dt])
+            if h != prev:
+                px = float(levpx.loc[dt]); val = float(equity.loc[dt]) * partial
+                txns.append({"date": dt.date().isoformat(),
+                             "action": ("BUY_" + lev) if h else ("SELL_" + lev),
+                             "symbol": lev, "price": round(px, 4),
+                             "shares": round(val / px, 4) if h else round(val / px, 4),
+                             "value": round(val, 2)})
+            prev = h
+        if txns:
+            pd.DataFrame(txns).to_csv(out_dir / "transactions.csv", index=False)
 
     return res
 
