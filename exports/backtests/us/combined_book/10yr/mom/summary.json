@@ -1,0 +1,17 @@
+{
+  "label": "top3 regime",
+  "top": 3,
+  "regime": true,
+  "mid_month": false,
+  "start": "2016-05-24",
+  "end": "2026-05-22",
+  "years": 9.99,
+  "capital": 1000000.0,
+  "final_nav": 20697363.0,
+  "cagr_pct": 35.42,
+  "max_dd_pct_daily": 63.59,
+  "calmar": 0.56,
+  "trades": 264,
+  "win_rate_pct": 63.6,
+  "regime_time_in_market_pct": 82.5
+}

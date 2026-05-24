@@ -6,6 +6,22 @@ book: MOM now ranks on **multi-timeframe ("blend") momentum**, and BRK runs its
 **regime gate ON**. All cash-only, buyable at IBKR (no margin). True daily MTM
 drawdown. Costs: $0 commission (IBKR Lite) + 8 bps slippage.
 
+## Universe support (same models, both markets)
+
+The 3 models are universe-agnostic via `--universe-csv` + `--regime-sym`. Run
+**per-universe** (do NOT merge — a combined pool makes top-3 momentum pick extreme
+high-beta names and blows out DD). Nasdaq is the best book; S&P is fully supported.
+
+| Universe | flags | 3yr CAGR/DD/Calmar | 10yr CAGR/DD/Calmar |
+|----------|-------|--------------------|---------------------|
+| **Nasdaq-100** (default, best) | `--universe-csv src/data/symbols/nasdaq100.csv --regime-sym QQQ` | 108.7 / 24.9 / 4.36 | 55.2 / 37.7 / 1.46 |
+| S&P 500 | `--universe-csv src/data/symbols/sp500.csv --regime-sym SPY` | 87.7 / 30.1 / 2.91 | 37.7 / 38.9 / 0.97 |
+| Combined (516) | `--universe-csv src/data/symbols/combined_us.csv --regime-sym SPY` | 79.0 / 30.7 / 2.57 | 35.3 / 45.9 / 0.77 |
+
+Leveraged sleeve: TQQQ (`--lev TQQQ --index QQQ`) for Nasdaq; UPRO (`--lev UPRO
+--index SPY`) for S&P. Numbers above use TQQQ. Momentum/trend is strongest on Nasdaq
+(tech concentration + dispersion); broadening to S&P or the union dilutes it.
+
 ## The three models (locked configs)
 
 | Sleeve | File | Live config | Mechanism |
