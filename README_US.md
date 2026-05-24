@@ -20,22 +20,27 @@ from **yfinance** (no Fyers — that's India-only) and the universe is US Nasdaq
 | Per-model summaries | `exports/backtests/us/<model>/summary.json` |
 | Plan | `docs/plans/2026-05-24-us-port.md` |
 
-## 3-Model Diversified Book (recommended)
+## LOCKED — 3-Model Momentum Book (recommended)
 
-Three **distinct mechanisms** (cash-only, true daily-MTM drawdown), blended:
+Final book after scanning ~12 US strategy archetypes (momentum, breakout,
+VCP/Minervini, leveraged-trend, mean-reversion, factor/sector/cross-asset rotation,
+overnight/intraday, seasonality, gold, crypto). Conclusion: **systematic US large-cap
+CAGR comes only from concentrated momentum/trend** — these three are the keepers.
+Cash-only, true daily-MTM drawdown.
 
-| Sleeve | Mechanism | 3yr CAGR | 3yr MaxDD | Calmar |
-|---|---|---:|---:|---:|
-| MOM `momentum_n100_regime_top3` | momentum rotation + QQQ>200d gate, top-3 | 114.8% | 29.6% | 3.88 |
-| TQQQ `leveraged_regime_tqqq` | 3× Nasdaq ETF timed by QQQ 200d SMA | 64.2% | 37.4% | 1.72 |
-| BRK `breakout_n100` | 50d-high breakout + 20% trailing stop | 55.3% | 25.0% | 2.21 |
-| **Blend 45/30/25** | daily-rebalanced | **88.2%** | **25.9%** | **3.40** |
+| Sleeve | Live config | 3yr CAGR | 3yr DD | Calmar | 4yr CAGR | 4yr DD |
+|---|---|---:|---:|---:|---:|---:|
+| MOM `momentum_n100_regime_top3` | `--top 3 --regime` | 115.1% | 29.6% | 3.89 | 86.8% | 29.6% |
+| TQQQ `leveraged_regime_tqqq` | `--sma 200` | 67.9% | 37.4% | 1.82 | 56.2% | 37.4% |
+| BRK `breakout_n100` | `--donchian 50 --trail 20 --maxn 5` | 56.6% | 25.0% | 2.26 | 33.7% | 23.3% |
+| **Blend 50/25/25** | — | **90.4%** | **26.0%** | **3.48** | **68.3%** | **25.7%** |
 
-4yr (incl. 2022 bear): blend 45/30/25 = **66.96% / 25.68% DD / 2.61 Calmar**.
-Blending drops drawdown below every single sleeve. **Numbers are survivorship- and
-bull-window-inflated** — honest forward ≈ 50-65% CAGR, DD 30-40% in a real bear. Full
-data, rejected models (mean-reversion, SOXL), the point-in-time reality check, the
-16-year TQQQ cycle test, correlations, caveats, and reproduce commands are in
+**Numbers are survivorship- and bull-window-inflated** — honest forward ≈ 45-60% CAGR,
+DD 30-40% in a real bear. Locked-book summary + per-model exports:
+`exports/backtests/us/3MODEL_BOOK.md` and `exports/backtests/us/<model>/{3yr,4yr}/`.
+Per-model fact sheets in `exports/backtests/us/reports/`. Full search incl. rejected
+models (VCP, mean-reversion, SOXL, factor rotation), the point-in-time reality check,
+the 16-year TQQQ cycle test, and the diversifier research are in
 `exports/backtests/US_3MODEL_RESULTS.md`.
 
 ## Results (4yr, $1M, 2022-05-24 → 2026-05-24)
