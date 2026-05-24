@@ -2,7 +2,13 @@
 
 **Mechanism:** cross-sectional momentum rotation (buy the strongest names).
 **File:** `tools/models/momentum_n100_regime_top3/backtest.py`
-**Live config:** `--top 3 --regime` (mid-month check OFF)
+**Live config (LOCKED v2):** `--top 3 --regime --mom-mode blend`
+
+> v2 upgrade: rank by **blend** momentum = mean of 21/63/126-day returns (vs raw 30d).
+> Multi-timeframe favors durable trends → 10yr CAGR 50%→81%, Calmar 1.08→1.72 (DD ~flat).
+> Other flags available: `--trail` (per-position stop), `--fast-sma` (faster gate),
+> `--mom-mode sharpe` (vol-adjusted, lower DD/lower CAGR). Trailing/fast-gate hurt the
+> blend signal over 10yr (whipsaw) — left off in the locked config.
 
 ## Rules
 - **Universe:** real Nasdaq-100 (`src/data/symbols/nasdaq100.csv`, 101 names).

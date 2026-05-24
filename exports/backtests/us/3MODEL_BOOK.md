@@ -1,69 +1,75 @@
-# LOCKED — 3-Model Momentum Book (US Nasdaq)
+# LOCKED — 3-Model Momentum Book v2 (US Nasdaq)
 
-Final book after an exhaustive search of ~12 US strategy archetypes (momentum,
-breakout, VCP/Minervini, leveraged-trend, mean-reversion, factor rotation, sector &
-cross-asset rotation, overnight/intraday, seasonality, gold, crypto — see
-`US_3MODEL_RESULTS.md`). Conclusion: **systematic US large-cap CAGR comes only from
-concentrated momentum/trend.** These three are the keepers. All cash-only, buyable at
-IBKR (no margin). True daily mark-to-market drawdown. Costs: $0 commission (IBKR Lite)
-+ 8 bps slippage.
+Final book after an exhaustive archetype search (see `US_3MODEL_RESULTS.md`) **plus a
+model-based optimization pass**. Two changes lifted CAGR *and* cut drawdown vs the v1
+book: MOM now ranks on **multi-timeframe ("blend") momentum**, and BRK runs its
+**regime gate ON**. All cash-only, buyable at IBKR (no margin). True daily MTM
+drawdown. Costs: $0 commission (IBKR Lite) + 8 bps slippage.
 
-## The three models
+## The three models (locked configs)
 
 | Sleeve | File | Live config | Mechanism |
 |--------|------|-------------|-----------|
-| **MOM** | `tools/models/momentum_n100_regime_top3/backtest.py` | `--top 3 --regime` | rank Nasdaq-100 by 30d return, hold top-3, monthly; cash when QQQ < 200d SMA |
+| **MOM** | `tools/models/momentum_n100_regime_top3/backtest.py` | `--top 3 --regime --mom-mode blend` | Nasdaq-100, rank by avg of 21/63/126-day returns, top-3, monthly; cash when QQQ < 200d SMA |
 | **TQQQ** | `tools/models/leveraged_regime_tqqq/backtest.py` | `--sma 200` | hold TQQQ (3× Nasdaq) when QQQ > 200d SMA, else cash |
-| **BRK** | `tools/models/breakout_n100/backtest.py` | `--donchian 50 --trail 20 --maxn 5` | buy 50-day high in uptrend, ride with 20% trailing stop, top-5 |
+| **BRK** | `tools/models/breakout_n100/backtest.py` | `--donchian 50 --trail 20 --maxn 5 --regime` | buy 50-day high in uptrend (QQQ>200d), 20% trailing stop, top-5 |
 
-## Per-model results (true daily DD)
-
-| Model | 3yr CAGR | 3yr DD | 3yr Calmar | 4yr CAGR | 4yr DD | 4yr Calmar | Cycle test |
-|-------|---------:|-------:|-----------:|---------:|-------:|-----------:|-----------|
-| MOM | 115.12% | 29.61% | 3.89 | 86.82% | 29.61% | 2.93 | 4yr only |
-| TQQQ | 67.94% | 37.37% | 1.82 | 56.19% | 37.37% | 1.50 | 16yr → 33.55% / 54.92% / 0.61 |
-| BRK | 56.55% | 25.04% | 2.26 | 33.68% | 23.26% | 1.45 | 4yr only |
-
-## Blended book — 50 / 25 / 25 (MOM / TQQQ / BRK)
+## Blended book — 45 / 15 / 40 (MOM / TQQQ / BRK)
 
 | Window | CAGR | MaxDD | Calmar |
 |--------|-----:|------:|-------:|
-| 3yr (2023-2026) | **90.44%** | 25.97% | **3.48** |
-| 4yr (2022-2026, incl. bear) | 68.29% | 25.73% | 2.65 |
+| 3yr (2023-2026) | **108.69%** | 24.90% | **4.36** |
+| 4yr (2022-2026, incl. bear) | 74.75% | 26.17% | 2.86 |
+| 10yr (2016-2026, incl. 2018/2020/2022) | 55.19% | 37.69% | 1.46 |
 
-Daily-return correlations (3yr): MOM-TQQQ 0.51, MOM-BRK 0.61, TQQQ-BRK 0.52 — all long
-US tech beta, so the blend smooths return paths but does not deeply cut drawdown (only a
-non-equity sleeve would; intentionally excluded here).
+### v2 (upgraded) vs v1 (original) — better on every metric, both windows
+| Book | 3yr CAGR / DD / Calmar | 10yr CAGR / DD / Calmar |
+|------|------------------------|-------------------------|
+| v1 (raw 30d MOM, BRK no-regime, 50/25/25) | 90.4% / 26.0% / 3.48 | 45.7% / 39.0% / 1.17 |
+| **v2 (blend MOM, BRK regime, 45/15/40)** | **108.7% / 24.9% / 4.36** | **55.2% / 37.7% / 1.46** |
 
-## Caveats (carry forward to live)
-1. **Survivorship.** MOM/BRK sit on the *current* Nasdaq-100 → upward bias. The
-   point-in-time check (`pseudo_n100_regime_top3`) shows the same momentum logic makes
-   only ~34-56% on a bias-free universe. **Honest forward ≈ 45-60% CAGR for the book.**
-2. **Window.** 2023-2025 was an AI mega-bull; 3yr is flattering, 4yr fairer. DDs are
-   identical 3yr↔4yr → the worst drawdown is post-2022, not the 2022 bear.
-3. **Bear stress.** Stock sleeves have only 4yr history; only TQQQ has a 16yr record
-   (and it's sobering — 33.6% CAGR / 54.9% DD over the cycle).
-4. **Concentration / single-name.** MOM top-3 is carried by a few mega-caps.
-5. Live DD will likely run 30-40% in a real bear despite the regime gates.
+## Per-model results (locked configs, true daily DD)
 
-## Artifacts on disk (`exports/backtests/us/`)
-- `momentum_n100_regime_top3/{3yr,4yr}/` — summary.json + equity_curve.csv
-- `leveraged_regime_tqqq/{3yr,4yr,15yr}/` — summary.json + equity_curve.csv
-- `breakout_n100/{3yr,4yr}/` — summary.json + equity_curve.csv
-- `<model>/sweep.json` — all parameter configs
+| Model | 3yr CAGR/DD/Calmar | 4yr CAGR/DD/Calmar | 10yr CAGR/DD/Calmar |
+|-------|--------------------|--------------------|---------------------|
+| MOM (blend) | 162.9% / 39.2% / 4.16 | 117.7% / 39.2% / 3.00 | 80.9% / 47.0% / 1.72 |
+| TQQQ | 67.9% / 37.4% / 1.82 | 56.2% / 37.4% / 1.50 | 44.8% / 54.9% / 0.81 |
+| BRK (regime) | 66.3% / 25.5% / 2.60 | 34.1% / 21.2% / 1.61 | 26.9% / 36.7% / 0.73 |
+
+## What the optimization pass found (model-based, not curve-fit)
+1. **MOM blend momentum** (avg of 21/63/126-day returns vs raw 30d) — 10yr CAGR 50→81%,
+   Calmar 1.08→1.72. Multi-timeframe ranking favors durable trends over volatile pumps.
+   The real alpha upgrade.
+2. **BRK regime gate ON** — CAGR 56→66% (3yr) *and* DD 48→37% (10yr). Near-free win.
+3. **Reweight to 45/15/40** (less TQQQ — it's the highest-DD sleeve at 55%) lowers book DD.
+4. **Rejected:** trailing stop + fast (50d) gate on the blend signal *raised* 10yr DD
+   (whipsaw); Sharpe-momentum cut DD but killed CAGR. Blend-clean is best.
+
+## Caveats (carry to live)
+1. **Survivorship.** MOM/BRK on the *current* Nasdaq-100 → upward bias (~2.5× per the
+   point-in-time `pseudo_n100_regime_top3` check). Honest forward ≈ 40-60% CAGR.
+2. **Window / bull tilt.** 3yr 109% rides the AI mega-bull; 10yr (real bears) is the
+   fair read: ~55% CAGR / ~38% DD.
+3. **DD floor.** Concentrated momentum draws down ~38-47% in real bears even with the
+   regime gate (2020 COVID gapped through the 200d). The blend upgrade raised
+   CAGR/Calmar; it did NOT lower the DD floor.
+4. Stock sleeves have 10yr history; only TQQQ has 16yr (33.6% CAGR / 54.9% DD over cycle).
+
+## Artifacts (`exports/backtests/us/`)
+- `book_v2/{3yr,4yr,10yr}/{mom,tqqq,brk}/` — summary.json + equity_curve.csv (locked configs)
+- `<model>/sweep.json` — parameter sweeps
 - `reports/{1_MOM,2_TQQQ,3_BRK}_*.md` — per-model fact sheets
-- `US_3MODEL_RESULTS.md` — full results + rejected models + the diversifier research
+- `US_3MODEL_RESULTS.md` — full archetype search + rejected models + diversifier research
 
 ## Reproduce
 ```bash
 docker compose up -d database
 export DATABASE_URL="postgresql+psycopg2://trader:trader_password@localhost:5432/trading_system"
-F=2023-05-24; T=2026-05-24; U=exports/backtests/us
-PYTHONPATH=. python3 tools/models/momentum_n100_regime_top3/backtest.py --top 3 --regime --from $F --to $T --out $U/momentum_n100_regime_top3/3yr
-PYTHONPATH=. python3 tools/models/leveraged_regime_tqqq/backtest.py     --sma 200            --from $F --to $T --out $U/leveraged_regime_tqqq/3yr
-PYTHONPATH=. python3 tools/models/breakout_n100/backtest.py --donchian 50 --trail 20 --maxn 5 --from $F --to $T --out $U/breakout_n100/3yr
-PYTHONPATH=. python3 tools/analysis/blend_models.py \
-  MOM=$U/momentum_n100_regime_top3/3yr/equity_curve.csv \
-  TQQQ=$U/leveraged_regime_tqqq/3yr/equity_curve.csv \
-  BRK=$U/breakout_n100/3yr/equity_curve.csv --weights 0.5,0.25,0.25
+# 10yr needs Nasdaq-100 history back to ~2014:
+PYTHONPATH=. python3 tools/pull_yfinance_history.py --universe src/data/symbols/nasdaq100.csv --start 2014-01-01 --end 2026-05-24
+F=2016-05-24; T=2026-05-24; D=exports/backtests/us/book_v2/10yr
+PYTHONPATH=. python3 tools/models/momentum_n100_regime_top3/backtest.py --top 3 --regime --mom-mode blend --from $F --to $T --out $D/mom
+PYTHONPATH=. python3 tools/models/leveraged_regime_tqqq/backtest.py --sma 200 --from $F --to $T --out $D/tqqq
+PYTHONPATH=. python3 tools/models/breakout_n100/backtest.py --donchian 50 --trail 20 --maxn 5 --regime --from $F --to $T --out $D/brk
+PYTHONPATH=. python3 tools/analysis/blend_models.py MOM=$D/mom/equity_curve.csv TQQQ=$D/tqqq/equity_curve.csv BRK=$D/brk/equity_curve.csv --weights 0.45,0.15,0.40
 ```

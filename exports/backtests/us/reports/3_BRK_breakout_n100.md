@@ -3,7 +3,10 @@
 **Mechanism:** event-driven breakout momentum (let winners run, cut losers via a
 trailing stop). Different timing/DD profile from the monthly-rotation MOM sleeve.
 **File:** `tools/models/breakout_n100/backtest.py`
-**Live config:** `--donchian 50 --trail 20 --maxn 5`
+**Live config (LOCKED v2):** `--donchian 50 --trail 20 --maxn 5 --regime`
+
+> v2 upgrade: **regime gate ON** (only enter when QQQ > 200d SMA). Near-free win —
+> CAGR 56→66% (3yr) AND DD 48→37% (10yr), Calmar 0.54→0.73 (10yr).
 
 ## Rules
 - **Universe:** real Nasdaq-100.

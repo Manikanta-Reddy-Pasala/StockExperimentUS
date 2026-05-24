@@ -28,15 +28,19 @@ overnight/intraday, seasonality, gold, crypto). Conclusion: **systematic US larg
 CAGR comes only from concentrated momentum/trend** — these three are the keepers.
 Cash-only, true daily-MTM drawdown.
 
-| Sleeve | Live config | 3yr CAGR | 3yr DD | Calmar | 4yr CAGR | 4yr DD |
-|---|---|---:|---:|---:|---:|---:|
-| MOM `momentum_n100_regime_top3` | `--top 3 --regime` | 115.1% | 29.6% | 3.89 | 86.8% | 29.6% |
-| TQQQ `leveraged_regime_tqqq` | `--sma 200` | 67.9% | 37.4% | 1.82 | 56.2% | 37.4% |
-| BRK `breakout_n100` | `--donchian 50 --trail 20 --maxn 5` | 56.6% | 25.0% | 2.26 | 33.7% | 23.3% |
-| **Blend 50/25/25** | — | **90.4%** | **26.0%** | **3.48** | **68.3%** | **25.7%** |
+Optimization pass (model-based) upgraded it: MOM now ranks on multi-timeframe **blend**
+momentum, BRK runs its **regime gate ON** — higher CAGR *and* lower DD than v1.
 
-**Numbers are survivorship- and bull-window-inflated** — honest forward ≈ 45-60% CAGR,
-DD 30-40% in a real bear. Locked-book summary + per-model exports:
+| Sleeve | Live config | 3yr CAGR/DD/Calmar | 10yr CAGR/DD/Calmar |
+|---|---|---|---|
+| MOM `momentum_n100_regime_top3` | `--top 3 --regime --mom-mode blend` | 162.9% / 39.2% / 4.16 | 80.9% / 47.0% / 1.72 |
+| TQQQ `leveraged_regime_tqqq` | `--sma 200` | 67.9% / 37.4% / 1.82 | 44.8% / 54.9% / 0.81 |
+| BRK `breakout_n100` | `--donchian 50 --trail 20 --maxn 5 --regime` | 66.3% / 25.5% / 2.60 | 26.9% / 36.7% / 0.73 |
+| **Blend 45/15/40** | — | **108.7% / 24.9% / 4.36** | **55.2% / 37.7% / 1.46** |
+
+v2 beats v1 (90.4%/26.0%/3.48 · 45.7%/39.0%/1.17) on every metric, both windows.
+**Numbers are survivorship- and bull-window-inflated** — honest forward ≈ 40-60% CAGR,
+DD ~38% in a real bear (the DD floor; momentum's nature). Locked-book summary + exports:
 `exports/backtests/us/3MODEL_BOOK.md` and `exports/backtests/us/<model>/{3yr,4yr}/`.
 Per-model fact sheets in `exports/backtests/us/reports/`. Full search incl. rejected
 models (VCP, mean-reversion, SOXL, factor rotation), the point-in-time reality check,

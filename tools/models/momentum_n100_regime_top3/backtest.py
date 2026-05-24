@@ -87,7 +87,7 @@ def build_rebal(dates, start, end, mid_month):
 
 
 def run(start, end, capital, top=3, regime=True, mid_month=False,
-        label=None, out_dir=None, quiet=False):
+        trail=0.0, fast_sma=0, mom_mode="ret", label=None, out_dir=None, quiet=False):
     eng = get_engine()
     syms = load_n100()
     with eng.connect() as c:
@@ -106,11 +106,34 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
     qq["date"] = pd.to_datetime(qq["date"])
     qq = qq.set_index("date")["close"]
     qq_sma = qq.rolling(200).mean()
-    regime_on = (qq > qq_sma).reindex(cl.index).ffill().fillna(False)
+    on = qq > qq_sma
+    if fast_sma > 0:                       # faster secondary gate: must also be > fast SMA
+        on = on & (qq > qq.rolling(fast_sma).mean())
+    regime_on = on.reindex(cl.index).ffill().fillna(False)
 
     dates = cl.index
     present = [s for s in syms if s in cl.columns]
     rebal = build_rebal(dates, start, end, mid_month)
+    # signal precompute (for blend / sharpe momentum modes)
+    dret = cl.pct_change()
+    vol63 = dret.rolling(63).std()
+
+    def score_row(di):
+        if mom_mode == "blend":   # multi-timeframe momentum, smoother
+            s = None
+            for lb in (21, 63, 126):
+                if di - lb < 0:
+                    continue
+                r = cl.iloc[di] / cl.iloc[di - lb] - 1
+                s = r if s is None else s + r
+            return s / 3.0
+        if mom_mode == "sharpe":  # 63d return / 63d vol (volatility-adjusted)
+            if di - 63 < 0:
+                return cl.iloc[di] * 0
+            r = cl.iloc[di] / cl.iloc[di - 63] - 1
+            return r / vol63.iloc[di].replace(0, pd.NA)
+        # default: raw LOOKBACK return
+        return cl.iloc[di] / cl.iloc[di - LOOKBACK] - 1
 
     start_ts = pd.Timestamp(start)
     run_dates = dates[dates >= start_ts]
@@ -118,12 +141,28 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
     cash = capital
     pos: dict[str, float] = {}            # sym -> shares
     entry_px: dict[str, float] = {}
+    peak_px: dict[str, float] = {}        # for per-position trailing stop
     equity = []
     trades = []
     slip = SLIPPAGE_BPS / 1e4
+    trail_f = trail / 100.0
 
     for d in run_dates:
         di = dates.get_loc(d)
+        # daily per-position trailing stop (checked every day, not just on rebalance)
+        if trail_f > 0 and pos:
+            for s in list(pos):
+                px = cl[s].iloc[di]
+                if pd.isna(px):
+                    continue
+                px = float(px)
+                peak_px[s] = max(peak_px.get(s, px), px)
+                if px <= peak_px[s] * (1 - trail_f):
+                    cash += pos[s] * px * (1 - slip)
+                    if s in entry_px:
+                        trades.append({"sym": s, "exit_date": d.date().isoformat(),
+                                       "ret_pct": round((px / entry_px[s] - 1) * 100, 2)})
+                    pos.pop(s, None); entry_px.pop(s, None); peak_px.pop(s, None)
         if d in rebal and di >= LOOKBACK:
             # current portfolio value at today's close
             pv = cash + sum(sh * float(cl[s].iloc[di]) for s, sh in pos.items()
@@ -134,7 +173,7 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
             if risk_on:
                 univ = [s for s in present if pd.notna(cl[s].iloc[di])
                         and pd.notna(cl[s].iloc[di - LOOKBACK])]
-                rets = cl.iloc[di].reindex(univ) / cl.iloc[di - LOOKBACK].reindex(univ) - 1
+                rets = score_row(di).reindex(univ)
                 rk = rets.dropna().sort_values(ascending=False)
                 picks = list(rk.index[:top])
                 if picks:
@@ -160,10 +199,10 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
                 else:        # buy
                     cash -= dsh * px * (1 + slip)
                 if tgt <= 1e-9:
-                    pos.pop(s, None); entry_px.pop(s, None)
+                    pos.pop(s, None); entry_px.pop(s, None); peak_px.pop(s, None)
                 else:
                     if s not in pos:
-                        entry_px[s] = px
+                        entry_px[s] = px; peak_px[s] = px
                     pos[s] = tgt
         # daily MTM
         val = cash + sum(sh * float(cl[s].iloc[di]) for s, sh in pos.items()
@@ -218,6 +257,10 @@ def main():
     ap.add_argument("--regime", action="store_true")
     ap.add_argument("--no-regime", dest="regime", action="store_false")
     ap.add_argument("--mid-month", action="store_true")
+    ap.add_argument("--trail", type=float, default=0.0, help="per-position trailing stop %% (0=off)")
+    ap.add_argument("--fast-sma", type=int, default=0, help="faster secondary regime gate, e.g. 50 (0=off)")
+    ap.add_argument("--mom-mode", choices=["ret", "blend", "sharpe"], default="ret",
+                    help="ranking signal: ret=30d return, blend=21/63/126 avg, sharpe=63d ret/vol")
     ap.add_argument("--out", default=None)
     ap.add_argument("--sweep", action="store_true")
     ap.set_defaults(regime=True)
@@ -236,6 +279,7 @@ def main():
             (Path(a.out) / "sweep.json").write_text(json.dumps(rows, indent=2))
     else:
         run(s, e, a.capital, top=a.top, regime=a.regime, mid_month=a.mid_month,
+            trail=a.trail, fast_sma=a.fast_sma, mom_mode=a.mom_mode,
             out_dir=Path(a.out) if a.out else None)
 
 
