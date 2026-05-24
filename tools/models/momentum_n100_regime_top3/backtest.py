@@ -47,9 +47,9 @@ def get_engine():
     return create_engine(url, pool_pre_ping=True)
 
 
-def load_n100():
+def load_n100(path=N100_CSV):
     out = []
-    with open(N100_CSV) as f:
+    with open(path) as f:
         for r in csv.DictReader(f):
             if r.get("Series", "").strip() == "EQ":
                 out.append(r["Symbol"].strip())
@@ -87,9 +87,10 @@ def build_rebal(dates, start, end, mid_month):
 
 
 def run(start, end, capital, top=3, regime=True, mid_month=False,
-        trail=0.0, fast_sma=0, mom_mode="ret", label=None, out_dir=None, quiet=False):
+        trail=0.0, fast_sma=0, mom_mode="ret", universe_csv=N100_CSV, regime_sym="QQQ",
+        label=None, out_dir=None, quiet=False):
     eng = get_engine()
-    syms = load_n100()
+    syms = load_n100(universe_csv)
     with eng.connect() as c:
         df = pd.read_sql(text(
             "SELECT symbol,date,close FROM historical_data "
@@ -97,9 +98,9 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
             "ORDER BY symbol,date"
         ), c, params={"s": syms, "a": start - timedelta(days=400), "b": end})
         qq = pd.read_sql(text(
-            "SELECT date,close FROM historical_data WHERE symbol='QQQ' "
+            "SELECT date,close FROM historical_data WHERE symbol=:rs "
             "AND data_source='yfinance' AND date BETWEEN :a AND :b ORDER BY date"
-        ), c, params={"a": start - timedelta(days=400), "b": end})
+        ), c, params={"rs": regime_sym, "a": start - timedelta(days=400), "b": end})
 
     df["date"] = pd.to_datetime(df["date"])
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
@@ -272,6 +273,8 @@ def main():
     ap.add_argument("--fast-sma", type=int, default=0, help="faster secondary regime gate, e.g. 50 (0=off)")
     ap.add_argument("--mom-mode", choices=["ret", "blend", "sharpe"], default="ret",
                     help="ranking signal: ret=30d return, blend=21/63/126 avg, sharpe=63d ret/vol")
+    ap.add_argument("--universe-csv", default=N100_CSV, help="universe CSV (default Nasdaq-100)")
+    ap.add_argument("--regime-sym", default="QQQ", help="regime index symbol (QQQ or SPY)")
     ap.add_argument("--out", default=None)
     ap.add_argument("--sweep", action="store_true")
     ap.set_defaults(regime=True)
@@ -291,6 +294,7 @@ def main():
     else:
         run(s, e, a.capital, top=a.top, regime=a.regime, mid_month=a.mid_month,
             trail=a.trail, fast_sma=a.fast_sma, mom_mode=a.mom_mode,
+            universe_csv=a.universe_csv, regime_sym=a.regime_sym,
             out_dir=Path(a.out) if a.out else None)
 
 

@@ -1,0 +1,31 @@
+{
+  "label": "UPRO gate200",
+  "lev": "UPRO",
+  "index": "SPY",
+  "start": "2023-05-24",
+  "end": "2026-05-22",
+  "years": 3.0,
+  "capital": 100000.0,
+  "final_nav": 301211.0,
+  "cagr_pct": 44.5,
+  "max_dd_pct": 28.63,
+  "calmar": 1.55,
+  "switches": 12,
+  "time_in_market_pct": 91.5,
+  "params": {
+    "sma": 200,
+    "second_sma": 0,
+    "partial": 1.0,
+    "buffer_pct": 0.0,
+    "confirm_days": 1,
+    "riskoff": "cash"
+  },
+  "bench_buyhold_lev": {
+    "cagr_pct": 56.98,
+    "max_dd_pct": 48.87
+  },
+  "bench_buyhold_index": {
+    "cagr_pct": 23.57,
+    "max_dd_pct": 18.76
+  }
+}

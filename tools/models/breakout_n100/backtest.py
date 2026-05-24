@@ -49,10 +49,10 @@ def get_engine():
     return create_engine(url, pool_pre_ping=True)
 
 
-def load_n100():
+def load_n100(path=N100_CSV):
     import csv
     out = []
-    with open(N100_CSV) as f:
+    with open(path) as f:
         for r in csv.DictReader(f):
             if r.get("Series", "").strip() == "EQ":
                 out.append(r["Symbol"].strip())
@@ -65,9 +65,10 @@ def max_drawdown(equity: pd.Series) -> float:
 
 
 def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
-        regime=False, label=None, out_dir=None, quiet=False):
+        regime=False, universe_csv=N100_CSV, regime_sym="QQQ",
+        label=None, out_dir=None, quiet=False):
     eng = get_engine()
-    syms = load_n100()
+    syms = load_n100(universe_csv)
     with eng.connect() as c:
         df = pd.read_sql(text(
             "SELECT symbol,date,close FROM historical_data "
@@ -75,9 +76,9 @@ def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
             "ORDER BY symbol,date"
         ), c, params={"s": syms, "a": start - timedelta(days=500), "b": end})
         qq = pd.read_sql(text(
-            "SELECT date,close FROM historical_data WHERE symbol='QQQ' "
+            "SELECT date,close FROM historical_data WHERE symbol=:rs "
             "AND data_source='yfinance' AND date BETWEEN :a AND :b ORDER BY date"
-        ), c, params={"a": start - timedelta(days=500), "b": end})
+        ), c, params={"rs": regime_sym, "a": start - timedelta(days=500), "b": end})
 
     df["date"] = pd.to_datetime(df["date"])
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
@@ -203,6 +204,8 @@ def main():
     ap.add_argument("--maxn", type=int, default=5)
     ap.add_argument("--mom", type=int, default=60)
     ap.add_argument("--regime", action="store_true")
+    ap.add_argument("--universe-csv", default=N100_CSV, help="universe CSV (default Nasdaq-100)")
+    ap.add_argument("--regime-sym", default="QQQ", help="regime index symbol (QQQ or SPY)")
     ap.add_argument("--out", default=None)
     ap.add_argument("--sweep", action="store_true")
     a = ap.parse_args()
@@ -220,7 +223,8 @@ def main():
             (Path(a.out) / "sweep.json").write_text(json.dumps(rows, indent=2))
     else:
         run(s, e, a.capital, donchian=a.donchian, trail=a.trail, maxn=a.maxn, mom=a.mom,
-            regime=a.regime, out_dir=Path(a.out) if a.out else None)
+            regime=a.regime, universe_csv=a.universe_csv, regime_sym=a.regime_sym,
+            out_dir=Path(a.out) if a.out else None)
 
 
 if __name__ == "__main__":
