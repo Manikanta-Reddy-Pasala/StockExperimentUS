@@ -17,15 +17,17 @@ trailing stop). Different timing/DD profile from the monthly-rotation MOM sleeve
 - **Exit:** close ≤ peak-since-entry × (1 − 20%) trailing stop, OR close < 100-day SMA.
 - **Costs:** $0 commission + 8 bps slippage. Daily MTM DD.
 
-## Results (true daily DD)
+## Results — LOCKED config (`--donchian 50 --trail 20 --maxn 5 --regime`), true daily DD
 
-| Window | Config | CAGR | MaxDD | Calmar | WR |
-|--------|--------|-----:|------:|-------:|---:|
-| 3yr (2023-2026) | **D50 trail20 N5** | **56.55%** | 25.04% | 2.26 | 45.0% |
-| 3yr | D100 trail20 N5 regime | 56.10% | 28.24% | 1.99 | 47.5% |
-| 3yr | D100 trail20 N5 | 54.45% | 33.04% | 1.65 | 41.9% |
-| 4yr (2022-2026) | D100 trail20 N5 regime | 42.58% | 28.24% | 1.51 | 50.0% |
-| 4yr | D50 trail20 N5 | 33.68% | 23.26% | 1.45 | 46.8% |
+| Window | CAGR | MaxDD | Calmar |
+|--------|-----:|------:|-------:|
+| 3yr (2023-2026) | 66.34% | 25.51% | 2.60 |
+| 4yr (2022-2026) | 34.07% | 21.18% | 1.61 |
+| 10yr (2016-2026, incl. 2018/2020/2022) | 26.85% | 36.68% | 0.73 |
+
+Regime gate ON is the v2 upgrade — vs no-regime it adds CAGR (56→66% on 3yr) AND cuts DD
+(48→37% on 10yr). Low win rate (~45%) is normal for breakouts: small trailing-stop losses
+fund a few big winners.
 
 ## Notes
 - Robustly ~55-56% (3yr) across parameters — not curve-fit to one setting.

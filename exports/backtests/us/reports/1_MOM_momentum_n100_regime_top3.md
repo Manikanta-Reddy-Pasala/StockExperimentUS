@@ -17,16 +17,16 @@
 - **Regime gate:** if QQQ closes below its 200-day SMA on a rebalance day → 100% cash.
 - **Costs:** $0 commission (IBKR Lite) + 8 bps slippage. Daily mark-to-market DD.
 
-## Results (true daily DD)
+## Results — LOCKED config (`--top 3 --regime --mom-mode blend`), true daily DD
 
-| Window | Config | CAGR | MaxDD | Calmar | Trades | WR |
-|--------|--------|-----:|------:|-------:|-------:|---:|
-| 3yr (2023-2026) | **top3 regime** | **115.12%** | 29.61% | 3.89 | 93 | 65.6% |
-| 3yr | top3 no-regime | 140.03% | 32.36% | 4.33 | 101 | 66.3% |
-| 3yr | top1 no-regime +mid (≈parent) | 185.60% | 57.25% | 3.24 | 72 | 73.6% |
-| 3yr | top5 regime | 72.50% | 22.85% | 3.17 | 158 | 62.0% |
-| 4yr (2022-2026) | top3 regime | 86.82% | 29.61% | 2.93 | — | — |
-| 4yr | top1 no-regime +mid | 98.25% | 57.25% | 1.72 | — | — |
+| Window | CAGR | MaxDD | Calmar |
+|--------|-----:|------:|-------:|
+| 3yr (2023-2026) | 162.91% | 39.16% | 4.16 |
+| 4yr (2022-2026) | 117.65% | 39.16% | 3.00 |
+| 10yr (2016-2026, incl. 2018/2020/2022) | 80.85% | 47.04% | 1.72 |
+
+Reference (raw 30d `ret` mode, top3 regime): 3yr 115.1%/29.6%/3.89 · 10yr 49.8%/46.0%/1.08.
+Blend lifts CAGR + Calmar; DD floor (~40-47%) is unchanged — concentrated momentum's nature.
 
 ## Notes
 - The two levers (top-3 instead of top-1; QQQ regime gate) cut MaxDD from 57% to

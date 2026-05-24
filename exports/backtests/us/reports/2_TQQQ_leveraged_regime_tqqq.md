@@ -13,17 +13,18 @@ margin in your account).
   volatility decay already in its real prices. Daily MTM DD.
 - TQQQ inception 2010-02-11 → only sleeve with a full-cycle (16-year) record.
 
-## Results (true daily DD)
+## Results — LOCKED config (`--sma 200`, all-in), true daily DD
 
-| Window | Config | CAGR | MaxDD | Calmar |
-|--------|--------|-----:|------:|-------:|
-| 3yr (2023-2026) | **base 200d (all-in)** | **67.94%** | 37.37% | 1.82 |
-| 3yr | partial 0.66 (~2×) | 44.58% | 26.06% | 1.71 |
-| 3yr | partial 0.5 (~1.5×) | 33.47% | 20.25% | 1.65 |
-| 4yr (2022-2026) | base 200d | 56.19% | 37.37% | 1.50 |
-| **16yr (2010-2026)** | base 200d | **33.55%** | **54.92%** | **0.61** |
-| 16yr | partial 0.5 | 18.73% | 31.38% | 0.60 |
-| 16yr | buy-hold QQQ (no leverage) | 19.81% | 35.12% | 0.56 |
+| Window | CAGR | MaxDD | Calmar |
+|--------|-----:|------:|-------:|
+| 3yr (2023-2026) | 67.94% | 37.37% | 1.82 |
+| 4yr (2022-2026) | 56.19% | 37.37% | 1.50 |
+| 10yr (2016-2026) | 44.76% | 54.92% | 0.81 |
+| 16yr (2010-2026, full cycle) | 33.55% | 54.92% | 0.61 |
+
+DD-control variants (3yr): partial 0.66 → 44.6%/26.1% · partial 0.5 → 33.5%/20.3%.
+Reference: buy-hold QQQ (no leverage) 16yr = 19.8%/35.1%/0.56 — leverage barely beats it
+risk-adjusted over a full cycle. TQQQ is the highest-DD sleeve; trimmed to 15% in the book.
 
 ## Notes
 - **Sobering 16-year truth:** gated 3× (Calmar 0.61) barely beats unleveraged buy-hold
