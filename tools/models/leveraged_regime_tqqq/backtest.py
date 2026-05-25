@@ -201,18 +201,43 @@ def run(start: date, end: date, capital: float,
         # transaction log = regime switches (buy/sell the leveraged ETF)
         levpx = levdf["close"].reindex(cal).ffill()
         txns, prev = [], False
-        for dt in cal:
+        trades, open_leg = [], None       # paired entry->exit ledger
+        for i, dt in enumerate(cal):
             h = bool(held.loc[dt])
             if h != prev:
                 px = float(levpx.loc[dt]); val = float(equity.loc[dt]) * partial
+                sh = round(val / px, 4)
                 txns.append({"date": dt.date().isoformat(),
                              "action": ("BUY_" + lev) if h else ("SELL_" + lev),
                              "symbol": lev, "price": round(px, 4),
-                             "shares": round(val / px, 4) if h else round(val / px, 4),
-                             "value": round(val, 2)})
+                             "shares": sh, "value": round(val, 2)})
+                if h:
+                    open_leg = {"symbol": lev, "entry_date": dt.date().isoformat(),
+                                "entry_px": round(px, 4), "shares": sh, "entry_i": i}
+                elif open_leg is not None:
+                    ep = open_leg["entry_px"]
+                    trades.append({"symbol": lev, "entry_date": open_leg["entry_date"],
+                                   "entry_px": ep, "shares": open_leg["shares"],
+                                   "exit_date": dt.date().isoformat(), "exit_px": round(px, 4),
+                                   "pnl": round(open_leg["shares"] * (px - ep), 2),
+                                   "ret_pct": round((px / ep - 1) * 100, 2),
+                                   "bars_held": i - open_leg["entry_i"], "open": False})
+                    open_leg = None
             prev = h
+        if open_leg is not None:          # still in TQQQ at end -> mark open leg
+            dt = cal[-1]; px = float(levpx.loc[dt]); ep = open_leg["entry_px"]
+            trades.append({"symbol": lev, "entry_date": open_leg["entry_date"],
+                           "entry_px": ep, "shares": open_leg["shares"],
+                           "exit_date": dt.date().isoformat(), "exit_px": round(px, 4),
+                           "pnl": round(open_leg["shares"] * (px - ep), 2),
+                           "ret_pct": round((px / ep - 1) * 100, 2),
+                           "bars_held": (len(cal) - 1) - open_leg["entry_i"], "open": True})
         if txns:
             pd.DataFrame(txns).to_csv(out_dir / "transactions.csv", index=False)
+        if trades:
+            pd.DataFrame(trades, columns=["symbol", "entry_date", "entry_px", "shares",
+                                          "exit_date", "exit_px", "pnl", "ret_pct",
+                                          "bars_held", "open"]).to_csv(out_dir / "trade_ledger.csv", index=False)
 
     return res
 

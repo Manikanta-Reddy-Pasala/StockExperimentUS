@@ -97,6 +97,8 @@ def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
     cash = capital
     pos: dict[str, float] = {}        # sym -> shares
     entry_px: dict[str, float] = {}
+    entry_date: dict[str, str] = {}   # sym -> entry date iso
+    entry_di: dict[str, int] = {}     # sym -> entry bar index (for bars_held)
     peak_px: dict[str, float] = {}
     equity, trades, txns = [], [], []
     slip = SLIPPAGE_BPS / 1e4
@@ -122,8 +124,15 @@ def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
             if px <= stop or px < float(sma100.iloc[di][s]):
                 cash += pos[s] * px * (1 - slip)
                 log(d, "SELL", s, px, pos[s])
-                trades.append({"sym": s, "ret_pct": round((px / entry_px[s] - 1) * 100, 2)})
+                ep = entry_px[s]; sh = pos[s]
+                trades.append({"symbol": s, "entry_date": entry_date.get(s),
+                               "entry_px": round(ep, 4), "shares": round(sh, 4),
+                               "exit_date": d.date().isoformat(), "exit_px": round(px, 4),
+                               "pnl": round(sh * (px - ep), 2),
+                               "ret_pct": round((px / ep - 1) * 100, 2),
+                               "bars_held": int(di - entry_di.get(s, di))})
                 pos.pop(s); entry_px.pop(s); peak_px.pop(s, None)
+                entry_date.pop(s, None); entry_di.pop(s, None)
 
         # 2) ENTRIES — new donchian high in uptrend
         risk_on = (not regime) or bool(regime_on.iloc[di])
@@ -150,6 +159,7 @@ def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
                 if cost <= cash and sh > 0:
                     cash -= cost
                     pos[s] = sh; entry_px[s] = px; peak_px[s] = px
+                    entry_date[s] = d.date().isoformat(); entry_di[s] = di
                     log(d, "BUY", s, px, sh)
 
         val = cash + sum(sh * float(px_row[s]) for s, sh in pos.items() if pd.notna(px_row[s]))
@@ -181,6 +191,10 @@ def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
         eq.rename("equity").to_csv(out_dir / "equity_curve.csv")
         if txns:
             pd.DataFrame(txns).to_csv(out_dir / "transactions.csv", index=False)
+        if trades:
+            pd.DataFrame(trades, columns=["symbol", "entry_date", "entry_px", "shares",
+                                          "exit_date", "exit_px", "pnl", "ret_pct",
+                                          "bars_held"]).to_csv(out_dir / "trade_ledger.csv", index=False)
     return res
 
 

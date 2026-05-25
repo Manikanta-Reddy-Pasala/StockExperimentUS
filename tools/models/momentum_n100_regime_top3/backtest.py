@@ -142,6 +142,8 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
     cash = capital
     pos: dict[str, float] = {}            # sym -> shares
     entry_px: dict[str, float] = {}
+    entry_date: dict[str, str] = {}       # sym -> entry date iso
+    entry_di: dict[str, int] = {}         # sym -> entry bar index (for bars_held)
     peak_px: dict[str, float] = {}        # for per-position trailing stop
     equity = []
     trades = []
@@ -153,6 +155,19 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
         txns.append({"date": d.date().isoformat(), "action": action, "symbol": s,
                      "price": round(px, 4), "shares": round(shares, 4),
                      "value": round(shares * px, 2)})
+
+    def close_trade(s, exit_d, exit_px, sh, di_now):
+        # one ledger row per sell event (incl. partial trims on rebalance), paired
+        # to the position's original entry. matches v2 trade-count accounting.
+        ep = entry_px.get(s)
+        if ep is None:
+            return
+        trades.append({"symbol": s, "entry_date": entry_date.get(s),
+                       "entry_px": round(ep, 4), "shares": round(sh, 4),
+                       "exit_date": exit_d.date().isoformat(), "exit_px": round(exit_px, 4),
+                       "pnl": round(sh * (exit_px - ep), 2),
+                       "ret_pct": round((exit_px / ep - 1) * 100, 2),
+                       "bars_held": int(di_now - entry_di.get(s, di_now))})
 
     for d in run_dates:
         di = dates.get_loc(d)
@@ -167,10 +182,9 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
                 if px <= peak_px[s] * (1 - trail_f):
                     cash += pos[s] * px * (1 - slip)
                     log(d, "SELL_TRAIL", s, px, pos[s])
-                    if s in entry_px:
-                        trades.append({"sym": s, "exit_date": d.date().isoformat(),
-                                       "ret_pct": round((px / entry_px[s] - 1) * 100, 2)})
+                    close_trade(s, d, px, pos[s], di)
                     pos.pop(s, None); entry_px.pop(s, None); peak_px.pop(s, None)
+                    entry_date.pop(s, None); entry_di.pop(s, None)
         if d in rebal and di >= LOOKBACK:
             # current portfolio value at today's close
             pv = cash + sum(sh * float(cl[s].iloc[di]) for s, sh in pos.items()
@@ -202,17 +216,17 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
                     sh = -dsh
                     cash += sh * px * (1 - slip)
                     log(d, "SELL", s, px, sh)
-                    if s in entry_px:
-                        trades.append({"sym": s, "exit_date": d.date().isoformat(),
-                                       "ret_pct": round((px / entry_px[s] - 1) * 100, 2)})
+                    close_trade(s, d, px, sh, di)
                 else:        # buy
                     cash -= dsh * px * (1 + slip)
                     log(d, "BUY", s, px, dsh)
                 if tgt <= 1e-9:
                     pos.pop(s, None); entry_px.pop(s, None); peak_px.pop(s, None)
+                    entry_date.pop(s, None); entry_di.pop(s, None)
                 else:
                     if s not in pos:
                         entry_px[s] = px; peak_px[s] = px
+                        entry_date[s] = d.date().isoformat(); entry_di[s] = di
                     pos[s] = tgt
         # daily MTM
         val = cash + sum(sh * float(cl[s].iloc[di]) for s, sh in pos.items()
@@ -247,6 +261,10 @@ def run(start, end, capital, top=3, regime=True, mid_month=False,
         eq.rename("equity").to_csv(out_dir / "equity_curve.csv")
         if txns:
             pd.DataFrame(txns).to_csv(out_dir / "transactions.csv", index=False)
+        if trades:
+            pd.DataFrame(trades, columns=["symbol", "entry_date", "entry_px", "shares",
+                                          "exit_date", "exit_px", "pnl", "ret_pct",
+                                          "bars_held"]).to_csv(out_dir / "trade_ledger.csv", index=False)
     return res
 
 

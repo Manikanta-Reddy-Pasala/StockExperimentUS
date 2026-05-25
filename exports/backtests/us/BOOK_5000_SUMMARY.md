@@ -38,6 +38,24 @@ Per-sleeve `transactions.csv` — columns: `date, action, symbol, price, shares,
 Actions: `BUY` / `SELL` (MOM, BRK), `SELL_TRAIL` (MOM trailing stop if enabled),
 `BUY_TQQQ` / `SELL_TQQQ` (TQQQ regime switches). Prices are split-adjusted.
 
+## Per-trade entry→exit ledgers (paired, with both dates)
+For each sleeve, a paired round-trip ledger pairs every entry with its exit so you can
+see **entry date + entry price + shares + exit date + exit price + PnL + return% + bars held**
+on one row. `trade_ledger.csv` (machine) + `TRADE_LEDGER.md` (readable table) per sleeve/window:
+
+- 3yr: `exports/backtests/us/book_5000_3yr/{mom,tqqq,brk}/{trade_ledger.csv,TRADE_LEDGER.md}`
+- 10yr: `exports/backtests/us/book_5000/{mom,tqqq,brk}/{trade_ledger.csv,TRADE_LEDGER.md}`
+
+Notes per model:
+- **MOM** — one row per sell event; partial rebalance trims are separate rows against the
+  same entry (matches the v2 trade count). 10yr: 242 legs / WR 76.4%. 3yr: 79 / WR 84.8%.
+- **BRK** — one row per full position exit (trailing-stop / structural). 10yr: 119 / WR 45.4%.
+  3yr: 39 / WR 43.6%.
+- **TQQQ** — one row per risk-on→risk-off round trip (42 switches → 21 legs over 10yr; 6→3 over 3yr).
+  `open=True` on the final leg = still holding TQQQ on the last bar (exit_px = last close, MTM).
+
+Regenerate ledgers from the CSVs: `PYTHONPATH=. python3 tools/analysis/build_trade_ledger_md.py <run_dir> ...`
+
 Example (MOM, first rebalance 2016-05-24, $750/name across top-3):
 ```
 date,action,symbol,price,shares,value
