@@ -63,3 +63,31 @@ tradeable strategy. The honest survivable book stays the unleveraged 45/15/40 (5
 
 **Bottom line:** 100% CAGR over 5–10yr exists only WITH ~2× leverage at ~70% DD. Without
 leverage the robust ceiling is ~53% (10yr) / ~109% (3yr bull). Search complete.
+
+## Iteration 7 (2026-06-05) — vol-targeted leveraged book (4th leverage angle)
+Scale daily leverage by inverse realized vol (target_vol / 20d-realized, capped), de-levering
+in crashes. Does it hold ~100% CAGR at lower DD than flat 2×?
+
+| Config | 10yr CAGR / DD / Calmar | 3yr CAGR / DD / Calmar |
+|---|---|---|
+| flat 1.0× | 53.4 / 37.7 / 1.42 | 114 / 24.9 / 4.6 |
+| flat 2.0× | **101.1** / 69.8 / 1.45 | 273 / 45.1 / — |
+| voltgt 40% max3 | 71.4 / 50.8 / 1.41 | **131.8** / 28.3 / 4.66 |
+| voltgt 50% max3 | 84.7 / 58.2 / 1.46 | 164.9 / 33.5 / 4.92 |
+
+- **10yr:** vol-targeting CANNOT hold 100% — best ~85% / 58% DD. It smooths the ride (marginally
+  better Calmar 1.46 vs 1.45) but trades CAGR for DD along the SAME frontier; over a full cycle
+  100% CAGR still costs ~70% DD.
+- **3yr (bull):** vol-targeting is excellent — 131.8% CAGR at only 28% DD (Calmar 4.66). But that's
+  a bull-only window.
+
+## SEARCH CLOSED — frontier mapped from 4 leverage angles
+flat-book-lev, single-sleeve-lev (N40), 3x-ETF-rotation, vol-targeted-lev — ALL agree:
+**a survivable 100% CAGR over a full 5–10yr cycle does not exist** for US large-cap systematic.
+100%/10yr requires ~2× leverage at ~70% DD (margin-call/liquidation). Best options:
+- **Max CAGR, accept liquidation risk:** flat 2× book = 101% / 70% DD (10yr).
+- **Best risk-adjusted high-CAGR:** vol-targeted 50%/max3 = 85% / 58% DD (10yr), or in a bull
+  3yr window 132% / 28% DD.
+- **Survivable / real:** unleveraged 45/15/40 book = 53% / 38% DD (10yr), 114% (3yr bull).
+The 100% headline is reachable only in 3yr bull bursts or with un-survivable leverage. This is the
+honest ceiling — consistent across every archetype + leverage scheme tested.
