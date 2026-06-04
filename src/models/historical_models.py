@@ -50,7 +50,7 @@ class HistoricalData(Base):
 
     # Data quality and metadata
     is_adjusted = Column(Boolean, default=False)
-    data_source = Column(String(20), default='fyers')
+    data_source = Column(String(20), default='yfinance')
     api_resolution = Column(String(10))  # Original API resolution (1D, 5M, etc.)
     data_quality_score = Column(Float)  # 0-1 score for data completeness
 
@@ -111,7 +111,7 @@ class HistoricalData1H(Base):
     ema_200 = Column(Float)
     ema_400 = Column(Float)
 
-    data_source = Column(String(20), default='fyers')
+    data_source = Column(String(20), default='yfinance')
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -142,7 +142,7 @@ class HistoricalData15M(Base):
     close = Column(Float, nullable=False)
     volume = Column(BigInteger, nullable=False, default=0)
 
-    data_source = Column(String(20), default='fyers')
+    data_source = Column(String(20), default='yfinance')
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

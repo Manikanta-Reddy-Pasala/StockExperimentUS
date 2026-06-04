@@ -613,7 +613,7 @@ class HistoricalDataService:
                             lower_shadow_pct=lower_shadow_pct,
 
                             # Metadata
-                            data_source='fyers',
+                            data_source='yfinance',
                             api_resolution='1D',
                             data_quality_score=1.0,  # Full data available
                             is_adjusted=False

@@ -99,7 +99,7 @@ class SymbolMaster(Base):
     isin = Column(String(20))  # ISIN code
 
     # Data source and versioning
-    data_source = Column(String(20), default='fyers')
+    data_source = Column(String(20), default='yfinance')
     source_updated = Column(String(20))  # Last updated timestamp from source
     download_date = Column(DateTime, default=datetime.utcnow)
 
@@ -183,7 +183,7 @@ class MarketDataSnapshot(Base):
     advance_decline_ratio = Column(Float)
     
     # Metadata
-    data_source = Column(String(20), default='fyers')
+    data_source = Column(String(20), default='yfinance')
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Unique constraint

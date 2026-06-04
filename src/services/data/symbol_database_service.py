@@ -131,7 +131,7 @@ class SymbolDatabaseService:
                 lot_size=symbol_data.get('lot', 1),
                 tick_size=symbol_data.get('tick', 0.05),
                 isin=symbol_data.get('isin', ''),
-                data_source='fyers',
+                data_source='yfinance',
                 source_updated=symbol_data.get('last_updated', ''),
                 download_date=datetime.utcnow(),
                 is_active=True,

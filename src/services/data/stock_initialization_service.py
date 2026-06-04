@@ -126,7 +126,7 @@ class StockInitializationService:
                                 lot_size=symbol_data.get('lot', 1),
                                 tick_size=symbol_data.get('tick', 0.05),
                                 isin=symbol_data.get('isin', ''),
-                                data_source='fyers',
+                                data_source='yfinance',
                                 is_active=True,
                                 is_equity=True,
                                 created_at=datetime.utcnow(),
