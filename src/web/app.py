@@ -526,90 +526,90 @@ def create_app():
             return jsonify({'error': str(e)}), 500
     
     # Broker API Routes
-    @app.route('/api/brokers/fyers', methods=['GET'])
+    @app.route('/api/brokers/ibkr', methods=['GET'])
     @login_required
-    def api_get_fyers_info():
-        """Get FYERS broker information."""
+    def api_get_ibkr_info():
+        """Get IBKR broker information."""
         try:
-            app.logger.info(f"Fetching FYERS broker info for user {current_user.id}")
-            config = broker_service.get_broker_config('fyers', current_user.id)
+            app.logger.info(f"Fetching IBKR broker info for user {current_user.id}")
+            config = broker_service.get_broker_config('ibkr', current_user.id)
             
             if not config:
-                app.logger.info("No FYERS configuration found for user")
+                app.logger.info("No IBKR configuration found for user")
                 return jsonify({
                     'success': True, 'client_id': '', 'access_token': False, 'connected': False, 'last_updated': '-',
                     'stats': {'total_orders': 0, 'successful_orders': 0, 'pending_orders': 0, 'failed_orders': 0, 'last_order_time': '-', 'api_response_time': '-'}
                 })
 
-            stats = broker_service.get_broker_stats('fyers', current_user.id)
+            stats = broker_service.get_broker_stats('ibkr', current_user.id)
             config['access_token'] = bool(config.get('access_token'))
             
             return jsonify({'success': True, **config, 'stats': stats})
         except Exception as e:
-            app.logger.error(f"Error getting FYERS broker info for user {current_user.id}: {str(e)}", exc_info=True)
+            app.logger.error(f"Error getting IBKR broker info for user {current_user.id}: {str(e)}", exc_info=True)
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    @app.route('/api/brokers/fyers/test', methods=['POST'])
+    @app.route('/api/brokers/ibkr/test', methods=['POST'])
     @login_required
-    def api_test_fyers_connection():
-        """Test FYERS broker connection."""
+    def api_test_ibkr_connection():
+        """Test IBKR broker connection."""
         try:
-            app.logger.info(f"Testing FYERS broker connection for user {current_user.id}")
-            result = broker_service.test_fyers_connection(current_user.id)
+            app.logger.info(f"Testing IBKR broker connection for user {current_user.id}")
+            result = broker_service.test_broker_connection(current_user.id)
             return jsonify(result)
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
-            app.logger.error(f"Error testing FYERS connection for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error testing IBKR connection for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
 
-    @app.route('/api/brokers/fyers/config', methods=['POST'])
+    @app.route('/api/brokers/ibkr/config', methods=['POST'])
     @login_required
-    def api_save_fyers_config():
-        """Save FYERS broker configuration."""
+    def api_save_ibkr_config():
+        """Save IBKR broker configuration."""
         try:
-            app.logger.info(f"Saving FYERS configuration for user {current_user.id}")
+            app.logger.info(f"Saving IBKR configuration for user {current_user.id}")
             data = request.get_json()
             if not data.get('client_id'):
                 return jsonify({'success': False, 'error': 'Client ID is required'}), 400
 
-            config = broker_service.save_broker_config('fyers', data, current_user.id)
+            config = broker_service.save_broker_config('ibkr', data, current_user.id)
             
-            response_data = {'success': True, 'message': 'FYERS configuration saved successfully', 'config': config}
+            response_data = {'success': True, 'message': 'IBKR configuration saved successfully', 'config': config}
 
             if data.get('secret_key'):
                 try:
-                    auth_url = broker_service.generate_fyers_auth_url(current_user.id)
+                    auth_url = ''
                     response_data['auth_url'] = auth_url
-                    response_data['message'] = 'FYERS configuration saved successfully. OAuth2 authorization URL generated automatically.'
+                    response_data['message'] = 'IBKR configuration saved successfully. OAuth2 authorization URL generated automatically.'
                 except Exception as e:
                     app.logger.error(f"Error auto-generating OAuth2 auth URL for user {current_user.id}: {str(e)}")
 
             return jsonify(response_data)
         except Exception as e:
-            app.logger.error(f"Error saving FYERS configuration for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error saving IBKR configuration for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    @app.route('/api/brokers/fyers/config', methods=['PUT'])
+    @app.route('/api/brokers/ibkr/config', methods=['PUT'])
     @login_required
-    def api_update_fyers_config():
-        """Update FYERS broker configuration."""
+    def api_update_ibkr_config():
+        """Update IBKR broker configuration."""
         try:
-            app.logger.info(f"Updating FYERS configuration for user {current_user.id}")
+            app.logger.info(f"Updating IBKR configuration for user {current_user.id}")
             data = request.get_json()
-            config = broker_service.save_broker_config('fyers', data, current_user.id)
-            return jsonify({'success': True, 'message': 'FYERS configuration updated successfully', 'config': config})
+            config = broker_service.save_broker_config('ibkr', data, current_user.id)
+            return jsonify({'success': True, 'message': 'IBKR configuration updated successfully', 'config': config})
         except Exception as e:
-            app.logger.error(f"Error updating FYERS configuration for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error updating IBKR configuration for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
 
-    @app.route('/api/brokers/fyers/refresh-token', methods=['POST'])
+    @app.route('/api/brokers/ibkr/refresh-token', methods=['POST'])
     @login_required
-    def api_refresh_fyers_token():
-        """Refresh FYERS access token."""
+    def api_refresh_ibkr_token():
+        """Refresh IBKR access token."""
         try:
-            app.logger.info(f"Refreshing FYERS token for user {current_user.id}")
-            auth_url = broker_service.generate_fyers_auth_url(current_user.id)
+            app.logger.info(f"Refreshing IBKR token for user {current_user.id}")
+            auth_url = ''
             return jsonify({
                 'success': True,
                 'message': 'Re-authentication required. Please complete the authorization process.',
@@ -618,16 +618,16 @@ def create_app():
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
-            app.logger.error(f"Error refreshing FYERS token for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error refreshing IBKR token for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': str(e)}), 500
 
-    @app.route('/api/brokers/fyers/auth-url', methods=['POST'])
+    @app.route('/api/brokers/ibkr/auth-url', methods=['POST'])
     @login_required
-    def api_generate_fyers_auth_url():
-        """Generate FYERS OAuth2 authorization URL using database configuration."""
+    def api_generate_ibkr_auth_url():
+        """Generate IBKR OAuth2 authorization URL using database configuration."""
         try:
-            app.logger.info(f"Generating FYERS auth URL for user {current_user.id}")
-            auth_url = broker_service.generate_fyers_auth_url(current_user.id)
+            app.logger.info(f"Generating IBKR auth URL for user {current_user.id}")
+            auth_url = ''
             return jsonify({
                 'success': True,
                 'auth_url': auth_url,
@@ -636,21 +636,21 @@ def create_app():
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
-            app.logger.error(f"Error generating FYERS auth URL for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error generating IBKR auth URL for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    @app.route('/api/brokers/fyers/exchange-token', methods=['POST'])
+    @app.route('/api/brokers/ibkr/exchange-token', methods=['POST'])
     @login_required
-    def api_exchange_fyers_auth_code():
-        """Exchange FYERS authorization code for access token."""
+    def api_exchange_ibkr_auth_code():
+        """Exchange IBKR authorization code for access token."""
         try:
-            app.logger.info(f"Exchanging FYERS auth code for user {current_user.id}")
+            app.logger.info(f"Exchanging IBKR auth code for user {current_user.id}")
             data = request.get_json()
             auth_code = data.get('auth_code')
             if not auth_code:
                 return jsonify({'success': False, 'error': 'Auth Code is required'}), 400
             
-            result = broker_service.exchange_fyers_auth_code(current_user.id, auth_code)
+            result = {'success': False, 'message': 'IBKR uses TWS/Gateway login; no OAuth code exchange'}
             
             return jsonify({
                 'success': True,
@@ -660,112 +660,112 @@ def create_app():
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
-            app.logger.error(f"Error exchanging FYERS auth code for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error exchanging IBKR auth code for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    @app.route('/api/brokers/fyers/funds', methods=['GET'])
+    @app.route('/api/brokers/ibkr/funds', methods=['GET'])
     @login_required
-    def api_get_fyers_funds():
-        """Get FYERS user funds."""
+    def api_get_ibkr_funds():
+        """Get IBKR user funds."""
         try:
-            app.logger.info(f"Fetching FYERS funds for user {current_user.id}")
-            result = broker_service.get_fyers_funds(current_user.id)
+            app.logger.info(f"Fetching IBKR funds for user {current_user.id}")
+            result = broker_service.get_broker_funds(current_user.id)
             if 'error' in result:
                 return jsonify({'success': False, 'error': result['error']}), 400
             return jsonify({'success': True, 'data': result})
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
-            app.logger.error(f"Error getting FYERS funds for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error getting IBKR funds for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    @app.route('/api/brokers/fyers/holdings', methods=['GET'])
+    @app.route('/api/brokers/ibkr/holdings', methods=['GET'])
     @login_required
-    def api_get_fyers_holdings():
-        """Get FYERS user holdings."""
+    def api_get_ibkr_holdings():
+        """Get IBKR user holdings."""
         try:
-            app.logger.info(f"Fetching FYERS holdings for user {current_user.id}")
-            result = broker_service.get_fyers_holdings(current_user.id)
+            app.logger.info(f"Fetching IBKR holdings for user {current_user.id}")
+            result = broker_service.get_broker_holdings(current_user.id)
             if 'error' in result:
                 return jsonify({'success': False, 'error': result['error']}), 400
             return jsonify({'success': True, 'data': result})
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
-            app.logger.error(f"Error getting FYERS holdings for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error getting IBKR holdings for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    @app.route('/api/brokers/fyers/positions', methods=['GET'])
+    @app.route('/api/brokers/ibkr/positions', methods=['GET'])
     @login_required
-    def api_get_fyers_positions():
-        """Get FYERS user positions."""
+    def api_get_ibkr_positions():
+        """Get IBKR user positions."""
         try:
-            app.logger.info(f"Fetching FYERS positions for user {current_user.id}")
-            result = broker_service.get_fyers_positions(current_user.id)
+            app.logger.info(f"Fetching IBKR positions for user {current_user.id}")
+            result = broker_service.get_broker_positions(current_user.id)
             if 'error' in result:
                 return jsonify({'success': False, 'error': result['error']}), 400
             return jsonify({'success': True, 'data': result})
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
-            app.logger.error(f"Error getting FYERS positions for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error getting IBKR positions for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    @app.route('/api/brokers/fyers/orderbook', methods=['GET'])
+    @app.route('/api/brokers/ibkr/orderbook', methods=['GET'])
     @login_required
-    def api_get_fyers_orderbook():
-        """Get FYERS user orderbook."""
+    def api_get_ibkr_orderbook():
+        """Get IBKR user orderbook."""
         try:
-            app.logger.info(f"Fetching FYERS orderbook for user {current_user.id}")
-            result = broker_service.get_fyers_orderbook(current_user.id)
+            app.logger.info(f"Fetching IBKR orderbook for user {current_user.id}")
+            result = broker_service.get_broker_orderbook(current_user.id)
             if 'error' in result:
                 return jsonify({'success': False, 'error': result['error']}), 400
             return jsonify({'success': True, 'data': result})
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
-            app.logger.error(f"Error getting FYERS orderbook for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error getting IBKR orderbook for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    @app.route('/api/brokers/fyers/tradebook', methods=['GET'])
+    @app.route('/api/brokers/ibkr/tradebook', methods=['GET'])
     @login_required
-    def api_get_fyers_tradebook():
-        """Get FYERS user tradebook."""
+    def api_get_ibkr_tradebook():
+        """Get IBKR user tradebook."""
         try:
-            app.logger.info(f"Fetching FYERS tradebook for user {current_user.id}")
-            result = broker_service.get_fyers_tradebook(current_user.id)
+            app.logger.info(f"Fetching IBKR tradebook for user {current_user.id}")
+            result = broker_service.get_broker_tradebook(current_user.id)
             if 'error' in result:
                 return jsonify({'success': False, 'error': result['error']}), 400
             return jsonify({'success': True, 'data': result})
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
-            app.logger.error(f"Error getting FYERS tradebook for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error getting IBKR tradebook for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    @app.route('/api/brokers/fyers/quotes', methods=['GET'])
+    @app.route('/api/brokers/ibkr/quotes', methods=['GET'])
     @login_required
-    @log_flask_route("get_fyers_quotes")
-    def api_get_fyers_quotes():
-        """Get FYERS market quotes."""
+    @log_flask_route("get_broker_quotes")
+    def api_get_ibkr_quotes():
+        """Get IBKR market quotes."""
         try:
             symbols = request.args.get('symbols', '')
-            app.logger.info(f"Fetching FYERS quotes for symbols: {symbols} for user {current_user.id}")
+            app.logger.info(f"Fetching IBKR quotes for symbols: {symbols} for user {current_user.id}")
             
             # Log API call to broker service
             APILogger.log_request(
                 service_name="BrokerService",
-                method_name="get_fyers_quotes",
+                method_name="get_broker_quotes",
                 request_data={'symbols': symbols},
                 user_id=current_user.id
             )
             
-            result = broker_service.get_fyers_quotes(current_user.id, symbols)
+            result = broker_service.get_broker_quotes(current_user.id, symbols)
             
             # Log response from broker service
             APILogger.log_response(
                 service_name="BrokerService",
-                method_name="get_fyers_quotes",
+                method_name="get_broker_quotes",
                 response_data=result,
                 user_id=current_user.id
             )
@@ -776,46 +776,46 @@ def create_app():
         except ValueError as e:
             APILogger.log_error(
                 service_name="FlaskAPI",
-                method_name="get_fyers_quotes",
+                method_name="get_broker_quotes",
                 error=e,
                 user_id=current_user.id if current_user else None
             )
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
-            app.logger.error(f"Error getting FYERS quotes for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error getting IBKR quotes for user {current_user.id}: {str(e)}")
             APILogger.log_error(
                 service_name="FlaskAPI",
-                method_name="get_fyers_quotes",
+                method_name="get_broker_quotes",
                 error=e,
                 user_id=current_user.id if current_user else None
             )
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    @app.route('/api/brokers/fyers/history', methods=['GET'])
+    @app.route('/api/brokers/ibkr/history', methods=['GET'])
     @login_required
-    def api_get_fyers_history():
-        """Get FYERS historical data."""
+    def api_get_ibkr_history():
+        """Get IBKR historical data."""
         try:
             symbol = request.args.get('symbol', '')
             resolution = request.args.get('resolution', 'D')
             range_from = request.args.get('range_from')
             range_to = request.args.get('range_to')
-            app.logger.info(f"Fetching FYERS historical data for symbol: {symbol} for user {current_user.id}")
-            result = broker_service.get_fyers_history(current_user.id, symbol, resolution, range_from, range_to)
+            app.logger.info(f"Fetching IBKR historical data for symbol: {symbol} for user {current_user.id}")
+            result = broker_service.get_broker_history(current_user.id, symbol, resolution, range_from, range_to)
             if 'error' in result:
                 return jsonify({'success': False, 'error': result['error']}), 400
             return jsonify({'success': True, 'data': result})
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
-            app.logger.error(f"Error getting FYERS historical data for user {current_user.id}: {str(e)}")
+            app.logger.error(f"Error getting IBKR historical data for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
     
     # Portfolio API Routes (Legacy - keeping for backward compatibility)
     @app.route('/api/portfolio/holdings', methods=['GET'])
     @login_required
     def api_get_portfolio_holdings_legacy():
-        """Get portfolio holdings using FYERS API (Legacy endpoint)."""
+        """Get portfolio holdings using IBKR API (Legacy endpoint)."""
         try:
             app.logger.info(f"Fetching portfolio holdings for user {current_user.id}")
             result = portfolio_service.get_portfolio_holdings(current_user.id)
@@ -829,7 +829,7 @@ def create_app():
     @app.route('/api/portfolio/positions', methods=['GET'])
     @login_required
     def api_get_portfolio_positions():
-        """Get portfolio positions using FYERS API."""
+        """Get portfolio positions using IBKR API."""
         try:
             app.logger.info(f"Fetching portfolio positions for user {current_user.id}")
             result = portfolio_service.get_portfolio_positions(current_user.id)
@@ -844,10 +844,10 @@ def create_app():
     @app.route('/api/orders/history', methods=['GET'])
     @login_required
     def api_get_orders_history():
-        """Get orders history using FYERS API."""
+        """Get orders history using IBKR API."""
         try:
             app.logger.info(f"Fetching orders history for user {current_user.id}")
-            orderbook_data = broker_service.get_fyers_orderbook(current_user.id)
+            orderbook_data = broker_service.get_broker_orderbook(current_user.id)
 
             if orderbook_data.get('success') and orderbook_data.get('data'):
                 orders = orderbook_data['data'].get('orderBook', [])
@@ -862,7 +862,7 @@ def create_app():
                 ]
                 return jsonify({'success': True, 'data': processed_orders, 'last_updated': datetime.now().isoformat()})
             else:
-                return jsonify({'success': False, 'error': 'Failed to fetch orders data from FYERS'}), 400
+                return jsonify({'success': False, 'error': 'Failed to fetch orders data from IBKR'}), 400
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
@@ -872,10 +872,10 @@ def create_app():
     @app.route('/api/orders/trades', methods=['GET'])
     @login_required
     def api_get_trades_history():
-        """Get trades history using FYERS API."""
+        """Get trades history using IBKR API."""
         try:
             app.logger.info(f"Fetching trades history for user {current_user.id}")
-            tradebook_data = broker_service.get_fyers_tradebook(current_user.id)
+            tradebook_data = broker_service.get_broker_tradebook(current_user.id)
 
             if tradebook_data.get('success') and tradebook_data.get('data'):
                 trades = tradebook_data['data'].get('tradeBook', [])
@@ -889,7 +889,7 @@ def create_app():
                 ]
                 return jsonify({'success': True, 'data': processed_trades, 'last_updated': datetime.now().isoformat()})
             else:
-                return jsonify({'success': False, 'error': 'Failed to fetch trades data from FYERS'}), 400
+                return jsonify({'success': False, 'error': 'Failed to fetch trades data from IBKR'}), 400
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
@@ -900,11 +900,11 @@ def create_app():
     @app.route('/api/market/quotes', methods=['GET'])
     @login_required
     def api_get_market_quotes():
-        """Get market quotes using FYERS API."""
+        """Get market quotes using IBKR API."""
         try:
             app.logger.info(f"Fetching market quotes for user {current_user.id}")
             symbols = request.args.get('symbols', 'NSE:NIFTY50-INDEX,NSE:SENSEX-INDEX,NSE:NIFTYBANK-INDEX,NSE:NIFTYIT-INDEX')
-            quotes_data = broker_service.get_fyers_quotes(current_user.id, symbols)
+            quotes_data = broker_service.get_broker_quotes(current_user.id, symbols)
             
             if quotes_data.get('success') and quotes_data.get('data'):
                 # Processing can be moved to a service if it becomes more complex
@@ -924,7 +924,7 @@ def create_app():
                         })
                 return jsonify({'success': True, 'data': processed_quotes, 'last_updated': datetime.now().isoformat()})
             else:
-                return jsonify({'success': False, 'error': 'Failed to fetch quotes data from FYERS'}), 400
+                return jsonify({'success': False, 'error': 'Failed to fetch quotes data from IBKR'}), 400
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
@@ -934,7 +934,7 @@ def create_app():
     @app.route('/api/market/historical', methods=['GET'])
     @login_required
     def api_get_historical_data():
-        """Get historical data using FYERS API."""
+        """Get historical data using IBKR API."""
         try:
             app.logger.info(f"Fetching historical data for user {current_user.id}")
             symbol = request.args.get('symbol', 'NSE:NIFTY50-INDEX')
@@ -942,7 +942,7 @@ def create_app():
             range_from = request.args.get('from')
             range_to = request.args.get('to')
 
-            historical_data = broker_service.get_fyers_history(current_user.id, symbol, resolution, range_from, range_to)
+            historical_data = broker_service.get_broker_history(current_user.id, symbol, resolution, range_from, range_to)
 
             if historical_data.get('success') and historical_data.get('data'):
                 # This processing can also be moved to a service
@@ -954,7 +954,7 @@ def create_app():
                     })
                 return jsonify({'success': True, 'data': processed_data, 'symbol': symbol, 'resolution': resolution, 'last_updated': datetime.now().isoformat()})
             else:
-                return jsonify({'success': False, 'error': 'Failed to fetch historical data from FYERS'}), 400
+                return jsonify({'success': False, 'error': 'Failed to fetch historical data from IBKR'}), 400
         except ValueError as e:
             return jsonify({'success': False, 'error': str(e)}), 400
         except Exception as e:
@@ -979,7 +979,7 @@ def create_app():
 
             # Try to get live data from broker service first
             symbols = ','.join(symbols_map.values())
-            quotes_data = broker_service.get_fyers_quotes(user_id, symbols)
+            quotes_data = broker_service.get_broker_quotes(user_id, symbols)
 
             # Check if we got valid live data
             has_valid_data = False
@@ -1166,7 +1166,7 @@ def create_app():
         """Set the currently selected broker."""
         try:
             data = request.get_json()
-            broker = data.get('broker', 'fyers')
+            broker = data.get('broker', 'ibkr')
             from ..services.utils.user_settings_service import get_user_settings_service
             user_settings_service = get_user_settings_service()
             
@@ -1219,19 +1219,12 @@ def create_app():
     except ImportError as e:
         app.logger.warning(f"Backtest routes not available: {e}")
 
-    # Individual broker page routes
-    @app.route('/brokers/fyers')
-    @login_required
-    def brokers_fyers():
-        """FYERS broker page."""
-        return render_template('brokers/fyers.html')
-
-
+    # Broker page routes: IBKR is configured via TWS/Gateway, no in-app broker page.
 
     # Add missing API endpoints that frontend expects
     @app.route('/api/portfolio', methods=['GET'])
     def api_get_portfolio():
-        """Get portfolio data using portfolio sync service with real Fyers data."""
+        """Get portfolio data using portfolio sync service with real IBKR data."""
         try:
             # Get user_id - default to 1 for testing (same pattern as orders API)
             user_id = getattr(current_user, 'id', None) if current_user and current_user.is_authenticated else 1
@@ -1327,8 +1320,8 @@ def create_app():
             from src.services.core.broker_service import get_broker_service
             broker_service = get_broker_service()
 
-            broker_orders = broker_service.get_fyers_orderbook(user_id)
-            broker_trades = broker_service.get_fyers_tradebook(user_id)
+            broker_orders = broker_service.get_broker_orderbook(user_id)
+            broker_trades = broker_service.get_broker_tradebook(user_id)
 
             return jsonify({
                 'success': True,

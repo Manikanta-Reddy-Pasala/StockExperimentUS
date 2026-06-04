@@ -38,9 +38,9 @@ class UserSettingsService:
                 'max_capital_per_trade': 1.00,
                 'stop_loss_percentage': 2.0,
                 'take_profit_percentage': 5.0,
-                'primary_data_source': 'fyers',
-                'backup_data_source': 'fyers',
-                'broker_provider': 'fyers',
+                'primary_data_source': 'ibkr',
+                'backup_data_source': 'yfinance',
+                'broker_provider': 'ibkr',
                 'email_notifications': True,
                 'sms_notifications': False,
                 'notification_email': 'trader@example.com'
@@ -87,7 +87,7 @@ class UserSettingsService:
     def get_broker_provider(self, user_id: int) -> str:
         """Get the broker provider for a user."""
         settings = self.get_user_settings(user_id)
-        return settings.get('broker_provider', 'fyers')
+        return settings.get('broker_provider', 'ibkr')
     
     def set_broker_provider(self, user_id: int, broker_provider: str) -> bool:
         """Set the broker provider for a user."""
