@@ -32,7 +32,7 @@ def _fyers_avg_price(symbol_bare: str, user_id: int = 1):
     Returns (None, None) on any failure or no-match.
     """
     try:
-        from src.services.brokers.fyers_service import FyersService
+        from src.services.data.market_data_service import MarketDataService as FyersService
         svc = FyersService()
         holdings = (svc.holdings(user_id) or {}).get("data") or []
         for h in holdings:

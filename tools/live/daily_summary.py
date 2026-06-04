@@ -65,7 +65,7 @@ def _ret_60d(symbol: str, ts: int) -> float:
 def _portfolio_nav(ledger: Dict, history: List[Dict], today_ts: int) -> Dict:
     """Read NAV from LIVE Fyers account (funds + holdings)."""
     try:
-        from src.services.brokers.fyers_service import FyersService
+        from src.services.data.market_data_service import MarketDataService as FyersService
         svc = FyersService()
         funds = (svc.funds(1) or {}).get("data") or {}
         holdings = (svc.holdings(1) or {}).get("data") or []

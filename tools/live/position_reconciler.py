@@ -99,7 +99,7 @@ def reconcile_once(user_id: int = 1, dry_run: bool = False) -> List[Dict]:
     """One pass. Returns list of correction dicts."""
     from src.models.database import get_database_manager
     from src.models.model_ledger_models import ModelLedger, ModelSettings
-    from src.services.brokers.fyers_service import FyersService
+    from src.services.data.market_data_service import MarketDataService as FyersService
 
     svc = FyersService()
     fyers = _fyers_positions_by_symbol(svc, user_id)

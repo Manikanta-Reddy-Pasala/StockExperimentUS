@@ -98,34 +98,9 @@ def _run_subprocess_with_retry(cmd: list, label: str, timeout: int = 3600,
 
 
 def refresh_fyers_token_job():
-    """Daily TOTP-based Fyers token refresh (03:30 IST, pre-market).
-
-    Without this, the access_token expires (24h-ish on TOTP path) and every
-    downstream svc.history() / placeorder call silently fails. Failures
-    propagate to: prefetch_ohlcv 'ok' inserts 0 rows, signal scripts emit
-    nothing, executor skips entries.
-
-    Idempotent. Re-fetches even when token still valid (force) so we never
-    rely on TTL detection — too many silent failure modes if TTL math wrong.
-    """
-    logger.info("=" * 80)
-    logger.info("Fyers token refresh (TOTP, daily 03:30 IST)")
-    logger.info("=" * 80)
-    ok = _run_subprocess_with_retry(
-        ['python3', '/app/tools/refresh_fyers_token.py', '--force'],
-        'fyers_token_refresh',
-        timeout=120,
-        max_retries=3,
-        alert_on_fail=False,  # custom alert below — more actionable
-    )
-    if not ok:
-        _tg_alert(
-            "🛑 *Fyers token refresh FAILED (3 attempts)*\n"
-            "All downstream data pulls + orders will fail until token "
-            "is restored.\n"
-            "Manual fix: `docker exec trading_system_app python "
-            "/app/tools/refresh_fyers_token.py --force`"
-        )
+    """No-op: IBKR auth is managed by TWS/Gateway (no TOTP token refresh)."""
+    logger.debug("IBKR uses TWS/Gateway auth; token refresh job skipped")
+    return
 
 
 def daily_universe_csv_check():
@@ -448,15 +423,15 @@ def update_symbol_master():
     logger.info("=" * 80)
     
     try:
-        from src.services.data.fyers_symbol_service import FyersSymbolService
+        from src.services.data.symbol_master_service import SymbolMasterService
         from src.models.database import get_database_manager
         
         db_manager = get_database_manager()
         with db_manager.get_session() as session:
-            symbol_service = FyersSymbolService()
+            symbol_service = SymbolMasterService()
             
             # Refresh symbol master
-            logger.info("Fetching latest NSE symbols from Fyers...")
+            logger.info("US uses static CSV universes; symbol-master refresh is a no-op")
             result = symbol_service.refresh_all_symbols(sync_to_database=True)
 
             logger.info(f"Symbol master updated successfully")
@@ -586,7 +561,6 @@ def run_scheduler():
 
     # Daily Fyers TOTP token refresh (03:30 IST, pre-market). Without this,
     # token expires silently → all downstream pulls/orders fail with no rows.
-    schedule.every().day.at("03:30").do(refresh_fyers_token_job)
 
     # Weekly symbol master update (Monday 6 AM) — refreshes NSE_CM_symbols.json cache
     schedule.every().monday.at("06:00").do(update_symbol_master)

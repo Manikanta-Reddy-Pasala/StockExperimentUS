@@ -30,7 +30,7 @@ from tools.shared.ohlcv_cache import _get_engine  # noqa: E402
 
 
 def fetch(symbol: str, start: str, end: str) -> pd.DataFrame:
-    from src.services.brokers.fyers_service import FyersService
+    from src.services.data.market_data_service import MarketDataService as FyersService
     svc = FyersService()
     sd = datetime.strptime(start, "%Y-%m-%d").date()
     ed = datetime.strptime(end, "%Y-%m-%d").date()
