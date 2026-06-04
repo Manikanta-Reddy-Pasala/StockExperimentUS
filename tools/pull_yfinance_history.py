@@ -20,6 +20,12 @@ from sqlalchemy import create_engine, text
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+# Shared history core — same fetch path the IBKR broker uses (IBKR -> yfinance).
+try:
+    from src.services.data.price_history_provider import fetch_daily_bars
+except Exception:  # noqa: BLE001
+    fetch_daily_bars = None
+
 
 def get_engine():
     url = os.environ.get("DATABASE_URL", "postgresql+psycopg2://trader:trader_password@localhost:5432/trading_system")
@@ -69,11 +75,36 @@ def main() -> int:
     ap.add_argument("--start", default="2022-05-24")
     ap.add_argument("--end", default=date.today().isoformat())
     ap.add_argument("--batch", type=int, default=50)
+    ap.add_argument("--source", choices=["yfinance", "ibkr", "auto"], default="yfinance",
+                    help="yfinance=fast batch (default); ibkr/auto=per-symbol via shared "
+                         "core (IBKR primary, yfinance fallback)")
     args = ap.parse_args()
 
     syms = load_universe(args.universe)
-    print(f"Universe: {len(syms)} symbols, {args.start} -> {args.end}", flush=True)
+    print(f"Universe: {len(syms)} symbols, {args.start} -> {args.end} src={args.source}", flush=True)
     eng = get_engine()
+
+    # Shared-core path: identical fetch logic to the live IBKR broker.
+    if args.source in ("ibkr", "auto"):
+        if fetch_daily_bars is None:
+            print("! shared price_history_provider unavailable; aborting", file=sys.stderr)
+            return 1
+        total, failed = 0, []
+        prefer = "ibkr" if args.source != "yfinance" else "yfinance"
+        for n, sym in enumerate(syms, 1):
+            try:
+                df = fetch_daily_bars(sym, args.start, args.end, prefer=prefer)
+                if df is None or df.empty:
+                    failed.append(sym); continue
+                with eng.begin() as conn:
+                    total += insert_symbol(conn, sym, df)
+            except Exception as e:  # noqa: BLE001
+                failed.append(sym); print(f"  ! {sym}: {e}", file=sys.stderr, flush=True)
+            if n % 25 == 0 or n == len(syms):
+                print(f"  {n}/{len(syms)} done, rows={total}", flush=True)
+        print(f"DONE rows={total} failed={len(failed)}: {failed[:30]}", flush=True)
+        return 0
+
     total, failed = 0, []
     for i in range(0, len(syms), args.batch):
         batch = syms[i:i + args.batch]
