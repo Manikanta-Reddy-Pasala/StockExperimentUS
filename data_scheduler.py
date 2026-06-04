@@ -537,6 +537,17 @@ def snapshot_data_quality_audit():
         logger.error(f"snapshot_data_quality_audit error: {e}", exc_info=True)
 
 
+def generate_us_book_signal():
+    """Generate today's US book (MOM/TQQQ/BRK) IBKR rebalance plan — DRY-RUN, logs only."""
+    logger.info("=" * 80)
+    logger.info("US book signal — IBKR rebalance plan (dry-run)")
+    logger.info("=" * 80)
+    _run_subprocess_with_retry(
+        ['python3', 'tools/live/us_executor.py', '--model', 'book'],
+        'us_book_signal', timeout=300, max_retries=2, alert_on_fail=False,
+    )
+
+
 def run_scheduler():
     """Main scheduler loop."""
     logger.info("=" * 80)
@@ -646,6 +657,10 @@ def run_scheduler():
     schedule.every().day.at("22:00").do(export_daily_csv)
     schedule.every().day.at("22:00").do(validate_data_quality)
     schedule.every().day.at("22:05").do(snapshot_data_quality_audit)
+
+    # US book signal — generate today's IBKR rebalance plan (DRY-RUN, logs only).
+    # Live placement stays manual (run us_executor.py --live) to avoid auto-trading.
+    schedule.every().day.at("13:45").do(generate_us_book_signal)
 
     # Weekly full-history backfill — fills gaps for stocks added after the
     # initial seed (newly-listed midcaps, universe changes, etc.). Daily
