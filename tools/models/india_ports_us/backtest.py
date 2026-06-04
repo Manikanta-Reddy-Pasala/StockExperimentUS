@@ -149,9 +149,12 @@ def momscore(cl, di, mode="ret", lb=15):
 
 
 def simulate(cl, run_dates, dates, capital, target_fn, rebal_days, mid_days=None,
-             regime_on=None, regime=False, trail=0.0):
+             regime_on=None, regime=False, trail=0.0, lev=1.0, margin_apr=0.0):
+    """lev>1 = apply margin to the target weights (cash goes negative = borrowing).
+    margin_apr = annual borrow cost charged daily on negative cash (e.g. 0.06 = IBKR-ish)."""
     slip = SLIPPAGE_BPS / 1e4
     trail_f = trail / 100.0
+    daily_borrow = margin_apr / 252.0
     cash = capital
     pos: dict[str, float] = {}
     entry_px, entry_date, entry_di, peak_px = {}, {}, {}, {}
@@ -191,7 +194,7 @@ def simulate(cl, run_dates, dates, capital, target_fn, rebal_days, mid_days=None
                             if pd.notna(cl[s].iloc[di]))
             risk_on = (not regime) or (regime_on is not None and bool(regime_on.iloc[di]))
             target = target_fn(di, d, pos, risk_on) if risk_on else {}
-            desired = {s: (w * pv) / float(cl[s].iloc[di]) for s, w in target.items()
+            desired = {s: (w * lev * pv) / float(cl[s].iloc[di]) for s, w in target.items()
                        if pd.notna(cl[s].iloc[di]) and float(cl[s].iloc[di]) > 0}
             for s in list(set(pos) | set(desired)):
                 px = float(cl[s].iloc[di]) if pd.notna(cl[s].iloc[di]) else None
@@ -218,6 +221,8 @@ def simulate(cl, run_dates, dates, capital, target_fn, rebal_days, mid_days=None
                         entry_px[s] = px; peak_px[s] = px
                         entry_date[s] = d.date().isoformat(); entry_di[s] = di
                     pos[s] = tgt
+        if daily_borrow > 0 and cash < 0:        # margin interest on borrowed cash
+            cash += cash * daily_borrow
         val = cash + sum(sh * float(cl[s].iloc[di]) for s, sh in pos.items()
                          if pd.notna(cl[s].iloc[di]))
         equity.append(val)
@@ -318,7 +323,8 @@ def run_retest(cl, dv, dates, start, end, capital, pool=120, k=2, retain=4,
 
 
 def run_n40(cl, dv, dates, start, end, capital, topadv=40, top=1, mom_lb=63,
-            signal="ret", trail=0.0, out_dir=None, regime_on=None, regime=False, tag=""):
+            signal="ret", trail=0.0, out_dir=None, regime_on=None, regime=False, tag="",
+            lev=1.0, margin_apr=0.0):
     n100 = [s for s in cl.columns if s in set(load_csv(N100_CSV))]
     rebal = build_rebal(dates, start, end, weekly=True)
     run_dates = dates[dates >= pd.Timestamp(start)]
@@ -334,7 +340,8 @@ def run_n40(cl, dv, dates, start, end, capital, topadv=40, top=1, mom_lb=63,
         return {s: w for s in picks}
 
     res, trades, txns = simulate(cl, run_dates, dates, capital, target_fn, rebal,
-                                 regime_on=regime_on, regime=regime, trail=trail)
+                                 regime_on=regime_on, regime=regime, trail=trail,
+                                 lev=lev, margin_apr=margin_apr)
     _report(f"n40{tag}", res, trades, txns, out_dir)
     return res
 

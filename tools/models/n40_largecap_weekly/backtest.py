@@ -53,6 +53,10 @@ def main():
     ap.add_argument("--topadv", type=int, default=40)
     ap.add_argument("--signal", choices=["ret", "blend"], default="blend")
     ap.add_argument("--trail", type=float, default=0.0)
+    ap.add_argument("--lev", type=float, default=1.0,
+                    help="margin multiplier on target weights (1=cash; >1 borrows). "
+                         "WARNING: lev>=2 => 75-90%% DD = margin-call territory.")
+    ap.add_argument("--margin-apr", type=float, default=0.06, help="annual borrow cost on margin")
     ap.add_argument("--no-regime", dest="regime", action="store_false")
     ap.add_argument("--out", default=None)
     ap.set_defaults(regime=True)
@@ -66,8 +70,10 @@ def main():
 
     run_n40(cl, dv, dates, s, e, a.capital, topadv=a.topadv, top=a.top,
             signal=a.signal, trail=a.trail, out_dir=a.out,
-            regime_on=reg, regime=a.regime,
-            tag="_top%d_%s%s" % (a.top, a.signal, "_reg" if a.regime else ""))
+            regime_on=reg, regime=a.regime, lev=a.lev,
+            margin_apr=(a.margin_apr if a.lev > 1 else 0.0),
+            tag="_top%d_%s%s%s" % (a.top, a.signal, "_reg" if a.regime else "",
+                                   ("_lev%g" % a.lev) if a.lev != 1 else ""))
 
 
 if __name__ == "__main__":
