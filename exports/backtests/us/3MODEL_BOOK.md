@@ -30,6 +30,27 @@ Leveraged sleeve: TQQQ (`--lev TQQQ --index QQQ`) for Nasdaq; UPRO (`--lev UPRO
 | **TQQQ** | `tools/models/leveraged_regime_tqqq/backtest.py` | `--sma 200` | hold TQQQ (3× Nasdaq) when QQQ > 200d SMA, else cash |
 | **BRK** | `tools/models/breakout_n100/backtest.py` | `--donchian 50 --trail 20 --maxn 5 --regime` | buy 50-day high in uptrend (QQQ>200d), 20% trailing stop, top-5 |
 
+## Additional model — N40 (large-cap weekly momentum)
+
+`tools/models/n40_largecap_weekly/backtest.py` — improved US port of the India `n40`
+archetype (top-3 + blend signal + QQQ regime). Standalone sleeve, not in the 45/15/40
+blend by default.
+
+| Sleeve | File | Locked config | Mechanism |
+|--------|------|---------------|-----------|
+| **N40** | `tools/models/n40_largecap_weekly/backtest.py` | `--top 3 --topadv 40 --signal blend` + regime ON | top-40 ADV ∩ Nasdaq-100, rank by avg(21/63/126d) returns, top-3 equal-wt, **weekly**; cash when QQQ<200d |
+
+| Window | CAGR | MaxDD | Calmar | WR |
+|--------|-----:|------:|-------:|---:|
+| 3yr (2023-2026) | **132.5%** | 38.6% | 3.44 | 80% |
+| 5yr (2021-2026) | 53.1% | 46.8% | 1.13 | 75% |
+| 10yr (2016-2026) | 53.0% | 46.8% | 1.13 | 77% |
+
+⚠️ **Book role:** N40 is a higher-turnover twin of MOM (both = Nasdaq large-cap blend
+momentum) → HIGH correlation to MOM and *higher* DD (~47% vs the book's 38%). Use it as a
+MOM alternative (more names, weekly cadence), not as a diversifying sleeve. Exhaustive
+port comparison + why emerging/retest don't translate: `INDIA_PORTS_{RESULTS,IMPROVED}.md`.
+
 ## Blended book — 45 / 15 / 40 (MOM / TQQQ / BRK)
 
 | Window | CAGR | MaxDD | Calmar |

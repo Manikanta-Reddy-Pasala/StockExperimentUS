@@ -1,0 +1,74 @@
+"""N40 — large-cap WEEKLY momentum (top-3, blend signal, QQQ regime). LOCKED config.
+
+The improved US port of the India `n40` archetype. The faithful India rule (single
+large-cap name, weekly) bled to 62-80% DD on US; the IMPROVED config below
+(diversify to top-3 + the v2 "blend" momentum signal + a QQQ 200d regime gate)
+turns it into a real ≥60%-CAGR large-cap sleeve — see
+`exports/backtests/us/INDIA_PORTS_IMPROVED.md`.
+
+LOCKED config (this file's defaults):
+  universe  : top-40 by 20d ADV ∩ Nasdaq-100  (liquid large caps)
+  signal    : blend = avg(21/63/126-day return)  (same alpha as the v2 MOM sleeve)
+  hold      : top-3 equal-weight, rebalanced WEEKLY (first trading day each ISO week)
+  regime    : 100% cash when QQQ < 200d SMA
+  costs     : $0 commission (IBKR Lite) + 8 bps slippage; true daily-MTM drawdown
+
+NOTE (book role): this is essentially a higher-turnover twin of the v2 MOM sleeve
+(large-cap blend momentum) — expect HIGH correlation to MOM, so it raises CAGR/turnover
+but does NOT diversify the 3-model book. Use as a MOM variant, not a low-corr sleeve.
+
+Measured (Nasdaq-100, locked config):
+  3yr  2023-05→2026-05 : ~132% CAGR / 38% DD / Calmar 3.4
+  5yr  2021-03→2026-05 : ~53%  CAGR / 47% DD / Calmar 1.1
+Run:
+  PYTHONPATH=. python tools/models/n40_largecap_weekly/backtest.py \
+      --from 2023-05-24 --to 2026-05-24 --out exports/backtests/us/n40_largecap_weekly/3yr
+"""
+from __future__ import annotations
+import sys, argparse
+from pathlib import Path
+from datetime import date
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
+
+from tools.models.india_ports_us.backtest import (  # noqa: E402  shared core engine
+    load_csv, load_panels, load_regime, run_n40, N100_CSV,
+)
+
+DEFAULT_START = date(2023, 5, 24)
+DEFAULT_END = date(2026, 5, 24)
+DEFAULT_CAP = 1_000_000.0
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--from", dest="start", default=DEFAULT_START.isoformat())
+    ap.add_argument("--to", dest="end", default=DEFAULT_END.isoformat())
+    ap.add_argument("--capital", type=float, default=DEFAULT_CAP)
+    ap.add_argument("--universe-csv", default=N100_CSV, help="large-cap pool (default Nasdaq-100)")
+    ap.add_argument("--regime-sym", default="QQQ")
+    # locked knobs (overridable for research)
+    ap.add_argument("--top", type=int, default=3)
+    ap.add_argument("--topadv", type=int, default=40)
+    ap.add_argument("--signal", choices=["ret", "blend"], default="blend")
+    ap.add_argument("--trail", type=float, default=0.0)
+    ap.add_argument("--no-regime", dest="regime", action="store_false")
+    ap.add_argument("--out", default=None)
+    ap.set_defaults(regime=True)
+    a = ap.parse_args()
+    s, e = date.fromisoformat(a.start), date.fromisoformat(a.end)
+
+    syms = sorted(set(load_csv(a.universe_csv)))
+    cl, dv = load_panels(syms, s, e)
+    dates = cl.index
+    reg = load_regime(a.regime_sym, dates, s, e) if a.regime else None
+
+    run_n40(cl, dv, dates, s, e, a.capital, topadv=a.topadv, top=a.top,
+            signal=a.signal, trail=a.trail, out_dir=a.out,
+            regime_on=reg, regime=a.regime,
+            tag="_top%d_%s%s" % (a.top, a.signal, "_reg" if a.regime else ""))
+
+
+if __name__ == "__main__":
+    main()
