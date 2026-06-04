@@ -6,7 +6,7 @@ Fetches 15m OHLCV candles from Fyers and persists them in
 post-cross ENTRY confirmation triggers ~15m after a level break instead of
 waiting for the next 1H close.
 
-Mirror of :mod:`historical_1h_service`; reuses the same FyersService auth.
+Mirror of :mod:`historical_1h_service`; reuses the same MarketDataService auth.
 """
 
 import logging
@@ -17,11 +17,11 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import desc
 
 try:
-    from ..brokers.fyers_service import FyersService
+    from ..data.market_data_service import MarketDataService
     from ...models.database import get_database_manager
     from ...models.historical_models import HistoricalData15M
 except ImportError:
-    from src.services.brokers.fyers_service import FyersService
+    from ..data.market_data_service import MarketDataService
     from src.models.database import get_database_manager
     from src.models.historical_models import HistoricalData15M
 
@@ -36,7 +36,7 @@ class Historical15MService:
 
     def __init__(self):
         self.db = get_database_manager()
-        self.fyers = FyersService()
+        self.fyers = MarketDataService()
         self.rate_limit_delay = 0.3
 
     def backfill_symbol(

@@ -124,8 +124,8 @@ def _portfolio_state() -> Dict:
     T+1 settlement, then move to HOLDINGS. We merge both.
     """
     try:
-        from src.services.brokers.fyers_service import FyersService
-        svc = FyersService()
+        from src.services.brokers.ibkr import IBKRBrokerService
+        svc = IBKRBrokerService()
         funds_resp = svc.funds(1)
         holdings_resp = svc.holdings(1)
         # Raw positions has more fields (buyAvg, netQty, pl) than standardized
@@ -161,8 +161,8 @@ def _portfolio_state() -> Dict:
     fyers_syms_for_quote = list({s for s in fyers_syms_for_quote if s})
     if fyers_syms_for_quote:
         try:
-            from src.services.brokers.fyers_service import FyersService
-            qsvc = FyersService()
+            from src.services.brokers.ibkr import IBKRBrokerService
+            qsvc = IBKRBrokerService()
             qr = qsvc.quotes_multiple(1, fyers_syms_for_quote) or {}
             qdata = (qr.get("data") or {})
             for fs, qd in qdata.items():
@@ -317,8 +317,8 @@ def _current_ranking(top: int = 10, live_prices: bool = True) -> List[Dict]:
     # Enrich top-N with LIVE Fyers quotes — overrides cached close
     if live_prices and top_rows:
         try:
-            from src.services.brokers.fyers_service import FyersService
-            svc = FyersService()
+            from src.services.brokers.ibkr import IBKRBrokerService
+            svc = IBKRBrokerService()
             fyers_syms = [f"NSE:{r['symbol']}-EQ" for r in top_rows]
             q = svc.quotes_multiple(1, fyers_syms) or {}
             quotes = (q.get("data") or {})
@@ -399,8 +399,8 @@ def api_history():
     """Trade history: Fyers tradebook (real trades) + local override file."""
     trades = []
     try:
-        from src.services.brokers.fyers_service import FyersService
-        svc = FyersService()
+        from src.services.brokers.ibkr import IBKRBrokerService
+        svc = IBKRBrokerService()
         raw = svc._get_api_instance(1)._make_request("GET", "tradebook") or {}
         for t in (raw.get("data") or []):
             side = t.get("side")
@@ -452,9 +452,9 @@ def _fyers_place_market(symbol: str, qty: int, side: str, user_id: int = 1,
     Also writes an audit_orders row (with computed broker charges) so every
     UI-triggered trade is captured in the charges-summary aggregates.
     """
-    from src.services.brokers.fyers_service import FyersService
+    from src.services.brokers.ibkr import IBKRBrokerService
     fyers_sym = symbol if symbol.startswith("NSE:") else f"NSE:{symbol}-EQ"
-    svc = FyersService()
+    svc = IBKRBrokerService()
     req = {
         "symbol": fyers_sym, "qty": int(qty), "side": side.upper(),
         "product": "CNC", "pricetype": "MARKET",
@@ -506,8 +506,8 @@ def _fyers_place_market(symbol: str, qty: int, side: str, user_id: int = 1,
 def _fyers_available_cash(user_id: int = 1) -> float:
     """Fetch Fyers available_cash."""
     try:
-        from src.services.brokers.fyers_service import FyersService
-        svc = FyersService()
+        from src.services.brokers.ibkr import IBKRBrokerService
+        svc = IBKRBrokerService()
         f = svc.funds(user_id) or {}
         return float((f.get("data") or {}).get("available_cash") or 0)
     except Exception:
@@ -517,8 +517,8 @@ def _fyers_available_cash(user_id: int = 1) -> float:
 def _fyers_live_ltp(symbol: str, user_id: int = 1) -> float:
     """Fetch live LTP for a symbol via Fyers quotes API (real-time)."""
     try:
-        from src.services.brokers.fyers_service import FyersService
-        svc = FyersService()
+        from src.services.brokers.ibkr import IBKRBrokerService
+        svc = IBKRBrokerService()
         fyers_sym = symbol if symbol.startswith("NSE:") else f"NSE:{symbol}-EQ"
         r = svc.quotes_multiple(user_id, [fyers_sym]) or {}
         data = (r.get("data") or {})
@@ -537,8 +537,8 @@ def _fyers_holdings(user_id: int = 1) -> List[Dict]:
     out = []
     seen = set()
     try:
-        from src.services.brokers.fyers_service import FyersService
-        svc = FyersService()
+        from src.services.brokers.ibkr import IBKRBrokerService
+        svc = IBKRBrokerService()
         api = svc._get_api_instance(user_id)
 
         # Settled holdings
@@ -858,9 +858,9 @@ def api_summary():
 def api_fyers_account():
     """Pull live data from real Fyers account: funds + holdings + positions."""
     try:
-        from src.services.brokers.fyers_service import FyersService
+        from src.services.brokers.ibkr import IBKRBrokerService
         user_id = int(request.args.get("user_id", 1))
-        svc = FyersService()
+        svc = IBKRBrokerService()
 
         out = {"user_id": user_id}
 
@@ -895,9 +895,9 @@ def api_fyers_account():
 def api_fyers_orderbook():
     """Live order history from Fyers."""
     try:
-        from src.services.brokers.fyers_service import FyersService
+        from src.services.brokers.ibkr import IBKRBrokerService
         user_id = int(request.args.get("user_id", 1))
-        svc = FyersService()
+        svc = IBKRBrokerService()
         ob = svc.orderbook(user_id)
         tb = svc.tradebook(user_id)
         return jsonify({"success": True, "orderbook": ob, "tradebook": tb})

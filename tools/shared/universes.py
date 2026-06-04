@@ -152,8 +152,8 @@ def _fyers_service():
     if _FYERS_CACHE["service"] is not None:
         return _FYERS_CACHE["service"]
     try:
-        from src.services.brokers.fyers_service import FyersService
-        svc = FyersService()
+        from src.services.data.market_data_service import MarketDataService
+        svc = MarketDataService()
         cfg = svc.get_broker_config(_FYERS_CACHE["user_id"])
         if not cfg or not cfg.get("access_token"):
             print(f"  fyers: no token for user_id={_FYERS_CACHE['user_id']}")

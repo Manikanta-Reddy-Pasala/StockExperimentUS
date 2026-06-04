@@ -5,7 +5,7 @@ Fetches 1H OHLCV candles from Fyers and persists them in `historical_data_1h`.
 Used by the EMA 200/400 crossover strategy (1H timeframe).
 
 This service does NOT touch login or token flow — it reuses the existing
-`FyersService.history()` which handles authentication for us.
+`MarketDataService.history()` which handles authentication for us.
 """
 
 import logging
@@ -16,12 +16,12 @@ from typing import Dict, List, Optional, Any
 from sqlalchemy import and_, desc
 
 try:
-    from ..brokers.fyers_service import FyersService
+    from ..data.market_data_service import MarketDataService
     from ...models.database import get_database_manager
     from ...models.historical_models import HistoricalData1H
     from ...models.stock_models import Stock
 except ImportError:
-    from src.services.brokers.fyers_service import FyersService
+    from ..data.market_data_service import MarketDataService
     from src.models.database import get_database_manager
     from src.models.historical_models import HistoricalData1H
     from src.models.stock_models import Stock
@@ -38,7 +38,7 @@ class Historical1HService:
 
     def __init__(self):
         self.db = get_database_manager()
-        self.fyers = FyersService()
+        self.fyers = MarketDataService()
         self.rate_limit_delay = 0.3  # seconds between Fyers calls
 
     # ------------------------------------------------------------------

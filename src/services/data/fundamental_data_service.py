@@ -187,11 +187,11 @@ class FundamentalDataService:
         try:
             # Import Fyers service
             try:
-                from ..brokers.fyers_service import FyersService
+                from ..data.market_data_service import MarketDataService
             except ImportError:
-                from src.services.brokers.fyers_service import FyersService
+                from ..data.market_data_service import MarketDataService
 
-            fyers_service = FyersService()
+            fyers_service = MarketDataService()
 
             # Check if Fyers is configured
             config = fyers_service.get_broker_config(user_id=1)  # Default user

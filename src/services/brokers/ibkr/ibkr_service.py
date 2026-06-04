@@ -285,6 +285,72 @@ class IBKRBrokerService(BaseBrokerService):
         ]
         return self._ok({"symbol": symbol, "candles": candles, "resolution": "D"})
 
+    # ------------------------------------------------------------------ #
+    # legacy-compat methods (Fyers-shaped: user_id-first) so existing
+    # routes/services keep working after the Fyers->IBKR migration.
+    # IBKR is single-account; user_id is ignored.
+    # ------------------------------------------------------------------ #
+    def funds(self, user_id: int = 1):
+        return self.get_funds()
+
+    def holdings(self, user_id: int = 1):
+        return self.get_holdings()
+
+    def positions(self, user_id: int = 1):
+        return self.get_positions()
+
+    def orderbook(self, user_id: int = 1):
+        return self.get_orderbook()
+
+    def tradebook(self, user_id: int = 1):
+        return self.get_tradebook()
+
+    def quotes_multiple(self, user_id: int, symbols):
+        syms = symbols if isinstance(symbols, str) else ",".join(symbols)
+        return self.get_quotes(syms)
+
+    def quotes(self, user_id: int, symbol: str, exchange: str = ""):
+        return self.get_quotes(symbol)
+
+    def placeorder(self, user_id: int, symbol: str, quantity, action: str,
+                   product: str = "CNC", price: float = 0.0, order_type: str = "MKT",
+                   **kwargs):
+        return self.place_order({
+            "symbol": symbol, "side": action, "qty": quantity,
+            "type": "LMT" if (order_type or "").upper().startswith("L") else "MKT",
+            "price": price,
+        })
+
+    def history(self, user_id: int, symbol: str, exchange: str = "", interval: str = "D",
+                start_date: str = None, end_date: str = None):
+        return self.get_history(symbol, resolution=interval,
+                                range_from=start_date, range_to=end_date)
+
+    def _get_api_instance(self, user_id: int = 1):
+        """Return a tiny shim exposing _make_request(method, path) for legacy
+        callers that reached into the old Fyers API object."""
+        return _IBKRRawShim(self)
+
+
+class _IBKRRawShim:
+    """Maps legacy `_make_request('GET', 'positions'|'tradebook'|...)` to IBKR."""
+    def __init__(self, svc: "IBKRBrokerService"):
+        self._svc = svc
+
+    def _make_request(self, method: str, path: str, *args, **kwargs):
+        p = (path or "").strip("/").lower()
+        if p.startswith("positions"):
+            r = self._svc.get_positions()
+        elif p.startswith("tradebook") or p.startswith("trades"):
+            r = self._svc.get_tradebook()
+        elif p.startswith("orderbook") or p.startswith("orders"):
+            r = self._svc.get_orderbook()
+        elif p.startswith("funds") or p.startswith("holdings"):
+            r = self._svc.get_funds()
+        else:
+            return {}
+        return r.get("data", []) if isinstance(r, dict) and r.get("status") == "success" else {}
+
 
 def _is_float(v) -> bool:
     try:

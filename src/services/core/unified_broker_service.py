@@ -246,8 +246,8 @@ class UnifiedBrokerService:
                 current_broker = broker_config.broker_name if broker_config else 'fyers'
 
             if current_broker == 'fyers':
-                from ..brokers.fyers_service import FyersService
-                return FyersService().quotes_multiple(user_id, symbols)
+                from ..brokers.ibkr import IBKRBrokerService
+                return IBKRBrokerService().quotes_multiple(user_id, symbols)
             return self._no_provider_error('quotes')
 
         except Exception as e:
@@ -296,9 +296,9 @@ class UnifiedBrokerService:
             end_date_str = end_date.strftime('%Y-%m-%d')
 
             if current_broker == 'fyers':
-                from ..brokers.fyers_service import FyersService
+                from ..brokers.ibkr import IBKRBrokerService
                 exchange = symbol.split(':')[0] if ':' in symbol else 'NSE'
-                return FyersService().history(user_id, symbol, exchange, resolution, start_date_str, end_date_str)
+                return IBKRBrokerService().history(user_id, symbol, exchange, resolution, start_date_str, end_date_str)
             return self._no_provider_error('historical_data')
 
         except Exception as e:

@@ -13,7 +13,7 @@ import math
 import statistics
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
-from ..brokers.fyers_service import get_fyers_service
+from .market_data_service import get_market_data_service
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class VolatilityCalculatorService:
     """Service to calculate real volatility metrics from FYERS v3 API data."""
 
     def __init__(self):
-        self.fyers_service = get_fyers_service()
+        self.market_data = get_market_data_service()
 
     def calculate_stock_volatility_metrics(self, user_id: int, symbol: str,
                                          days_lookback: int = 252) -> Dict[str, Any]:
@@ -133,7 +133,7 @@ class VolatilityCalculatorService:
         """Get historical OHLCV data from FYERS History API."""
         try:
             # Use FYERS service to get historical data
-            response = self.fyers_service.get_historical_data(
+            response = self.market_data.get_historical_data(
                 user_id=user_id,
                 symbol=symbol,
                 resolution='D',  # Daily resolution
@@ -373,7 +373,7 @@ class VolatilityCalculatorService:
         """Get current price and liquidity metrics from FYERS Quotes API."""
         try:
             # Get current quote
-            quotes_response = self.fyers_service.quotes(user_id, [symbol])
+            quotes_response = self.market_data.quotes(user_id, [symbol])
 
             if not quotes_response.get('success') or not quotes_response.get('data'):
                 return {}
@@ -385,7 +385,7 @@ class VolatilityCalculatorService:
             quote = quote_data['v']
 
             # Get market depth for bid-ask spread
-            depth_response = self.fyers_service.get_market_depth(user_id, symbol)
+            depth_response = self.market_data.get_market_depth(user_id, symbol)
 
             metrics = {
                 'current_price': float(quote.get('lp', 0)),  # Last traded price

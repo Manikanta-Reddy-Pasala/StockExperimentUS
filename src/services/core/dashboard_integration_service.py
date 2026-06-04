@@ -39,8 +39,8 @@ class DashboardIntegrationService:
             
             # Import and initialize the appropriate broker service
             if current_broker == 'fyers':
-                from .brokers.fyers_service import FyersService
-                self.broker_instance = FyersService()
+                from ..brokers.ibkr import IBKRBrokerService
+                self.broker_instance = IBKRBrokerService()
             else:
                 logger.error(f"Unknown broker: {current_broker}")
                 return None

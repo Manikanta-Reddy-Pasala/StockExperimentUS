@@ -1388,8 +1388,8 @@ def _resolve_live_prices(symbols):
         return out
     fyers_syms = [f"NSE:{b}-EQ" for b in bare_set]
     try:
-        from src.services.brokers.fyers_service import FyersService
-        svc = FyersService()
+        from src.services.brokers.ibkr import IBKRBrokerService
+        svc = IBKRBrokerService()
         qr = svc.quotes_multiple(1, fyers_syms) or {}
         for fs, qd in (qr.get("data") or {}).items():
             b = fs.replace("NSE:", "").replace("-EQ", "")
