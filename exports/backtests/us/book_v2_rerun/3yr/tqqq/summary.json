@@ -1,0 +1,31 @@
+{
+  "label": "TQQQ gate200",
+  "lev": "TQQQ",
+  "index": "QQQ",
+  "start": "2023-05-24",
+  "end": "2026-05-22",
+  "years": 3.0,
+  "capital": 100000.0,
+  "final_nav": 472510.0,
+  "cagr_pct": 67.94,
+  "max_dd_pct": 37.37,
+  "calmar": 1.82,
+  "switches": 6,
+  "time_in_market_pct": 92.2,
+  "params": {
+    "sma": 200,
+    "second_sma": 0,
+    "partial": 1.0,
+    "buffer_pct": 0.0,
+    "confirm_days": 1,
+    "riskoff": "cash"
+  },
+  "bench_buyhold_lev": {
+    "cagr_pct": 74.67,
+    "max_dd_pct": 58.04
+  },
+  "bench_buyhold_index": {
+    "cagr_pct": 30.15,
+    "max_dd_pct": 22.77
+  }
+}
