@@ -65,6 +65,20 @@ port comparison + why emerging/retest don't translate: `INDIA_PORTS_{RESULTS,IMP
 | v1 (raw 30d MOM, BRK no-regime, 50/25/25) | 90.4% / 26.0% / 3.48 | 45.7% / 39.0% / 1.17 |
 | **v2 (blend MOM, BRK regime, 45/15/40)** | **108.7% / 24.9% / 4.36** | **55.2% / 37.7% / 1.46** |
 
+### Leveraged variants (the 100%-CAGR question — NOT the default book)
+The unleveraged book is the survivable default. For higher CAGR, `blend_models.py` supports
+margin (`--lev`) and vol-targeting (`--vol-target`). Full analysis: `HIGH_CAGR_SEARCH.md`.
+
+| Variant | 10yr CAGR / DD / Calmar | reproduce |
+|---|---|---|
+| **flat 2× book** (max CAGR) | **101.1% / 69.8% / 1.45** | `blend_models.py … --weights 0.45,0.15,0.40 --lev 2.0` |
+| vol-targeted 50%/max3 (best Calmar) | 85.4% / 58.2% / 1.47 | `… --vol-target 0.50 --max-lev 3` |
+| unleveraged (survivable, default) | 53.4% / 37.7% / 1.42 | `… --weights 0.45,0.15,0.40` |
+
+⚠️ 100% CAGR/10yr needs ~2× leverage at ~70% DD = **margin-call/liquidation territory** (the
+backtest ignores forced liquidation + survivorship). A *survivable* 100%/full-cycle does not
+exist for US large-cap; 100% only happens in 3yr bull bursts. Leverage at your own risk.
+
 ## Per-model results (locked configs, true daily DD)
 
 | Model | 3yr CAGR/DD/Calmar | 4yr CAGR/DD/Calmar | 10yr CAGR/DD/Calmar |

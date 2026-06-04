@@ -37,6 +37,11 @@ def main():
                     help="margin multiplier on the blend (>1 borrows). WARNING: lev>=2 "
                          "=> ~70-90%% DD = margin-call/liquidation territory.")
     ap.add_argument("--margin-apr", type=float, default=0.06, help="annual borrow cost on margin")
+    ap.add_argument("--vol-target", type=float, default=0.0,
+                    help="annualized vol target (e.g. 0.50). Scales daily leverage by "
+                         "target/realized-vol (de-levers in crashes). Overrides --lev.")
+    ap.add_argument("--max-lev", type=float, default=3.0, help="cap on vol-target leverage")
+    ap.add_argument("--vol-window", type=int, default=20, help="realized-vol lookback (days)")
     a = ap.parse_args()
 
     names, curves = [], []
@@ -55,8 +60,13 @@ def main():
     w = w / w.sum()
 
     blend_ret = (rets * w).sum(axis=1)
-    if a.lev != 1.0:                      # apply margin leverage + daily borrow cost
-        blend_ret = blend_ret * a.lev - max(0.0, a.lev - 1.0) * (a.margin_apr / 252.0)
+    mc = a.margin_apr / 252.0
+    if a.vol_target > 0:                   # vol-targeted leverage (de-levers in crashes)
+        rv = blend_ret.rolling(a.vol_window).std() * np.sqrt(252)
+        lev_t = (a.vol_target / rv).clip(0, a.max_lev).shift(1).fillna(1.0)
+        blend_ret = blend_ret * lev_t - (lev_t - 1).clip(lower=0) * mc
+    elif a.lev != 1.0:                     # flat margin leverage + daily borrow cost
+        blend_ret = blend_ret * a.lev - max(0.0, a.lev - 1.0) * mc
     blend_eq = (1 + blend_ret).cumprod()
 
     print("\n=== individual (on common dates) ===")
