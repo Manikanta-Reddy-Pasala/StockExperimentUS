@@ -23,14 +23,14 @@ try:
     from ..core.unified_broker_service import get_unified_broker_service
     from ...models.database import get_database_manager
     from ...models.stock_models import Stock, SymbolMaster
-    from ..data.fyers_symbol_service import get_fyers_symbol_service
+    from ..data.symbol_master_service import get_symbol_master_service
     from ..data.volatility_calculation_service import get_volatility_calculation_service
     from ..data.fundamental_data_service import get_fundamental_data_service
 except ImportError:
     from src.services.core.unified_broker_service import get_unified_broker_service
     from src.models.database import get_database_manager
     from src.models.stock_models import Stock, SymbolMaster
-    from src.services.data.fyers_symbol_service import get_fyers_symbol_service
+    from ..data.symbol_master_service import get_symbol_master_service
     from src.services.data.volatility_calculation_service import get_volatility_calculation_service
     from src.services.data.fundamental_data_service import get_fundamental_data_service
 
@@ -41,7 +41,7 @@ class StockInitializationService:
     def __init__(self):
         self.unified_broker_service = get_unified_broker_service()
         self.db_manager = get_database_manager()
-        self.fyers_service = get_fyers_symbol_service()
+        self.fyers_service = get_symbol_master_service()
         self.volatility_service = get_volatility_calculation_service()
         self.fundamental_service = get_fundamental_data_service()
         self.rate_limit_delay = 0.1  # 100ms between API calls (fast mode)

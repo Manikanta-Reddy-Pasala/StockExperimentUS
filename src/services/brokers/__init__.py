@@ -1,10 +1,8 @@
-"""
-Broker Services Package - Individual services for each broker
-"""
+"""Broker Services Package — IBKR (Interactive Brokers) for US trading + history."""
 
-from .fyers_service import get_fyers_service, FyersService
+from .ibkr import IBKRBrokerService, get_ibkr_service
 
 __all__ = [
-    'get_fyers_service',
-    'FyersService',
+    'IBKRBrokerService',
+    'get_ibkr_service',
 ]

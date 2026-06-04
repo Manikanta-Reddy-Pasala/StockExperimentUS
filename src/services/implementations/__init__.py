@@ -1,14 +1,14 @@
 """
 Broker Implementations Package
 
-Concrete implementations of the broker interfaces. Only Fyers is supported.
+Concrete implementations of the broker interfaces. IBKR (Interactive Brokers) providers.
 """
 
 try:
-    from .fyers_dashboard_provider import FyersDashboardProvider
-    from .fyers_orders_provider import FyersOrdersProvider
-    from .fyers_portfolio_provider import FyersPortfolioProvider
-    from .fyers_reports_provider import FyersReportsProvider
+    from .ibkr_dashboard_provider import IBKRDashboardProvider
+    from .ibkr_orders_provider import IBKROrdersProvider
+    from .ibkr_portfolio_provider import IBKRPortfolioProvider
+    from .ibkr_reports_provider import IBKRReportsProvider
     FYERS_AVAILABLE = True
 except ImportError:
     FYERS_AVAILABLE = False
@@ -17,8 +17,8 @@ __all__ = []
 
 if FYERS_AVAILABLE:
     __all__.extend([
-        'FyersDashboardProvider',
-        'FyersOrdersProvider',
-        'FyersPortfolioProvider',
-        'FyersReportsProvider'
+        'IBKRDashboardProvider',
+        'IBKROrdersProvider',
+        'IBKRPortfolioProvider',
+        'IBKRReportsProvider'
     ])

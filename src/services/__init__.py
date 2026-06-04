@@ -4,7 +4,7 @@ Services package - Business logic layer
 This package contains all business logic services organized into logical modules:
 
 - core/       : Core business services (users, orders, strategies, brokers)
-- brokers/    : Broker integration services (Fyers)
+- brokers/    : Broker integration services (IBKR)
 - technical/  : Technical indicator calculation services
 - data/       : Data management and synchronization services
 - portfolio/  : Portfolio management and tracking services
@@ -24,7 +24,7 @@ from .core import (
 
 from .data import (
     get_symbol_database_service,
-    get_fyers_symbol_service
+    get_symbol_master_service
 )
 
 from .portfolio import (
@@ -46,7 +46,7 @@ __all__ = [
 
     # Data services
     'get_symbol_database_service',
-    'get_fyers_symbol_service',
+    'get_symbol_master_service',
 
     # Portfolio services
     'get_portfolio_service',

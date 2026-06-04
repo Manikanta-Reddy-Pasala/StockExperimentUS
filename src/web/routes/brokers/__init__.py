@@ -1,9 +1,4 @@
-"""
-Broker Routes Package - Individual route modules for each broker
-"""
+"""Broker Routes Package — IBKR uses TWS/Gateway (no OAuth web flow), so there is
+no broker auth blueprint."""
 
-from .fyers_routes import fyers_bp
-
-__all__ = [
-    'fyers_bp',
-]
+__all__ = []

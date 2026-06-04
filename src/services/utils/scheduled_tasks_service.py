@@ -17,10 +17,10 @@ logger = logging.getLogger(__name__)
 
 try:
     from .symbol_database_service import get_symbol_database_service
-    from .fyers_symbol_service import get_fyers_symbol_service
+    from ..data.symbol_master_service import get_symbol_master_service
 except ImportError:
     from services.symbol_database_service import get_symbol_database_service
-    from services.fyers_symbol_service import get_fyers_symbol_service
+    from ..data.symbol_master_service import get_symbol_master_service
 
 
 class ScheduledTasksService:
@@ -165,7 +165,7 @@ class ScheduledTasksService:
 
         try:
             # Get symbol service
-            symbol_service = get_fyers_symbol_service()
+            symbol_service = get_symbol_master_service()
 
             # Force refresh CSV cache from Fyers
             symbol_service.refresh_all_symbols(sync_to_database=True)
@@ -220,7 +220,7 @@ class ScheduledTasksService:
             stats = db_service.get_database_stats()
 
             # Check symbol service
-            symbol_service = get_fyers_symbol_service()
+            symbol_service = get_symbol_master_service()
 
             result = {
                 'task': 'health_check',

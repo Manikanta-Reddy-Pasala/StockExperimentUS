@@ -177,12 +177,7 @@ def create_app():
     cache_service = get_cache_service()
     token_manager = get_token_manager()
 
-    # Register FYERS token refresh callback
-    try:
-        from ..services.brokers.fyers_token_refresh import register_fyers_refresh_callback
-        register_fyers_refresh_callback()
-    except Exception as e:
-        app.logger.warning(f"Could not register FYERS refresh callback: {e}")
+    # IBKR uses TWS/Gateway-managed auth — no in-app token refresh callback needed.
 
     # Token refresh is owned SOLELY by data_scheduler cron at 03:30 IST.
     # In-process daemon removed to keep a single source of truth — see
@@ -1187,9 +1182,8 @@ def create_app():
             app.logger.error(f"Error setting current broker for user {current_user.id}: {str(e)}")
             return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    # Register broker-specific blueprints
-    from .routes.brokers import fyers_bp
-    app.register_blueprint(fyers_bp)
+    # Broker-specific blueprints: IBKR uses TWS/Gateway (no OAuth web flow), so no
+    # broker auth blueprint is registered here (Fyers blueprint removed).
 
     # Register admin routes for manual triggers
     try:

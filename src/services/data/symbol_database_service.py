@@ -18,11 +18,11 @@ logger = logging.getLogger(__name__)
 try:
     from src.models.stock_models import SymbolMaster, Stock, MarketCapCategory
     from src.models.database import get_database_manager
-    from .fyers_symbol_service import get_fyers_symbol_service
+    from .symbol_master_service import get_symbol_master_service
 except ImportError:
     from models.stock_models import SymbolMaster, Stock, MarketCapCategory
     from models.database import get_database_manager
-    from services.fyers_symbol_service import get_fyers_symbol_service
+    from .symbol_master_service import get_symbol_master_service
 
 
 class SymbolDatabaseService:
@@ -30,7 +30,7 @@ class SymbolDatabaseService:
 
     def __init__(self):
         self.db_manager = get_database_manager()
-        self.symbol_service = get_fyers_symbol_service()
+        self.symbol_service = get_symbol_master_service()
 
     def sync_symbols_to_database(self, exchange: str = 'NSE', force_refresh: bool = False) -> Dict[str, int]:
         """
