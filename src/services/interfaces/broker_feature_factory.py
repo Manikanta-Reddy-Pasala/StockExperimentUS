@@ -36,19 +36,19 @@ class BrokerFeatureFactory:
     
     def _register_default_providers(self):
         """Register default broker providers."""
-        # Import and register FYERS providers
+        # Import and register IBKR (Interactive Brokers) providers — US default broker.
         try:
-            from ..implementations.fyers_dashboard_provider import FyersDashboardProvider
-            from ..implementations.fyers_orders_provider import FyersOrdersProvider
-            from ..implementations.fyers_portfolio_provider import FyersPortfolioProvider
-            from ..implementations.fyers_reports_provider import FyersReportsProvider
+            from ..implementations.ibkr_dashboard_provider import IBKRDashboardProvider
+            from ..implementations.ibkr_orders_provider import IBKROrdersProvider
+            from ..implementations.ibkr_portfolio_provider import IBKRPortfolioProvider
+            from ..implementations.ibkr_reports_provider import IBKRReportsProvider
 
-            self.register_dashboard_provider('fyers', FyersDashboardProvider)
-            self.register_orders_provider('fyers', FyersOrdersProvider)
-            self.register_portfolio_provider('fyers', FyersPortfolioProvider)
-            self.register_reports_provider('fyers', FyersReportsProvider)
+            self.register_dashboard_provider('ibkr', IBKRDashboardProvider)
+            self.register_orders_provider('ibkr', IBKROrdersProvider)
+            self.register_portfolio_provider('ibkr', IBKRPortfolioProvider)
+            self.register_reports_provider('ibkr', IBKRReportsProvider)
         except ImportError:
-            pass  # FYERS providers not available
+            pass  # IBKR providers not available
 
 
 
