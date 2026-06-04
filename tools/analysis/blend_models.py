@@ -33,6 +33,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("specs", nargs="+", help="NAME=path/equity_curve.csv")
     ap.add_argument("--weights", default=None, help="comma weights, default equal")
+    ap.add_argument("--lev", type=float, default=1.0,
+                    help="margin multiplier on the blend (>1 borrows). WARNING: lev>=2 "
+                         "=> ~70-90%% DD = margin-call/liquidation territory.")
+    ap.add_argument("--margin-apr", type=float, default=0.06, help="annual borrow cost on margin")
     a = ap.parse_args()
 
     names, curves = [], []
@@ -51,6 +55,8 @@ def main():
     w = w / w.sum()
 
     blend_ret = (rets * w).sum(axis=1)
+    if a.lev != 1.0:                      # apply margin leverage + daily borrow cost
+        blend_ret = blend_ret * a.lev - max(0.0, a.lev - 1.0) * (a.margin_apr / 252.0)
     blend_eq = (1 + blend_ret).cumprod()
 
     print("\n=== individual (on common dates) ===")

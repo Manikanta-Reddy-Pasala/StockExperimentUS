@@ -37,3 +37,29 @@ Trailing stop barely helps (leveraged 2020/2022 gap-downs blow through the regim
 - Confirms the mapped frontier ([[project-three-model-blend]] search log): US high-CAGR comes only
   from concentrated large-cap momentum; bears + leverage cap the realistic ceiling well under 100%/10yr.
 - 100% is achievable only over **3yr bull bursts** (N40 132%), not full cycles.
+
+## Iteration 5 (2026-06-05) — leverage the DIVERSIFIED BOOK (the answer)
+Added `--lev` to `tools/analysis/blend_models.py` (margin on the combined blend + 6% borrow).
+The v2 book (MOM/TQQQ/BRK 45/15/40) has lower base DD (38%) than any single sleeve, so
+leverage on the BOOK gives a better CAGR/DD frontier than leveraging one model.
+
+| Lev | 10yr CAGR | 10yr DD | Calmar | 3yr CAGR | 3yr DD |
+|---|---:|---:|---:|---:|---:|
+| 1.0× | 53.4% | 37.7% | 1.42 | 108.7% | 24.9% |
+| 1.5× | 77.8% | 55.9% | 1.39 | — | — |
+| **2.0×** | **101.1%** | 69.8% | 1.45 | 266.7% | 45.1% |
+| 2.5× | 121.9% | 80.0% | 1.52 | — | — |
+
+### THE 100%-CAGR ANSWER (with the honest caveat)
+**2× leveraged v2 book = 101% CAGR / 70% DD over a full 10yr** — reproduce with:
+`python tools/analysis/blend_models.py MOM=… TQQQ=… BRK=… --weights 0.45,0.15,0.40 --lev 2.0`
+
+This is the BEST 100%-CAGR-10yr config found (beats leveraged single-N40 87%/78%) because
+the diversified book's 38% base DD leaves more room before leverage. **BUT 70% MaxDD on a 2×
+margin account is margin-call / liquidation territory** (maintenance margin is breached well
+before a 70% equity drop), and the backtest ignores forced liquidation + carries
+survivorship/daily-rebalance optimism. So it clears 100% CAGR on paper but is NOT a safely
+tradeable strategy. The honest survivable book stays the unleveraged 45/15/40 (53%/38%).
+
+**Bottom line:** 100% CAGR over 5–10yr exists only WITH ~2× leverage at ~70% DD. Without
+leverage the robust ceiling is ~53% (10yr) / ~109% (3yr bull). Search complete.
