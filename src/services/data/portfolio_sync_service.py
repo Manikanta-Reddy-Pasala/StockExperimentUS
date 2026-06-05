@@ -100,8 +100,8 @@ class PortfolioSyncService:
 
             # Fetch positions and holdings concurrently
             with ThreadPoolExecutor(max_workers=2) as executor:
-                future_positions = executor.submit(self.broker_service.get_fyers_positions, user_id)
-                future_holdings = executor.submit(self.broker_service.get_fyers_holdings, user_id)
+                future_positions = executor.submit(self.broker_service.get_broker_positions, user_id)
+                future_holdings = executor.submit(self.broker_service.get_broker_holdings, user_id)
                 positions_result = future_positions.result()
                 holdings_result = future_holdings.result()
 

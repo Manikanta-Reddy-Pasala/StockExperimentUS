@@ -15,7 +15,7 @@ class PortfolioService:
         """Get portfolio holdings using FYERS API."""
         # Debug print removed for clean console
         try:
-            holdings_data = self.broker_service.get_fyers_holdings(user_id)
+            holdings_data = self.broker_service.get_broker_holdings(user_id)
         # Debug print removed for clean console
 
             # Check if the response is successful (FYERS format: 's': 'ok')
@@ -58,7 +58,7 @@ class PortfolioService:
         # Debug print removed for clean console
         try:
         # Debug print removed for clean console
-            positions_data = self.broker_service.get_fyers_positions(user_id)
+            positions_data = self.broker_service.get_broker_positions(user_id)
         # Debug print removed for clean console
             logger.info(f"Portfolio positions response: {positions_data}")
 

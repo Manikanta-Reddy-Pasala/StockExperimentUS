@@ -80,7 +80,7 @@ class OrderSyncService:
             db_order_ids = {order['order_id'] for order in db_orders}
 
             # Fetch from Fyers API
-            fyers_result = self.broker_service.get_fyers_orderbook(user_id)
+            fyers_result = self.broker_service.get_broker_orderbook(user_id)
 
             # Check if Fyers API call was successful
             if fyers_result.get('code') != 200 or fyers_result.get('s') != 'ok':
