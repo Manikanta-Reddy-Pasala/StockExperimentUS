@@ -127,6 +127,8 @@ def main():
                     help="book size $; default = IBKR NetLiquidation")
     ap.add_argument("--asof", default=date.today().isoformat())
     ap.add_argument("--live", action="store_true", help="actually place orders (default dry-run)")
+    ap.add_argument("--signals-out", default=None,
+                    help="persist target+plan JSON here (dir or file). Default logs/us_signals/.")
     a = ap.parse_args()
     asof = date.fromisoformat(a.asof)
 
@@ -174,6 +176,21 @@ def main():
     for o in plan:
         print(f"  {o['side']:4} {o['qty']:>10.2f} {o['symbol']:6} @ ~${o['price']:.2f} "
               f"(cur {o['cur']:.2f} -> {o['target']:.2f})")
+
+    # persist signal artifact (India-parity: dated JSON the UI/downstream can read)
+    out = a.signals_out or str(ROOT / "logs" / "us_signals")
+    op = Path(out)
+    if op.suffix != ".json":
+        op.mkdir(parents=True, exist_ok=True)
+        op = op / f"{asof.isoformat()}_{a.model}.json"
+    else:
+        op.parent.mkdir(parents=True, exist_ok=True)
+    op.write_text(json.dumps({
+        "asof": asof.isoformat(), "model": a.model, "why": why, "nav": nav,
+        "target_weights": {k: round(v, 4) for k, v in target_w.items()},
+        "orders": plan, "live": bool(a.live),
+    }, indent=2))
+    print(f"[signal] wrote {op}")
 
     if not a.live:
         print("[dry-run] no orders placed. Re-run with --live to execute (IBKR paper 7497).")
