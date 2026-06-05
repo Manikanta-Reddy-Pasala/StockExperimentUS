@@ -79,6 +79,21 @@ margin (`--lev`) and vol-targeting (`--vol-target`). Full analysis: `HIGH_CAGR_S
 backtest ignores forced liquidation + survivorship). A *survivable* 100%/full-cycle does not
 exist for US large-cap; 100% only happens in 3yr bull bursts. Leverage at your own risk.
 
+### DD-reduced book — add the diversifier sleeve (lower DD AND higher CAGR)
+The regime gate + vol-target only move along the frontier. The structural DD lever is a
+near-zero-correlation sleeve: `tools/models/diversifier_sleeve/` (managed futures DBMF/KMLM/CTA
++ commodities + dollar + gold + bonds, top-4 momentum, no regime). Corr to book = 0.09/0.10/0.13.
+
+| Book (2020-2026) | CAGR | MaxDD | Calmar |
+|---|---:|---:|---:|
+| 3-model 45/15/40 | 58.9% | 36.3% | 1.62 |
+| **MOM 0.60 / TQQQ 0.05 / DIV 0.35** | **61.0%** | **28.2%** | **2.17** |
+| min-DD MOM 0.15 / BRK 0.15 / DIV 0.70 | 23.5% | 14.8% | 1.59 |
+
+Dropping the MOM-correlated BRK for the uncorrelated DIV cuts DD 36→28% while CAGR rises
+59→61% — a real free lunch. Caveat: DBMF/KMLM/CTA exist only from 2020 (~6yr window, no
+2008/2018 test). Full analysis: `DD_REDUCTION.md`.
+
 ## Per-model results (locked configs, true daily DD)
 
 | Model | 3yr CAGR/DD/Calmar | 4yr CAGR/DD/Calmar | 10yr CAGR/DD/Calmar |

@@ -47,6 +47,31 @@ models (VCP, mean-reversion, SOXL, factor rotation), the point-in-time reality c
 the 16-year TQQQ cycle test, and the diversifier research are in
 `exports/backtests/US_3MODEL_RESULTS.md`.
 
+## DD-reduced book (diversifier sleeve) — lower DD AND higher CAGR
+
+The regime gate + vol-targeting only move along the frontier (less DD = less CAGR). The
+one STRUCTURAL drawdown lever is a near-zero-correlation sleeve: `tools/models/diversifier_sleeve/`
+(managed futures DBMF/KMLM/CTA + commodities + dollar + gold + bonds, top-4 momentum, no
+regime). Correlation to the book = **0.09 / 0.10 / 0.13**.
+
+| Book (2020-2026) | CAGR | MaxDD | Calmar |
+|---|---:|---:|---:|
+| 3-model 45/15/40 (MOM/TQQQ/BRK) | 58.9% | 36.3% | 1.62 |
+| **MOM 0.60 / TQQQ 0.05 / DIV 0.35** (DD-reduced) | **61.0%** | **28.2%** | **2.17** |
+| min-DD (MOM 0.15 / BRK 0.15 / DIV 0.70) | 23.5% | 14.8% | 1.59 |
+
+Adding DIV (and dropping the MOM-correlated BRK) cuts DD **36 → 28%** while CAGR *rises*
+59 → 61% — a real free lunch, not a risk-dial trade. Caveat: DBMF/KMLM/CTA only exist from
+2020, so this is a ~6yr window (no 2008/2018 long-cycle test). Full analysis:
+`exports/backtests/us/DD_REDUCTION.md`. Leverage variants (100%-CAGR question):
+`exports/backtests/us/HIGH_CAGR_SEARCH.md`.
+
+## Live trading (IBKR)
+
+Broker = Interactive Brokers (no Fyers — that's India). `tools/live/us_executor.py --model book`
+computes today's target → diffs vs IBKR positions → places orders (`--live`, paper 7497;
+dry-run default). End-to-end stack + commands: `US_LIVE_RUNBOOK.md`.
+
 ## Results (4yr, $1M, 2022-05-24 → 2026-05-24)
 
 | Model | CAGR | MaxDD | Calmar |
