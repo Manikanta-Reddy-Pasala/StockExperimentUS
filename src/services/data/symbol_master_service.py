@@ -1,7 +1,7 @@
 """SymbolMasterService — US symbol master (replaces the India NSE/BSE Fyers master).
 
-The US universe is defined by static CSVs (src/data/symbols/*.csv) loaded from the
-yfinance/IBKR data pipeline, so there is no live exchange symbol-master to fetch.
+The US universe is defined by static CSVs (src/data/symbols/*.csv) fed by the
+eToro data pipeline, so there is no live exchange symbol-master to fetch.
 These methods are no-ops kept for interface parity with the schedulers/services
 that used to call the old Fyers symbol service.
 """

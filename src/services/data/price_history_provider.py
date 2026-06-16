@@ -1,17 +1,19 @@
-"""Shared daily-bar history core — ONE fetch path for backtests AND the IBKR broker.
+"""Shared daily-bar history core — ONE fetch path for backtests AND live code.
 
-KISS: a single function `fetch_daily_bars()` that tries IBKR first (TWS/Gateway)
-and falls back to yfinance. Both the DB loader (tools/pull_yfinance_history.py)
-and the live IBKR broker (services/brokers/ibkr) call this, so backtest data and
-live history come from identical core logic.
+KISS: a single function `fetch_daily_bars()` backed solely by the eToro public
+market-data API (https://api-portal.etoro.com). There is no yfinance or IBKR
+fallback — eToro is the only data source. The DB loader
+(tools/pull_etoro_history.py), the data pipeline and the live executor all
+call this, so backtest data and live history come from identical core logic.
 
-Returns a yfinance-shaped DataFrame indexed by Timestamp with columns:
+Returns a DataFrame indexed by Timestamp with columns:
     Open, High, Low, Close, Adj Close, Volume
-so it is a drop-in for code that already consumes `yf.download` output.
+(the same column layout the rest of the pipeline already consumes).
 """
 from __future__ import annotations
 
 import os
+import uuid
 import logging
 from datetime import date, datetime
 from typing import Optional
@@ -20,13 +22,21 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# IBKR TWS/Gateway connection (paper port 7497 by default; live = 7496).
-IBKR_HOST = os.environ.get("IBKR_HOST", "127.0.0.1")
-IBKR_PORT = int(os.environ.get("IBKR_PORT", "7497"))
-IBKR_CLIENT_ID = int(os.environ.get("IBKR_CLIENT_ID", "11"))
-IBKR_TIMEOUT = float(os.environ.get("IBKR_TIMEOUT", "8"))
+# eToro public market-data API (https://api-portal.etoro.com).
+# Auth = three headers: x-request-id (per-request UUID), x-api-key, x-user-key.
+# Keys are minted under eToro Settings > Trading > API Key Management.
+ETORO_BASE_URL = os.environ.get("ETORO_BASE_URL", "https://public-api.etoro.com/api/v1").rstrip("/")
+ETORO_API_KEY = os.environ.get("ETORO_API_KEY", "")
+ETORO_USER_KEY = os.environ.get("ETORO_USER_KEY", "")
+ETORO_TIMEOUT = float(os.environ.get("ETORO_TIMEOUT", "10"))
+# eToro daily candles are count-based (max 1000 ≈ 4y of trading days), latest-first.
+ETORO_MAX_CANDLES = 1000
+_ETORO_INTERVAL_DAILY = "OneDay"
 
 COLUMNS = ["Open", "High", "Low", "Close", "Adj Close", "Volume"]
+
+# Module-level symbol -> eToro instrumentId cache (avoids a lookup per history call).
+_ETORO_ID_CACHE: dict[str, Optional[int]] = {}
 
 
 def _as_date(d) -> date:
@@ -38,130 +48,126 @@ def _as_date(d) -> date:
 
 
 # --------------------------------------------------------------------------- #
-# IBKR source
+# eToro source (sole data source)
 # --------------------------------------------------------------------------- #
-def _ibkr_daily_bars(symbol: str, start: date, end: date) -> Optional[pd.DataFrame]:
-    """Pull daily bars from IBKR. Returns None on any connection/data failure
-    so the caller transparently falls back to yfinance."""
-    try:
-        from ib_async import IB, Stock, util
-    except ImportError:
-        logger.debug("ib_async not installed; skipping IBKR source")
-        return None
+def _etoro_headers() -> dict:
+    return {
+        "x-request-id": str(uuid.uuid4()),
+        "x-api-key": ETORO_API_KEY,
+        "x-user-key": ETORO_USER_KEY,
+        "Accept": "application/json",
+    }
 
-    ib = IB()
-    try:
-        ib.connect(IBKR_HOST, IBKR_PORT, clientId=IBKR_CLIENT_ID, timeout=IBKR_TIMEOUT)
-    except Exception as e:  # noqa: BLE001  (TWS down, port closed, etc.)
-        logger.info("IBKR connect failed (%s:%s): %s -> fallback", IBKR_HOST, IBKR_PORT, e)
-        return None
 
+def _etoro_instrument_id(symbol: str, session) -> Optional[int]:
+    """Resolve a ticker (e.g. AAPL) to eToro's integer instrumentId. Cached."""
+    key = symbol.upper()
+    if key in _ETORO_ID_CACHE:
+        return _ETORO_ID_CACHE[key]
     try:
-        days = (end - start).days + 1
-        # IBKR caps a single daily request well above any realistic window.
-        duration = f"{max(days, 1)} D"
-        contract = Stock(symbol, "SMART", "USD")
-        ib.qualifyContracts(contract)
-        bars = ib.reqHistoricalData(
-            contract,
-            endDateTime=datetime(end.year, end.month, end.day),
-            durationStr=duration,
-            barSizeSetting="1 day",
-            whatToShow="ADJUSTED_LAST",   # split+div adjusted, matches yfinance Adj Close
-            useRTH=True,
-            formatDate=1,
+        resp = session.get(
+            f"{ETORO_BASE_URL}/instruments/{key}",
+            headers=_etoro_headers(), timeout=ETORO_TIMEOUT,
         )
-        if not bars:
+        if resp.status_code != 200:
+            logger.info("eToro instrument lookup %s -> HTTP %s", key, resp.status_code)
+            _ETORO_ID_CACHE[key] = None
             return None
-        df = util.df(bars)
-        if df is None or df.empty:
+        iid = resp.json().get("instrumentId")
+        iid = int(iid) if iid is not None else None
+        _ETORO_ID_CACHE[key] = iid
+        return iid
+    except Exception as e:  # noqa: BLE001
+        logger.warning("eToro instrument lookup error for %s: %s", key, e)
+        return None
+
+
+def _etoro_daily_bars(symbol: str, start: date, end: date) -> Optional[pd.DataFrame]:
+    """Pull daily bars from eToro's public market-data API. Returns None on any
+    config/connection/data failure (eToro is the only source, so None means the
+    bars are simply unavailable).
+
+    The candles endpoint is count-based (latest-first), not date-ranged, so we
+    request enough recent daily candles to cover the window then filter to it.
+    Windows older than ~1000 trading days back will filter empty.
+    """
+    if not (ETORO_API_KEY and ETORO_USER_KEY):
+        logger.error("eToro keys not configured (ETORO_API_KEY/ETORO_USER_KEY); no data source")
+        return None
+    try:
+        import requests
+    except ImportError:
+        logger.error("requests not installed; eToro source unavailable")
+        return None
+
+    session = requests.Session()
+    try:
+        iid = _etoro_instrument_id(symbol, session)
+        if iid is None:
             return None
-        df["date"] = pd.to_datetime(df["date"])
-        df = df.set_index("date")
+        days = (date.today() - start).days + 2          # cover window incl. today
+        count = max(1, min(days, ETORO_MAX_CANDLES))
+        if days > ETORO_MAX_CANDLES:
+            logger.info("eToro %s: window needs %d daily candles > cap %d; "
+                        "older bars unavailable", symbol, days, ETORO_MAX_CANDLES)
+        url = (f"{ETORO_BASE_URL}/market-data/instruments/{iid}"
+               f"/history/candles/desc/{_ETORO_INTERVAL_DAILY}/{count}")
+        resp = session.get(url, headers=_etoro_headers(), timeout=ETORO_TIMEOUT)
+        if resp.status_code != 200:
+            logger.info("eToro candles %s (id=%s) -> HTTP %s", symbol, iid, resp.status_code)
+            return None
+        payload = resp.json()
+        # Response nests candles: {"candles": [{"candles": [ {fromDate,open,...}, ... ]}]}
+        rows = []
+        for group in payload.get("candles", []) or []:
+            inner = group.get("candles") if isinstance(group, dict) else None
+            for c in (inner if inner is not None else [group]):
+                if not isinstance(c, dict) or "close" not in c:
+                    continue
+                rows.append(c)
+        if not rows:
+            return None
+        df = pd.DataFrame(rows)
+        df["date"] = pd.to_datetime(df["fromDate"]).dt.tz_localize(None).dt.normalize()
+        df = df.set_index("date").sort_index()
         out = pd.DataFrame(index=df.index)
-        out["Open"] = df["open"]
-        out["High"] = df["high"]
-        out["Low"] = df["low"]
-        out["Close"] = df["close"]
-        out["Adj Close"] = df["close"]   # ADJUSTED_LAST already adjusted
-        out["Volume"] = df["volume"].fillna(0).astype("int64")
+        out["Open"] = df["open"].astype(float)
+        out["High"] = df["high"].astype(float)
+        out["Low"] = df["low"].astype(float)
+        out["Close"] = df["close"].astype(float)
+        out["Adj Close"] = df["close"].astype(float)   # eToro candles unadjusted; Close==AdjClose
+        out["Volume"] = pd.to_numeric(df.get("volume", 0), errors="coerce").fillna(0).astype("int64")
+        out = out[~out.index.duplicated(keep="last")]
         out = out[(out.index.date >= start) & (out.index.date <= end)]
         return out if not out.empty else None
     except Exception as e:  # noqa: BLE001
-        logger.warning("IBKR history error for %s: %s -> fallback", symbol, e)
+        logger.warning("eToro history error for %s: %s", symbol, e)
         return None
     finally:
         try:
-            ib.disconnect()
+            session.close()
         except Exception:  # noqa: BLE001
             pass
 
 
 # --------------------------------------------------------------------------- #
-# yfinance source (fallback)
-# --------------------------------------------------------------------------- #
-def _yfinance_daily_bars(symbol: str, start: date, end: date) -> Optional[pd.DataFrame]:
-    try:
-        import yfinance as yf
-    except ImportError:
-        logger.error("yfinance not installed; no data source available")
-        return None
-    try:
-        df = yf.download(
-            symbol, start=start.isoformat(), end=end.isoformat(),
-            auto_adjust=False, progress=False, threads=False,
-        )
-        if df is None or df.empty:
-            return None
-        # yfinance may return a single-level or MultiIndex column frame.
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        keep = [c for c in COLUMNS if c in df.columns]
-        df = df[keep].dropna(subset=["Open", "High", "Low", "Close"])
-        if "Adj Close" not in df.columns:
-            df["Adj Close"] = df["Close"]
-        if "Volume" not in df.columns:
-            df["Volume"] = 0
-        return df[COLUMNS] if not df.empty else None
-    except Exception as e:  # noqa: BLE001
-        logger.warning("yfinance history error for %s: %s", symbol, e)
-        return None
-
-
-# --------------------------------------------------------------------------- #
 # Public core
 # --------------------------------------------------------------------------- #
-def fetch_daily_bars(
-    symbol: str,
-    start,
-    end,
-    prefer: str = "ibkr",
-) -> Optional[pd.DataFrame]:
-    """Fetch daily OHLCV+AdjClose for one symbol.
+def fetch_daily_bars(symbol: str, start, end) -> Optional[pd.DataFrame]:
+    """Fetch daily OHLCV+AdjClose for one symbol from eToro.
 
-    prefer="ibkr" (default): try IBKR, fall back to yfinance.
-    prefer="yfinance": yfinance only (skip IBKR entirely).
-
-    Returns a yfinance-shaped DataFrame or None if every source failed.
+    Returns a DataFrame with COLUMNS, or None if eToro returned no data.
     """
     start, end = _as_date(start), _as_date(end)
-
-    if prefer == "ibkr":
-        df = _ibkr_daily_bars(symbol, start, end)
-        if df is not None and not df.empty:
-            logger.debug("history %s from IBKR (%d rows)", symbol, len(df))
-            return df
-    df = _yfinance_daily_bars(symbol, start, end)
+    df = _etoro_daily_bars(symbol, start, end)
     if df is not None and not df.empty:
-        logger.debug("history %s from yfinance (%d rows)", symbol, len(df))
+        logger.debug("history %s from eToro (%d rows)", symbol, len(df))
     return df
 
 
-def source_for(symbol: str, start, end, prefer: str = "ibkr") -> str:
-    """Diagnostic helper: report which source actually returned data."""
+def source_for(symbol: str, start, end) -> str:
+    """Diagnostic helper: report whether eToro returned data."""
     start, end = _as_date(start), _as_date(end)
-    if prefer == "ibkr" and _ibkr_daily_bars(symbol, start, end) is not None:
-        return "ibkr"
-    if _yfinance_daily_bars(symbol, start, end) is not None:
-        return "yfinance"
+    if _etoro_daily_bars(symbol, start, end) is not None:
+        return "etoro"
     return "none"

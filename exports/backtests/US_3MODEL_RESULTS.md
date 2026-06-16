@@ -166,7 +166,7 @@ docker compose up -d database
 export DATABASE_URL="postgresql+psycopg2://trader:trader_password@localhost:5432/trading_system"
 
 # 1. data (stocks already loaded; pull the ETFs for the index sleeve + regime)
-PYTHONPATH=. python3 tools/pull_yfinance_history.py \
+PYTHONPATH=. python3 tools/pull_etoro_history.py \
   --universe src/data/symbols/leveraged_etfs.csv --start 2009-01-01 --end 2026-05-24
 
 # 2. individual sweeps (3yr shown; use --from 2022-05-24 for 4yr, 2010-02-11 for TQQQ full)

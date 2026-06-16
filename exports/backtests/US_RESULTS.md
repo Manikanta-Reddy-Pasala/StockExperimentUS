@@ -79,7 +79,7 @@ To remove the 2022-bear confound, the same US models re-run on India's window:
 ```bash
 docker compose up -d database
 PYTHONPATH=. DATABASE_URL="postgresql+psycopg2://trader:trader_password@localhost:5432/trading_system" \
-  python3 tools/pull_yfinance_history.py --universe src/data/symbols/nasdaq500.csv --start 2022-05-24 --end 2026-05-24
+  python3 tools/pull_etoro_history.py --universe src/data/symbols/nasdaq500.csv --start 2022-05-24 --end 2026-05-24
 for m in momentum_n100_top5_max1 momentum_pseudo_n100_adv n20_daily_large_only midcap_narrow_60d_breakout; do
   PYTHONPATH=. DATABASE_URL="postgresql+psycopg2://trader:trader_password@localhost:5432/trading_system" \
     python3 tools/models/$m/backtest.py

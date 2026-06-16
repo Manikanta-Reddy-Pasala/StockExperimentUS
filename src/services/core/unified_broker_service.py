@@ -2,7 +2,7 @@
 Unified Multi-Broker Service
 
 Unified interface for all broker features via Strategy pattern.
-Broker-only: Fyers is the sole data source. No yfinance fallback.
+Data comes from eToro (the sole data source); IBKR handles order execution.
 """
 
 import logging

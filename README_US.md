@@ -9,8 +9,8 @@ from **yfinance** (no Fyers — that's India-only) and the universe is US Nasdaq
 |---|---|
 | Universe builders | `tools/refresh_nasdaq100.py`, `tools/refresh_nasdaq500.py` |
 | Universe lists | `src/data/symbols/nasdaq100.csv` (101), `nasdaq500.csv` (500 by mkt cap) |
-| Data loader (yfinance → Postgres) | `tools/pull_yfinance_history.py` |
-| Backtested OHLCV data | `data/historical_yfinance_ohlcv.csv.gz` (500 syms, 461,731 rows, 2022-05-24→2026-05-22) |
+| Data loader (yfinance → Postgres) | `tools/pull_etoro_history.py` |
+| Backtested OHLCV data | `data/historical_etoro_ohlcv.csv.gz` (500 syms, 461,731 rows, 2022-05-24→2026-05-22) |
 | 4 ported models | `tools/models/{momentum_n100_top5_max1,momentum_pseudo_n100_adv,n20_daily_large_only,midcap_narrow_60d_breakout}/backtest.py` |
 | **3-model diversified book** | `tools/models/{momentum_n100_regime_top3,leveraged_regime_tqqq,breakout_n100}/backtest.py` |
 | Blend tool | `tools/analysis/blend_models.py` |
@@ -89,12 +89,12 @@ midcap lookahead, India-vs-US comparison).
 ```bash
 docker compose up -d database
 # option A: reload the committed data
-gzcat data/historical_yfinance_ohlcv.csv.gz | docker compose exec -T database \
+gzcat data/historical_etoro_ohlcv.csv.gz | docker compose exec -T database \
   psql -U trader -d trading_system -c "\copy historical_data(symbol,date,open,high,low,close,volume,adj_close) FROM STDIN WITH CSV HEADER"
 # (then UPDATE historical_data SET data_source='yfinance', timestamp=extract(epoch from date)::bigint, api_resolution='1D';)
 # option B: re-pull fresh
 PYTHONPATH=. DATABASE_URL="postgresql+psycopg2://trader:trader_password@localhost:5432/trading_system" \
-  python3 tools/pull_yfinance_history.py --universe src/data/symbols/nasdaq500.csv --start 2022-05-24 --end 2026-05-24
+  python3 tools/pull_etoro_history.py --universe src/data/symbols/nasdaq500.csv --start 2022-05-24 --end 2026-05-24
 
 for m in momentum_n100_top5_max1 momentum_pseudo_n100_adv n20_daily_large_only midcap_narrow_60d_breakout; do
   PYTHONPATH=. DATABASE_URL="postgresql+psycopg2://trader:trader_password@localhost:5432/trading_system" \

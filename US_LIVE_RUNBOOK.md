@@ -12,9 +12,9 @@ StockExperiment live loop (data → backtest → signal → execute), but on IBK
 
 ## 1. Pull data (IBKR primary, yfinance fallback — shared core)
 ```bash
-PYTHONPATH=. python tools/pull_yfinance_history.py \
+PYTHONPATH=. python tools/pull_etoro_history.py \
   --universe src/data/symbols/nasdaq100.csv --start 2016-05-24 --end $(date +%F) --source ibkr
-PYTHONPATH=. python tools/pull_yfinance_history.py \
+PYTHONPATH=. python tools/pull_etoro_history.py \
   --universe src/data/symbols/leveraged_etfs.csv --start 2016-05-24 --end $(date +%F) --source ibkr
 ```
 Rows tagged `data_source='yfinance'` (what the backtests + executor read).

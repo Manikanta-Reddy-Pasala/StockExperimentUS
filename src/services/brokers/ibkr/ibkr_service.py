@@ -1,12 +1,11 @@
-"""IBKR broker service — Interactive Brokers (US) trade + history.
+"""IBKR broker service — Interactive Brokers (US) order execution.
 
-KISS scope: history + orders module.
-  * History  -> delegates to the SAME shared core the backtest loader uses
-                (services/data/price_history_provider.fetch_daily_bars), so
-                live history and backtest data share one code path.
+KISS scope: orders + account module.
   * Orders   -> market/limit place / modify / cancel via ib_async.
   * Account  -> positions, holdings, funds via ib_async.
-  * Fallback -> yfinance for history/quotes when TWS/Gateway is unreachable.
+  * History/quotes -> delegate to the shared core (eToro) via
+                price_history_provider.fetch_daily_bars, so live and backtest
+                data share one code path. IBKR is NOT a data source.
 
 Connects to TWS or IB Gateway. Default = paper trading port 7497
 (live = 7496). Override via IBKR_HOST / IBKR_PORT / IBKR_CLIENT_ID env vars.
@@ -22,20 +21,21 @@ from datetime import datetime, date, timedelta
 from typing import Any, Dict, List, Optional
 
 from src.services.brokers.base_broker_service import BaseBrokerService
-from src.services.data.price_history_provider import (
-    fetch_daily_bars,
-    IBKR_HOST,
-    IBKR_PORT,
-    IBKR_CLIENT_ID,
-    IBKR_TIMEOUT,
-)
+from src.services.data.price_history_provider import fetch_daily_bars
 
 logger = logging.getLogger(__name__)
 
+# IBKR TWS/Gateway connection (paper port 7497 by default; live = 7496).
+IBKR_HOST = os.environ.get("IBKR_HOST", "127.0.0.1")
+IBKR_PORT = int(os.environ.get("IBKR_PORT", "7497"))
+IBKR_CLIENT_ID = int(os.environ.get("IBKR_CLIENT_ID", "11"))
+IBKR_TIMEOUT = float(os.environ.get("IBKR_TIMEOUT", "8"))
+
 
 class IBKRBrokerService(BaseBrokerService):
-    """Interactive Brokers service (paper by default). Graceful when TWS is down:
-    history/quotes fall back to yfinance; trading calls return a clear error."""
+    """Interactive Brokers order-execution service (paper by default). History and
+    quotes come from the shared eToro core; trading calls return a clear error
+    when TWS/Gateway is unreachable."""
 
     def __init__(self, host: str = None, port: int = None, client_id: int = None):
         super().__init__(client_id=str(client_id) if client_id else str(IBKR_CLIENT_ID))
@@ -97,7 +97,7 @@ class IBKRBrokerService(BaseBrokerService):
         ib = self._connect()
         if ib is None:
             return self._err(f"Cannot reach TWS/Gateway at {self.host}:{self.port} "
-                             f"(paper=7497, live=7496). History falls back to yfinance.")
+                             f"(paper=7497, live=7496). Orders unavailable until TWS is up.")
         try:
             accounts = ib.managedAccounts()
             return self._ok({"connected": True, "accounts": accounts,
@@ -237,44 +237,28 @@ class IBKRBrokerService(BaseBrokerService):
             return self._err(f"cancel_order failed: {e}")
 
     # ------------------------------------------------------------------ #
-    # market data / history  (SHARED CORE + yfinance fallback)
+    # market data / history  (SHARED CORE = eToro)
     # ------------------------------------------------------------------ #
     def get_quotes(self, symbols: str) -> Dict[str, Any]:
-        """Last price per symbol. Comma-separated. IBKR snapshot, yfinance fallback."""
+        """Last price per symbol (comma-separated) from eToro via the shared core."""
         syms = [s.strip().upper() for s in symbols.split(",") if s.strip()]
         out: Dict[str, Any] = {}
-        ib = self._connect()
-        if ib is not None:
-            try:
-                for s in syms:
-                    c = self._stock(s)
-                    ib.qualifyContracts(c)
-                    t = ib.reqMktData(c, "", True, False)
-                    ib.sleep(0.4)
-                    px = t.marketPrice() if t else None
-                    if px and px == px:  # not NaN
-                        out[s] = {"last_price": float(px), "source": "ibkr"}
-            except Exception as e:  # noqa: BLE001
-                logger.info("IBKR quotes error: %s -> yfinance", e)
-        # yfinance fallback for anything missing
-        missing = [s for s in syms if s not in out]
-        for s in missing:
-            df = fetch_daily_bars(s, date.today() - timedelta(days=7), date.today(),
-                                  prefer="yfinance")
+        for s in syms:
+            df = fetch_daily_bars(s, date.today() - timedelta(days=7), date.today())
             if df is not None and not df.empty:
-                out[s] = {"last_price": float(df["Close"].iloc[-1]), "source": "yfinance"}
+                out[s] = {"last_price": float(df["Close"].iloc[-1]), "source": "etoro"}
         return self._ok(out)
 
     def get_history(self, symbol: str, resolution: str = "D",
                     range_from: str = None, range_to: str = None) -> Dict[str, Any]:
-        """Daily history via the shared core (IBKR -> yfinance fallback).
+        """Daily history via the shared core (eToro).
 
         resolution is accepted for interface parity; only daily ('D'/'1D') is
         supported by the shared core today.
         """
         end = _parse_date(range_to) or date.today()
         start = _parse_date(range_from) or (end - timedelta(days=365 * 4))
-        df = fetch_daily_bars(symbol, start, end, prefer="ibkr")
+        df = fetch_daily_bars(symbol, start, end)
         if df is None or df.empty:
             return self._err(f"no history for {symbol}")
         candles = [

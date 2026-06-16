@@ -15,7 +15,7 @@ fetch_daily_bars()  ── IBKR (TWS/Gateway) ──┐
                     └─ yfinance (fallback) ──┴─► yfinance-shaped DataFrame
         ▲                                   ▲
         │                                   │
-tools/pull_yfinance_history.py     IBKRBrokerService.get_history()
+tools/pull_etoro_history.py     IBKRBrokerService.get_history()
    (--source ibkr|auto)                (live broker)
 ```
 
@@ -48,7 +48,7 @@ b.get_positions(); b.get_funds()
 Load backtest data through the shared core (IBKR primary, yfinance fallback):
 
 ```bash
-PYTHONPATH=. python tools/pull_yfinance_history.py \
+PYTHONPATH=. python tools/pull_etoro_history.py \
     --universe src/data/symbols/nasdaq100.csv \
     --start 2016-05-24 --end 2026-05-24 --source ibkr
 ```

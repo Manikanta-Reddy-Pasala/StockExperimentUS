@@ -132,7 +132,7 @@ Dropping the MOM-correlated BRK for the uncorrelated DIV cuts DD 36→28% while 
 docker compose up -d database
 export DATABASE_URL="postgresql+psycopg2://trader:trader_password@localhost:5432/trading_system"
 # 10yr needs Nasdaq-100 history back to ~2014:
-PYTHONPATH=. python3 tools/pull_yfinance_history.py --universe src/data/symbols/nasdaq100.csv --start 2014-01-01 --end 2026-05-24
+PYTHONPATH=. python3 tools/pull_etoro_history.py --universe src/data/symbols/nasdaq100.csv --start 2014-01-01 --end 2026-05-24
 F=2016-05-24; T=2026-05-24; D=exports/backtests/us/book_v2/10yr
 PYTHONPATH=. python3 tools/models/momentum_n100_regime_top3/backtest.py --top 3 --regime --mom-mode blend --from $F --to $T --out $D/mom
 PYTHONPATH=. python3 tools/models/leveraged_regime_tqqq/backtest.py --sma 200 --from $F --to $T --out $D/tqqq

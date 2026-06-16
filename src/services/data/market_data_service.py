@@ -1,12 +1,12 @@
-"""MarketDataService — US market data (IBKR primary, yfinance fallback).
+"""MarketDataService — US market data (eToro only).
 
 Replaces the old FyersService data role across the data pipeline. Drop-in for the
 methods the data services + routes call on the former broker data service:
 `history()`, `quotes()`, `quotes_multiple()`, plus thin compatibility stubs.
 
 Daily bars route through the shared `price_history_provider.fetch_daily_bars`
-(the SAME core the IBKR broker uses); intraday uses yfinance (IBKR intraday can be
-added later). user_id is accepted for signature parity but unused (single account).
+(eToro, the SAME core the executor uses). Intraday is not supported (eToro
+daily-only here). user_id is accepted for signature parity but unused.
 
 Return shapes match what consumers expect:
   history(...) -> {"status":"success","data":{"candles":[{timestamp,open,high,low,close,volume}, ...]}}
@@ -22,8 +22,6 @@ from .price_history_provider import fetch_daily_bars
 
 logger = logging.getLogger(__name__)
 
-_INTRADAY = {"1h": "60m", "60": "60m", "30m": "30m", "30": "30m",
-             "15m": "15m", "15": "15m", "5m": "5m", "5": "5m", "1m": "1m"}
 _DAILY = {"1d", "d", "day", "daily", "1day", "D"}
 
 
@@ -43,7 +41,7 @@ def _err(msg: str) -> Dict[str, Any]:
 
 class MarketDataService:
     def __init__(self):
-        self.source = "ibkr+yfinance"
+        self.source = "etoro"
 
     # ------------------------------------------------------------------ #
     # history
@@ -56,9 +54,9 @@ class MarketDataService:
         start = _to_date(start_date) or (end - timedelta(days=365 * 4))
         try:
             if interval in _DAILY or interval.lower() in _DAILY:
-                df = fetch_daily_bars(sym, start, end, prefer="ibkr")
+                df = fetch_daily_bars(sym, start, end)
             else:
-                df = self._intraday(sym, start, end, interval)
+                return _err(f"intraday interval '{interval}' not supported (eToro daily-only)")
             if df is None or df.empty:
                 return _err(f"no data for {symbol}")
             candles = [{
@@ -72,20 +70,6 @@ class MarketDataService:
         except Exception as e:  # noqa: BLE001
             logger.warning("history error %s: %s", symbol, e)
             return _err(str(e))
-
-    def _intraday(self, sym, start, end, interval):
-        import yfinance as yf
-        yi = _INTRADAY.get(interval, "60m")
-        df = yf.download(sym, start=start.isoformat(), end=end.isoformat(),
-                         interval=yi, auto_adjust=False, progress=False, threads=False)
-        if df is None or df.empty:
-            return None
-        import pandas as pd
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        if "Volume" not in df.columns:
-            df["Volume"] = 0
-        return df
 
     # alias used by some legacy callers
     def get_historical_data(self, user_id: int, symbol: str, exchange: str = "",
@@ -103,8 +87,7 @@ class MarketDataService:
         out: Dict[str, Any] = {}
         for raw in symbols:
             s = _plain(raw)
-            df = fetch_daily_bars(s, date.today() - timedelta(days=7), date.today(),
-                                  prefer="ibkr")
+            df = fetch_daily_bars(s, date.today() - timedelta(days=7), date.today())
             if df is not None and not df.empty:
                 out[s] = {"last_price": float(df["Close"].iloc[-1]),
                           "prev_close": float(df["Close"].iloc[-2]) if len(df) > 1 else None}

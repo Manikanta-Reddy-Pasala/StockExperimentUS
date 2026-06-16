@@ -156,12 +156,12 @@ def main():
     else:
         print(f"[warn] IBKR positions unavailable ({pos.get('message')}); assuming flat")
 
-    # last prices for target symbols (via shared history core / IBKR->yfinance)
+    # last prices for target symbols (via shared history core = eToro)
     from src.services.data.price_history_provider import fetch_daily_bars
     plan = []
     target_sym = set(target_w) | set(held)
     for s in sorted(target_sym):
-        df = fetch_daily_bars(s, asof - timedelta(days=7), asof, prefer="ibkr")
+        df = fetch_daily_bars(s, asof - timedelta(days=7), asof)
         px = float(df["Close"].iloc[-1]) if df is not None and not df.empty else None
         tgt_val = target_w.get(s, 0.0) * nav
         tgt_sh = (tgt_val / px) if px else 0.0
