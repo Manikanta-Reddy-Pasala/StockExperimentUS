@@ -1,0 +1,17 @@
+{
+  "label": "breakout D100 trail20 N5",
+  "donchian": 100,
+  "trail": 20.0,
+  "maxn": 5,
+  "mom": 60,
+  "regime": false,
+  "start": "2022-06-17",
+  "end": "2026-06-17",
+  "years": 4.0,
+  "final_nav": 3394361.0,
+  "cagr_pct": 35.73,
+  "max_dd_pct_daily": 30.33,
+  "calmar": 1.18,
+  "trades": 62,
+  "win_rate_pct": 48.4
+}
