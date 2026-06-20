@@ -49,12 +49,13 @@
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
       <thead><tr>
-        <th>Timestamp</th><th>Side</th><th>Symbol</th>
-        <th class="text-end">Qty</th><th class="text-end">Price ₹</th>
-        <th class="text-end">Value ₹</th><th class="text-end">P&amp;L ₹</th>
+        <th>Timestamp</th><th>Side</th><th>Symbol</th><th>Cap</th>
+        <th class="text-end">Qty</th><th class="text-end">Price $</th>
+        <th class="text-end">Value $</th><th class="text-end">P&amp;L $</th>
+        <th class="text-end" title="Live fill vs backtest daily open. +ve = filled better; −ve = slippage loss.">Drift</th>
         <th>Reason</th>
       </tr></thead>
-      <tbody id="hist"><tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+      <tbody id="hist"><tr><td colspan="10" class="text-center text-muted py-3">Loading…</td></tr></tbody>
     </table>
   </div>
 </div>
@@ -62,8 +63,14 @@
 
 {% block scripts %}
 <script>
-const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
+const fmtINR = n => "$" + Number(n||0).toLocaleString('en-US', {maximumFractionDigits:2});
 const cls = n => n>0?"pos":(n<0?"neg":"neutral");
+// PIT cap badge (large/mid/other), color-coded. '—' if untagged.
+const _CAP_BG = {large:'#0d6efd', mid:'#6f42c1', small:'#fd7e14', other:'#6c757d'};
+const capBadge = c => c ? `<span class="badge" style="background:${_CAP_BG[c]||'#6c757d'}">${c}</span>` : '<span class="text-muted">—</span>';
+// Fill drift: +ve = filled better than backtest (green), −ve = slippage loss (red).
+const driftCell = v => (v===null||v===undefined) ? '<span class="text-muted">—</span>'
+  : `<span class="${v>0?'pos':(v<0?'neg':'neutral')}">${v>0?'+':''}${Number(v).toFixed(2)}%</span>`;
 
 async function loadModels() {
   // Populate selector with enabled models only (authoritative via portfolio).
@@ -97,7 +104,7 @@ async function load() {
   const model = document.getElementById('model_sel').value;
   if (!model) {
     document.getElementById('hist').innerHTML =
-      '<tr><td colspan="8" class="text-center text-muted py-3">No enabled model selected</td></tr>';
+      '<tr><td colspan="10" class="text-center text-muted py-3">No enabled model selected</td></tr>';
     return;
   }
   try {
@@ -121,17 +128,19 @@ async function load() {
 
     const body = document.getElementById('hist');
     if (trades.length === 0) {
-      body.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">No trades yet for this model</td></tr>';
+      body.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">No trades yet for this model</td></tr>';
     } else {
       body.innerHTML = trades.map(t => `
         <tr>
           <td class="small text-muted">${window.fmtIST ? window.fmtIST(t.trade_at) : (t.trade_at||'').replace('T',' ').slice(0,19)}</td>
           <td><span class="badge ${t.side==='BUY'?'bg-primary':'bg-warning text-dark'}">${t.side}</span></td>
           <td><strong>${t.symbol}</strong></td>
-          <td class="text-end">${(t.qty||0).toLocaleString('en-IN')}</td>
+          <td data-label="Cap">${(t.side==='BUY'||t.side==='SELL') ? capBadge(t.cap) : '<span class="text-muted">—</span>'}</td>
+          <td class="text-end">${(t.qty||0).toLocaleString('en-US')}</td>
           <td class="text-end">${fmtINR(t.price)}</td>
           <td class="text-end">${fmtINR(t.value)}</td>
           <td class="text-end ${cls(t.pnl)}">${t.pnl !== null && t.pnl !== undefined ? fmtINR(t.pnl) : '—'}</td>
+          <td class="text-end" data-label="Drift">${driftCell(t.drift_pct)}${t.drift_usd!=null?`<div class="small ${t.drift_usd>0?'pos':(t.drift_usd<0?'neg':'neutral')}">$${t.drift_usd>0?'+':''}${Number(t.drift_usd).toLocaleString('en-US',{maximumFractionDigits:2})}</div>`:''}</td>
           <td><span class="badge bg-secondary">${t.reason||''}</span></td>
         </tr>
       `).join('');

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Trading Journal US logo">
+  <defs>
+    <linearGradient id="lbar" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#3B7BF0"/>
+      <stop offset="1" stop-color="#4C8DFF"/>
+    </linearGradient>
+  </defs>
+  <g stroke-linecap="round">
+    <line x1="118" y1="318" x2="118" y2="392" stroke="#4C8DFF" stroke-width="14"/>
+    <rect x="92" y="332" width="52" height="84" rx="13" fill="url(#lbar)"/>
+    <line x1="234" y1="214" x2="234" y2="318" stroke="#4C8DFF" stroke-width="14"/>
+    <rect x="208" y="232" width="52" height="128" rx="13" fill="url(#lbar)"/>
+    <line x1="350" y1="96" x2="350" y2="214" stroke="#22C55E" stroke-width="14"/>
+    <rect x="324" y="120" width="52" height="168" rx="13" fill="url(#lbar)"/>
+    <path d="M404 168 l60 -66 l0 42 l40 0" fill="none" stroke="#22C55E" stroke-width="20" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

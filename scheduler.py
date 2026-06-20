@@ -283,7 +283,6 @@ def run_scheduler():
     logger.info("  - momentum_pseudo_n100_adv:   signal 09:25 + execute 09:30 (monthly rebal)")
     logger.info("  - midcap_narrow_60d_breakout: signal 09:25 + execute 09:32 + EOD signal 15:25")
     logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (daily rotation)")
-    logger.info("  - finnifty_ic_otm4_w300_lots5: signal 09:25 + 14:30 (Monday entry / daily stop)")
     logger.info("")
     logger.info("Maintenance:")
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
@@ -313,14 +312,12 @@ def run_scheduler():
     from tools.models.n20_daily_large_only.cron import (
         register_trading_jobs as register_n20_daily_jobs,
     )
-    from tools.models.finnifty_ic_otm4_w300_lots5.cron import (
-        register_trading_jobs as register_fn_ic_otm4_jobs,
-    )
+    # NOTE: finnifty_ic_otm4_w300_lots5 is an India FINNIFTY options model with no
+    # US equivalent — not present in this repo, so it is not registered here.
     register_momentum_n100_jobs(schedule)
     register_pseudo_n100_jobs(schedule)
     register_midcap_narrow_jobs(schedule)
     register_n20_daily_jobs(schedule)
-    register_fn_ic_otm4_jobs(schedule)
 
     # Position reconciler — mirrors Fyers truth into model_ledger every 5 min
     # during market hours (09:30–15:30 IST). Catches drift when record_buy /
@@ -349,6 +346,26 @@ def run_scheduler():
             logger.error(f"reconciler call failed: {e}")
 
     schedule.every(5).minutes.do(_reconcile_market_hours)
+
+    # Fill-drift monitor — fires 09:50 (container-local; NUC runs America/New_York),
+    # AFTER the 09:30/09:32 execute window settles. Compares every real fill to the
+    # backtest daily-open reference; writes logs/fill_drift.jsonl + TG-alerts only on
+    # breach. This is the live CAGR-adherence watch (logic/timing already in parity).
+    def _fill_drift():
+        try:
+            import subprocess
+            r = subprocess.run(
+                ["python3", "tools/live/fill_drift_monitor.py"],
+                capture_output=True, text=True, timeout=180,
+            )
+            if r.returncode != 0:
+                logger.error(f"fill_drift exit={r.returncode}: {r.stderr[-300:]}")
+            elif r.stdout:
+                logger.info(r.stdout[-300:])
+        except Exception as e:
+            logger.error(f"fill_drift call failed: {e}")
+
+    schedule.every().day.at("09:50").do(_fill_drift)
 
     # Schedule weekly cleanup on Sunday at 3:00 AM
     schedule.every().sunday.at("03:00").do(cleanup_old_snapshots)

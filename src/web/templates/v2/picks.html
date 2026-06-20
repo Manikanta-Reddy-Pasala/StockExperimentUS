@@ -4,14 +4,13 @@
 
 {% block content %}
 <style>
-  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
-  .row-held { background: #fffbea !important; font-weight: 600; }
+  .row-held { background: rgba(245,177,76,.10) !important; font-weight: 600; }
   .model-card-header { cursor: pointer; }
-  .model-card-header:hover { background: #f1f5fc; }
-  .badge-disabled { background: #6c757d; }
-  .badge-held { background: #198754; }
-  .badge-rank-1 { background: #ffd60a; color: #333; }
-  .small-mute { font-size: 0.78rem; color: #8b95a5; }
+  .model-card-header:hover { background: var(--surface-3); }
+  .badge-disabled { background: var(--text-mute); }
+  .badge-held { background: var(--gain); }
+  .badge-rank-1 { background: var(--accent); color: #1A1205; }
+  .small-mute { font-size: 0.78rem; color: var(--text-mute); }
 </style>
 
 <div id="picks_container">
@@ -23,10 +22,10 @@
 <script>
 // 4 equity models to show. `schedule` drives the next-rebalance display.
 const MODELS = [
-  {key: "momentum_n100_top5_max1",     title: "Momentum N100 Top-5 (mc=1)",        desc: "Monthly rotation + mid-month check • real Nifty 100 • 30d return",        schedule: "monthly_midcheck"},
+  {key: "momentum_n100_top5_max1",     title: "Momentum N100 Top-5 (mc=1)",        desc: "Monthly rotation + mid-month check • real Nasdaq 100 • 30d return",        schedule: "monthly_midcheck"},
   {key: "n20_daily_large_only",        title: "N20 Daily ADV ∩ N100",              desc: "Daily rotation • top-20 ADV ∩ N100 • uptrend",                            schedule: "daily"},
-  {key: "midcap_narrow_60d_breakout",  title: "Midcap 60d Breakout",               desc: "Event-driven • 60d-high + vol surge + 200d SMA",                          schedule: "event"},
-  {key: "momentum_pseudo_n100_adv",    title: "Pseudo-N100 ADV",                    desc: "Monthly rotation • top-100 ADV from N500 • yearly-PIT rebuild",            schedule: "monthly"},
+  {key: "midcap_narrow_60d_breakout",  title: "Mid 60d Breakout",                  desc: "Event-driven • 60d-high + vol surge + 200d SMA",                          schedule: "event"},
+  {key: "momentum_pseudo_n100_adv",    title: "Pseudo-N100 ADV",                    desc: "Monthly rotation • top-100 ADV from Nasdaq 500 • yearly-PIT rebuild",      schedule: "monthly"},
 ];
 
 // Format YYYY-MM-DD in local TZ (avoid toISOString → UTC date drift).
@@ -81,7 +80,7 @@ function nextRebalance(schedule) {
   return {label: 'event-driven', days: null, kind: 'event'};
 }
 
-const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
+const fmtINR = n => "$" + Number(n||0).toLocaleString('en-US', {maximumFractionDigits:2});
 const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
 const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 
@@ -249,7 +248,7 @@ function renderCard(m, idx, ranking, status) {
             <thead>
               <tr>
                 <th>Rank</th><th>Symbol</th><th>Name</th>
-                <th class="text-end">30d Return</th><th class="text-end">Price ₹</th>
+                <th class="text-end">30d Return</th><th class="text-end">Price $</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -344,13 +343,13 @@ async function runSignal(modelKey, ev) {
           } else if (heldSym) {
             diffHtml = '<div class="alert alert-warning py-2 small mb-0">' +
               '<strong>Diff detected:</strong><br>' +
-              'Held: <code>' + heldSym + '</code> x' + heldQty + ' @ ₹' + Number(heldPx).toFixed(2) + '<br>' +
-              'Fresh rank-1: <code>' + newSym + '</code> @ ₹' + Number(newPx).toFixed(2) +
+              'Held: <code>' + heldSym + '</code> x' + heldQty + ' @ $' + Number(heldPx).toFixed(2) + '<br>' +
+              'Fresh rank-1: <code>' + newSym + '</code> @ $' + Number(newPx).toFixed(2) +
               (newRet != null ? ' (' + (newRet>=0?'+':'') + Number(newRet).toFixed(2) + '%)' : '') + '<br>' +
               '<em>Schedule decides if/when to rotate. This preview is not stored.</em></div>';
           } else {
             diffHtml = '<div class="alert alert-info py-2 small mb-0">' +
-              'Currently flat. Fresh rank-1: <code>' + newSym + '</code> @ ₹' + Number(newPx).toFixed(2) +
+              'Currently flat. Fresh rank-1: <code>' + newSym + '</code> @ $' + Number(newPx).toFixed(2) +
               (newRet != null ? ' (' + (newRet>=0?'+':'') + Number(newRet).toFixed(2) + '%)' : '') + '<br>' +
               '<em>Schedule decides entry. This preview is not stored.</em></div>';
           }

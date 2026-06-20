@@ -47,7 +47,19 @@ MAX_HOLD_DAYS = 120
 
 
 def load_universe(uf: str) -> List[str]:
-    d = json.load(open(uf))
+    # Graceful: on a fresh deploy the universe snapshot may not exist yet
+    # (the data pipeline writes it). Return an empty universe instead of
+    # raising FileNotFoundError so the caller degrades to "no signals".
+    if not Path(uf).exists():
+        print(f"[live_signal] universe file not found, treating as empty: {uf}",
+              file=sys.stderr)
+        return []
+    try:
+        with open(uf) as f:
+            d = json.load(f)
+    except (OSError, ValueError) as e:
+        print(f"[live_signal] failed to read universe {uf}: {e}", file=sys.stderr)
+        return []
     return [
         f"NSE:{s['symbol']}-EQ" if not s["symbol"].startswith("NSE:") else s["symbol"]
         for s in d.get("stocks", [])

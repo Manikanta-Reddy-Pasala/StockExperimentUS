@@ -26,10 +26,12 @@ from src.services.data.price_history_provider import fetch_daily_bars
 logger = logging.getLogger(__name__)
 
 # IBKR TWS/Gateway connection (paper port 7497 by default; live = 7496).
-IBKR_HOST = os.environ.get("IBKR_HOST", "127.0.0.1")
-IBKR_PORT = int(os.environ.get("IBKR_PORT", "7497"))
-IBKR_CLIENT_ID = int(os.environ.get("IBKR_CLIENT_ID", "11"))
-IBKR_TIMEOUT = float(os.environ.get("IBKR_TIMEOUT", "8"))
+# `or "<default>"` guards against the env var being PRESENT but EMPTY (e.g. a
+# compose file that sets IBKR_PORT= with no value) — int("") would crash import.
+IBKR_HOST = os.environ.get("IBKR_HOST") or "127.0.0.1"
+IBKR_PORT = int(os.environ.get("IBKR_PORT") or "7497")
+IBKR_CLIENT_ID = int(os.environ.get("IBKR_CLIENT_ID") or "11")
+IBKR_TIMEOUT = float(os.environ.get("IBKR_TIMEOUT") or "8")
 
 
 class IBKRBrokerService(BaseBrokerService):

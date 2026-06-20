@@ -1,24 +1,24 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="StockExperiment">
-  <title>StockExperiment</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Trading Journal US">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#15a36b"/>
-      <stop offset="100%" stop-color="#0e7a4f"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16181C"/>
+      <stop offset="1" stop-color="#0B0C0E"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#3B7BF0"/>
+      <stop offset="1" stop-color="#4C8DFF"/>
     </linearGradient>
   </defs>
-  <!-- Maskable safe-zone: keep content inside center 80 % = inset of 51 px on all sides -->
-  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <!-- Upward step chart (5 candles, ascending) -->
-  <g fill="#ffffff" opacity="0.95">
-    <rect x="118" y="320" width="44" height="80"  rx="6"/>
-    <rect x="182" y="270" width="44" height="130" rx="6"/>
-    <rect x="246" y="220" width="44" height="180" rx="6"/>
-    <rect x="310" y="170" width="44" height="230" rx="6"/>
-    <rect x="374" y="120" width="44" height="280" rx="6"/>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <rect x="2" y="2" width="508" height="508" rx="114" fill="none" stroke="#292E34" stroke-width="4"/>
+  <line x1="96" y1="396" x2="416" y2="396" stroke="#292E34" stroke-width="6" stroke-linecap="round"/>
+  <g stroke-linecap="round">
+    <line x1="148" y1="302" x2="148" y2="360" stroke="#4C8DFF" stroke-width="10"/>
+    <rect x="129" y="314" width="38" height="66" rx="9" fill="url(#bar)"/>
+    <line x1="228" y1="230" x2="228" y2="302" stroke="#4C8DFF" stroke-width="10"/>
+    <rect x="209" y="242" width="38" height="98" rx="9" fill="url(#bar)"/>
+    <line x1="308" y1="150" x2="308" y2="230" stroke="#22C55E" stroke-width="10"/>
+    <rect x="289" y="166" width="38" height="124" rx="9" fill="url(#bar)"/>
+    <path d="M356 196 l48 -52 l0 33 l31 0" fill="none" stroke="#22C55E" stroke-width="14" stroke-linejoin="round" stroke-linecap="round"/>
   </g>
-  <!-- Trend arrow over candles -->
-  <polyline points="118,300 182,250 246,200 310,150 418,100"
-            fill="none" stroke="#ffffff" stroke-width="14"
-            stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
-  <polygon points="380,80 432,86 418,134" fill="#ffffff" opacity="0.95"/>
 </svg>

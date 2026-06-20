@@ -4,58 +4,57 @@
 
 {% block content %}
 <style>
-  .summary-card { border-left: 4px solid #5b8def; }
-  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
-  .row-held { background: #fffbea !important; font-weight: 600; }
-  .strategy-pill { background: linear-gradient(135deg,#667eea,#764ba2); color:#fff; padding:4px 12px; border-radius:14px; font-size:0.75rem; font-weight:600; }
+  .summary-card { border-left: 4px solid var(--accent); }
+  .row-held { background: rgba(245,177,76,.10) !important; font-weight: 600; }
+  .strategy-pill { background: var(--accent); color:#1A1205; padding:4px 12px; border-radius:14px; font-size:0.75rem; font-weight:600; }
 
   /* T10 multi-model dashboard cards */
-  .model-card { border-radius: 10px; border: 1px solid #e3e6ef; transition: transform .12s ease, box-shadow .12s ease; height: 100%; }
-  .model-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+  .model-card { border-radius: 10px; background: var(--surface); border: 1px solid var(--hairline); transition: transform .12s ease, box-shadow .12s ease; height: 100%; }
+  .model-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.35); background: var(--surface-2); }
   .model-card .card-body { padding: 1rem; }
-  .model-card.equity { border-top: 4px solid #5b8def; }
-  .model-card.options { border-top: 4px solid #b66dff; }
+  .model-card.equity { border-top: 4px solid var(--accent); }
+  .model-card.options { border-top: 4px solid #8A7DF0; }
   /* Disabled models are skip-rendered on Dashboard (see loadPortfolio).
      CSS for `.model-card.disabled` removed — only enabled cards render here.
      Re-enable via /admin/v2/settings ⋮ menu. */
-  .model-card .ttl { font-size: 0.95rem; font-weight: 700; line-height: 1.2; }
-  .model-card .uni { font-size: 0.72rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .model-card .ttl { font-size: 0.95rem; font-weight: 700; line-height: 1.2; color: var(--text); }
+  .model-card .uni { font-size: 0.72rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
   .model-card .kv { display:flex; justify-content: space-between; font-size: 0.85rem; padding: 3px 0; }
-  .model-card .kv .k { color: #6c757d; }
-  .model-card .kv .v { font-weight: 600; font-variant-numeric: tabular-nums; }
-  .model-card .nav-row { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #e3e6ef; }
+  .model-card .kv .k { color: var(--text-mute); }
+  .model-card .kv .v { font-weight: 600; font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+  .model-card .nav-row { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--hairline); }
   .model-card .pnl-line { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
   .model-card .pnl-line small { font-size: 0.75rem; font-weight: 500; }
-  .model-card .footer-bar { display:flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid #f0f2f7; font-size: 0.75rem; }
+  .model-card .footer-bar { display:flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--hairline); font-size: 0.75rem; }
   .model-card .sig-badge { padding: 2px 8px; border-radius: 10px; font-weight: 600; font-size: 0.7rem; }
-  .model-card .sig-fired { background: #d4edda; color: #155724; }
-  .model-card .sig-quiet { background: #e9ecef; color: #6c757d; }
-  .model-card .sig-error { background: #f8d7da; color: #721c24; }
-  .model-card .warn-pill { font-size: 0.6rem; padding: 1px 6px; border-radius: 8px; background:#fff3cd; color:#856404; border:1px solid #ffeeba; vertical-align: middle; margin-left: 4px; }
-  .model-card .enable-pill { font-size: 0.6rem; padding: 1px 6px; border-radius: 8px; background:#f1f3f5; color:#6c757d; border:1px solid #dee2e6; vertical-align: middle; margin-left: 4px; }
+  .model-card .sig-fired { background: rgba(46,189,133,.16); color: var(--gain); }
+  .model-card .sig-quiet { background: var(--surface-3); color: var(--text-mute); }
+  .model-card .sig-error { background: rgba(246,70,93,.16); color: var(--loss); }
+  .model-card .warn-pill { font-size: 0.6rem; padding: 1px 6px; border-radius: 8px; background:rgba(245,177,76,.18); color:var(--accent); border:1px solid var(--hairline-2); vertical-align: middle; margin-left: 4px; }
+  .model-card .enable-pill { font-size: 0.6rem; padding: 1px 6px; border-radius: 8px; background:var(--surface-3); color:var(--text-mute); border:1px solid var(--hairline); vertical-align: middle; margin-left: 4px; }
 
   /* Today's signals widget */
-  .signals-widget .sig-row { display:flex; gap: 10px; align-items: center; padding: 4px 0; border-bottom: 1px dashed #eef0f5; font-size: 0.85rem; }
+  .signals-widget .sig-row { display:flex; gap: 10px; align-items: center; padding: 4px 0; border-bottom: 1px dashed var(--hairline); font-size: 0.85rem; }
   .signals-widget .sig-row:last-child { border-bottom: none; }
   .signals-widget .sig-row .side { width: 50px; }
-  .signals-widget .sig-row .model { width: 220px; color: #6c757d; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; }
-  .signals-widget .sig-row code { background: #f4f6fb; padding: 1px 6px; border-radius: 4px; }
-  .signals-widget .empty { color: #6c757d; padding: 14px 6px; text-align: center; }
-  .totals-strip { background: linear-gradient(180deg,#fafbff,#f4f6fb); border: 1px solid #e3e6ef; border-radius: 10px; padding: 12px 16px; }
+  .signals-widget .sig-row .model { width: 220px; color: var(--text-mute); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; }
+  .signals-widget .sig-row code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; }
+  .signals-widget .empty { color: var(--text-mute); padding: 14px 6px; text-align: center; }
+  .totals-strip { background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 10px; padding: 12px 16px; }
 
   /* Click-to-expand header (picks-style) — no buttons */
   .expand-header { cursor: pointer; }
-  .expand-header:hover { background: #f4f6fb; border-radius: 6px; }
-  .expand-header .bi-chevron-down { transition: transform 0.15s ease; font-size: 0.85rem; color: #6c757d; }
+  .expand-header:hover { background: var(--surface-3); border-radius: 6px; }
+  .expand-header .bi-chevron-down { transition: transform 0.15s ease; font-size: 0.85rem; color: var(--text-mute); }
   .expand-header[aria-expanded="true"] .bi-chevron-down { transform: rotate(180deg); }
-  .model-headline { display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; padding: 6px 0 8px; border-bottom: 1px dashed #e3e6ef; margin-bottom: 6px; font-size: 0.85rem; }
-  .model-headline .lbl { color: #6c757d; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.4px; margin-right: 4px; }
-  .model-headline .val { font-weight: 700; font-variant-numeric: tabular-nums; }
-  .totals-detail { border-top: 1px dashed #d8dde8; margin-top: 10px; padding-top: 10px; font-size: 0.85rem; }
+  .model-headline { display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; padding: 6px 0 8px; border-bottom: 1px dashed var(--hairline); margin-bottom: 6px; font-size: 0.85rem; }
+  .model-headline .lbl { color: var(--text-mute); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.4px; margin-right: 4px; }
+  .model-headline .val { font-weight: 700; font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+  .totals-detail { border-top: 1px dashed var(--hairline-2); margin-top: 10px; padding-top: 10px; font-size: 0.85rem; }
   .totals-detail .kv { display: flex; justify-content: space-between; padding: 3px 0; }
-  .totals-detail .kv .k { color: #6c757d; }
-  .totals-detail .kv .v { font-weight: 600; font-variant-numeric: tabular-nums; }
-  .totals-detail code { background: #fff; border: 1px solid #e3e6ef; padding: 2px 6px; border-radius: 4px; font-size: 0.78rem; }
+  .totals-detail .kv .k { color: var(--text-mute); }
+  .totals-detail .kv .v { font-weight: 600; font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+  .totals-detail code { background: var(--surface); border: 1px solid var(--hairline); padding: 2px 6px; border-radius: 4px; font-size: 0.78rem; }
 </style>
 
 <!-- Today's signals widget (T10) -->
@@ -80,7 +79,7 @@
        title="Click to expand breakdown + math identity">
     <div>
       <span class="strategy-pill">Multi-Model Portfolio</span>
-      <span class="text-muted small ms-2">4 equity + 1 options · per-model cash silos</span>
+      <span class="text-muted small ms-2">4 equity · per-model cash silos</span>
       <i class="bi bi-chevron-down ms-2"></i>
     </div>
     <div class="row text-end g-3 flex-grow-1 justify-content-end align-items-center">
@@ -118,16 +117,56 @@
   </div>
 </div>
 
-<!-- 5-card grid: 4 equity + 1 options (T10) -->
+<!-- card grid: 4 equity (T10) -->
 <div class="row g-3 mb-4" id="model_grid">
   <div class="col-12 text-center text-muted py-3">Loading models…</div>
+</div>
+
+<!-- Slippage / live-vs-backtest: execution gap from the backtest daily-open reference -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-speedometer2 me-2"></i>Slippage — live vs backtest</span>
+    <small class="text-muted" id="slip_overall">—</small>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr>
+        <th>Model</th>
+        <th class="text-end" title="Mean fill cost vs the backtest daily open. +ve = filled better; −ve = slippage loss.">Mean drift</th>
+        <th class="text-end" title="Mean of the last ≤20 fills">Recent</th>
+        <th class="text-end" title="Single worst fill">Worst</th>
+        <th class="text-end" title="$ gained(+)/lost(−) to slippage vs backtest">$ Gained/Lost</th>
+        <th class="text-end">Fills</th>
+        <th class="text-end">Last</th>
+      </tr></thead>
+      <tbody id="slip_body"><tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="px-3 pt-2 pb-0 small text-muted fw-semibold">Per-fill detail (newest first)</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr>
+        <th>Date</th><th>Model</th><th>Stock</th><th>Side</th>
+        <th class="text-end" title="Backtest daily-open reference price">Expected $</th>
+        <th class="text-end" title="Actual live fill price">Actual $</th>
+        <th class="text-end">Drift</th>
+        <th class="text-end">$</th>
+      </tr></thead>
+      <tbody id="slip_fills"><tr><td colspan="8" class="text-center text-muted py-3">—</td></tr></tbody>
+    </table>
+  </div>
+  <div class="card-footer text-muted" style="font-size:0.75rem;">
+    Logic + timing are in backtest↔live parity; this is the only gap — execution slippage.
+    Drift +ve (green) = filled better than backtest; −ve (red) = slippage loss.
+    Expected = backtest daily open; Actual = live fill.
+  </div>
 </div>
 
 {% endblock %}
 
 {% block scripts %}
 <script>
-const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
+const fmtINR = n => "$" + Number(n||0).toLocaleString('en-US', {maximumFractionDigits:2});
 const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
 const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 
@@ -135,19 +174,17 @@ const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 // optional warning. Kept independent of backend description text so the UI
 // can evolve without redeploying the service.
 const MODEL_META = {
-  'momentum_n100_top5_max1':     { universe: 'Nifty 100 (live)',       kind: 'equity'  },
+  'momentum_n100_top5_max1':     { universe: 'Nasdaq 100',             kind: 'equity'  },
   'momentum_pseudo_n100_adv':    { universe: 'Pseudo-N100 ADV',        kind: 'equity' },
-  'midcap_narrow_60d_breakout':  { universe: 'Midcap-narrow 60d HH',   kind: 'equity'  },
+  'midcap_narrow_60d_breakout':  { universe: 'Nasdaq mid 60d HH',      kind: 'equity'  },
   'n20_daily_large_only':        { universe: 'Top-20 ADV ∩ N100',      kind: 'equity'  },
-  'finnifty_ic_otm4_w300_lots5': { universe: 'FinNifty Options IC',    kind: 'options' },
 };
-// Display order: 4 equity first then options.
+// Display order: equity models.
 const MODEL_ORDER = [
   'momentum_n100_top5_max1',
   'momentum_pseudo_n100_adv',
   'midcap_narrow_60d_breakout',
   'n20_daily_large_only',
-  'finnifty_ic_otm4_w300_lots5',
 ];
 
 let _signalsByModel = {};
@@ -250,8 +287,8 @@ function renderModelCard(m, sig) {
                   <div class="kv"><span class="k" title="Open position: Live MTM − Cost basis">+ Unrealized (MTM − cost)</span><span class="v ${cls(unreal)}">${fmtINR(unreal)}</span></div>
                   <div class="kv"><span class="k"><strong>≈ Total P&amp;L</strong></span><span class="v ${pnlCls}"><strong>${fmtINR(m.pnl_total)}</strong></span></div>
                   <div class="text-muted" style="font-size:0.72rem; margin-top:4px; line-height:1.4;">
-                    Approx Txn Charges (info only): ₹${Number(m.total_txn_charges||0).toFixed(2)}
-                    = Buy ₹${Number(m.buy_txn_charges||0).toFixed(2)} + Sell ₹${Number(m.sell_txn_charges||0).toFixed(2)}.
+                    Approx Txn Charges (info only): $${Number(m.total_txn_charges||0).toFixed(2)}
+                    = Buy $${Number(m.buy_txn_charges||0).toFixed(2)} + Sell $${Number(m.sell_txn_charges||0).toFixed(2)}.
                     Formula-estimated, deducted from cash at trade time.
                   </div>
                 </div>
@@ -421,8 +458,54 @@ async function loadPortfolio() {
   }
 }
 
+// Slippage (live vs backtest) summary + per-fill detail.
+async function loadSlippage() {
+  try {
+    const r = await fetch('/admin/slippage-summary');
+    const d = await r.json();
+    if (!d.success) return;
+    const ov = d.overall || {};
+    const usd = n => '$' + (n>0?'+':'') + Number(n||0).toLocaleString('en-US', {maximumFractionDigits:2});
+    document.getElementById('slip_overall').textContent =
+      ov.n ? `${ov.n} fills · mean ${ov.mean_cost>0?'+':''}${ov.mean_cost}% · ${usd(ov.cost_usd)}` : 'no fills yet';
+    const dc = v => (v===null||v===undefined) ? '<span class="text-muted">—</span>'
+      : `<span class="${v>0?'pos':(v<0?'neg':'neutral')}">${v>0?'+':''}${Number(v).toFixed(2)}%</span>`;
+    const ic = v => (v===null||v===undefined) ? '<span class="text-muted">—</span>'
+      : `<span class="${v>0?'pos':(v<0?'neg':'neutral')}">${usd(v)}</span>`;
+    const lbl = m => (window.modelLabel ? window.modelLabel(m) : m);
+    const body = document.getElementById('slip_body');
+    const ms = d.models || [];
+    body.innerHTML = ms.length ? ms.map(m => `
+      <tr>
+        <td>${lbl(m.model)}</td>
+        <td class="text-end">${dc(m.mean_cost)}</td>
+        <td class="text-end">${dc(m.recent_cost)}</td>
+        <td class="text-end">${dc(m.worst_cost)}</td>
+        <td class="text-end">${ic(m.cost_usd)}</td>
+        <td class="text-end">${m.n}</td>
+        <td class="text-end small text-muted">${m.last_date||'—'}</td>
+      </tr>`).join('')
+      : '<tr><td colspan="7" class="text-center text-muted py-3">No fills recorded yet — populates after live trades fill.</td></tr>';
+    const fb = document.getElementById('slip_fills');
+    const fl = d.fills || [];
+    fb.innerHTML = fl.length ? fl.map(f => `
+      <tr>
+        <td class="small text-muted">${f.date}</td>
+        <td class="small">${lbl(f.model)}</td>
+        <td><strong>${f.symbol}</strong></td>
+        <td><span class="badge ${f.side==='BUY'?'bg-primary':'bg-warning text-dark'}">${f.side}</span></td>
+        <td class="text-end">$${Number(f.expected).toLocaleString('en-US',{maximumFractionDigits:2})}</td>
+        <td class="text-end">$${Number(f.fill).toLocaleString('en-US',{maximumFractionDigits:2})}</td>
+        <td class="text-end">${dc(f.drift_pct)}</td>
+        <td class="text-end">${ic(f.cost_usd)}</td>
+      </tr>`).join('')
+      : '<tr><td colspan="8" class="text-center text-muted py-3">No fills yet.</td></tr>';
+  } catch(e) { console.error('slippage load failed', e); }
+}
+
 function load() {
   loadPortfolio();
+  loadSlippage();
 }
 load();
 setInterval(load, 30000);

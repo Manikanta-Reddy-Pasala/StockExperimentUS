@@ -42,7 +42,7 @@ KNOWN_MODELS = [
         "name": "momentum_n100_top5_max1",
         "default_capital": 30000,
         "enabled": True,
-        "description": "Equity monthly rotation top-1 from real NSE Nifty 100 by 30d return",
+        "description": "Equity monthly rotation top-1 from Nasdaq 100 by 30d return",
     },
     {
         "name": "momentum_pseudo_n100_adv",
@@ -50,26 +50,22 @@ KNOWN_MODELS = [
         # LIVE. Universe is rebuilt at each year-start using only data
         # observable at that date — PIT-safe for live deployment.
         "enabled": True,
-        "description": "Equity monthly rotation top-1 from pseudo-N100 (top-100 ADV from N500, yearly PIT rebuild)",
+        "description": "Equity monthly rotation top-1 from pseudo-N100 (top-100 ADV from Nasdaq 500, yearly PIT rebuild)",
     },
     {
         "name": "midcap_narrow_60d_breakout",
         "default_capital": 30000,
         "enabled": True,
-        "description": "Equity 60d-high swing on midcap_narrow (event-driven)",
+        "description": "Equity 60d-high swing on Nasdaq mid (event-driven)",
     },
     {
         "name": "n20_daily_large_only",
         "default_capital": 30000,
         "enabled": True,
-        "description": "Equity daily rotation top-20-ADV ∩ Nifty 100 by 30d return",
+        "description": "Equity daily rotation top-20-ADV ∩ Nasdaq 100 by 30d return",
     },
-    {
-        "name": "finnifty_ic_otm4_w300_lots5",
-        "default_capital": 30000,
-        "enabled": True,
-        "description": "FinNifty monthly Iron Condor — OTM 4% / wings 300pt / 5 lots",
-    },
+    # NOTE: finnifty_ic_otm4_w300_lots5 (India FINNIFTY options Iron Condor) is
+    # removed — US has no options model and no option_universe table.
 ]
 
 

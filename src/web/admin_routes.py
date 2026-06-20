@@ -497,12 +497,6 @@ def trigger_model_data_pull(model_name):
             ("midcap_narrow universe refresh (skip top-30, take next 100)",
              "tools.models.midcap_narrow_60d_breakout.data_pull", "refresh_universe"),
         ],
-        "finnifty_ic_otm4_w300_lots5": [
-            ("Index spots (NIFTY/BN/FN)", "tools.models.finnifty_ic_otm4_w300_lots5.data_pull",
-             "fetch_index_spots"),
-            ("Option bhavcopy (NIFTY/BN/FN)", "tools.models.finnifty_ic_otm4_w300_lots5.data_pull",
-             "fetch_option_bhav"),
-        ],
         "n20_daily_large_only": [
             ("Equity OHLCV (N500 — covers N20 top-ADV)",
              "tools.models.n20_daily_large_only.data_pull", "pull_daily_ohlcv"),
@@ -782,90 +776,9 @@ def models_status():
                 ],
             })
 
-            # ============================================================
-            # Model 3: finnifty_ic_otm4_w300_lots5 (options)
-            # ============================================================
-            # Spot sufficiency: last 30 calendar days >= 18 trading days
-            spot_since = today - timedelta(days=30)
-            spot_items = []
-            spots_ok = True
-            for sym in ("NSE:NIFTY50-INDEX", "NSE:NIFTYBANK-INDEX", "NSE:FINNIFTY-INDEX"):
-                r = session.execute(text("""
-                    SELECT COUNT(DISTINCT date) days, MAX(date) latest
-                    FROM historical_data WHERE symbol = :s AND date >= :since
-                """), {"s": sym, "since": spot_since}).fetchone()
-                days = int(r.days) if r and r.days else 0
-                latest = r.latest if r else None
-                stale = (today - latest).days if latest else 999
-                short = sym.replace("NSE:", "").replace("-INDEX", "")
-                ok = days >= 18 and stale <= 3
-                if not ok:
-                    spots_ok = False
-                spot_items.append({
-                    "label": f"{short} spot trading days (30d)",
-                    "value": days,
-                    "required": ">= 18 (≈ 22 - holidays)",
-                    "ok": ok,
-                    "extra": (latest.isoformat() if latest else "—") + f" • {stale}d old",
-                })
-
-            # Current monthly expiry availability per underlying
-            opt_items = []
-            opts_ok = True
-            current_finnifty_spot = session.execute(text("""
-                SELECT close FROM historical_data
-                WHERE symbol='NSE:FINNIFTY-INDEX' ORDER BY date DESC LIMIT 1
-            """)).fetchone()
-            fn_spot_val = float(current_finnifty_spot.close) if current_finnifty_spot else 0
-
-            for u in ("NIFTY", "BANKNIFTY", "FINNIFTY"):
-                # Next monthly expiry from option_universe
-                next_exp_row = session.execute(text("""
-                    SELECT MIN(expiry) AS exp FROM option_universe
-                    WHERE underlying = :u AND expiry_kind = 'monthly'
-                      AND expiry >= :today
-                """), {"u": u, "today": today}).fetchone()
-                next_exp = next_exp_row.exp if next_exp_row else None
-
-                if next_exp is None:
-                    opt_items.append({
-                        "label": f"{u} next monthly expiry",
-                        "value": "—",
-                        "required": "exists",
-                        "ok": False,
-                    })
-                    opts_ok = False
-                    continue
-
-                # Strike coverage for that expiry: count distinct strikes that
-                # have at least 1 bar in last 7 calendar days
-                strike_cov = session.execute(text("""
-                    SELECT COUNT(DISTINCT strike) AS strikes
-                    FROM historical_options
-                    WHERE underlying = :u AND expiry = :exp
-                      AND candle_time::date >= :since
-                """), {"u": u, "exp": next_exp,
-                       "since": today - timedelta(days=7)}).fetchone()
-                strikes = int(strike_cov.strikes) if strike_cov else 0
-                ok = strikes >= 5
-                if not ok:
-                    opts_ok = False
-                opt_items.append({
-                    "label": f"{u} {next_exp.isoformat()} strikes (last 7d)",
-                    "value": strikes,
-                    "required": ">= 5 strikes",
-                    "ok": ok,
-                    "extra": f"expires {(next_exp - today).days}d",
-                })
-
-            fn_ok = spots_ok and opts_ok
-            models.append({
-                "name": "finnifty_ic_otm4_w300_lots5",
-                "type": "options",
-                "wired": _wired("finnifty_ic_otm4_w300_lots5"),
-                "data_sufficient": bool(fn_ok),
-                "items": spot_items + opt_items,
-            })
+            # NOTE: the India FINNIFTY options model and its option_universe /
+            # historical_options data-status checks are removed — US has no
+            # options model and no such tables.
 
             # ============================================================
             # Model 4: n20_daily_large_only (equity intraday/daily)
@@ -1355,6 +1268,84 @@ def model_trade_history(model_name):
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@admin_bp.route('/slippage-summary', methods=['GET'])
+def slippage_summary():
+    """Per-model fill-drift roll-up for the dashboard — computed from the SAME
+    source as the per-trade History column (model_trades fill price vs the
+    backtest daily-open reference), so card totals equal the sum of trade-level
+    drifts.
+
+    GAIN convention: mean_cost / cost_usd +ve = filled better than the backtest,
+    -ve = slippage loss. worst_cost = the single worst (most negative) fill.
+    """
+    try:
+        from src.services.trading.model_ledger_service import get_trades
+        from src.models.model_ledger_models import ModelLedger
+        from src.models.database import get_database_manager
+        from tools.shared.intraday_fill import exec_raw_open
+
+        db = get_database_manager()
+        with db.get_session() as s:
+            model_names = sorted({l.model_name for l in s.query(ModelLedger).all()
+                                  if l.model_name})
+
+        models, fills = [], []
+        all_g, all_usd = [], 0.0
+        for m in model_names:
+            try:
+                trades = get_trades(m, limit=5000)
+            except Exception:
+                trades = []
+            gains, usd, last = [], 0.0, None
+            for t in trades:
+                side = (t.get("side") or "").upper()
+                if side not in ("BUY", "SELL"):
+                    continue
+                sym = t.get("symbol") or ""
+                px = float(t.get("price") or 0)
+                ta = str(t.get("trade_at") or t.get("trade_date") or "")[:10]
+                if not sym or px <= 0 or len(ta) != 10:
+                    continue
+                exp = exec_raw_open(sym, ta, m, side)
+                if not exp or exp <= 0:
+                    continue
+                drift = (px / exp - 1) * 100
+                gain = -drift if side == "BUY" else drift
+                cusd = float(t.get("qty") or 0) * ((exp - px) if side == "BUY" else (px - exp))
+                gains.append(gain)
+                usd += cusd
+                last = max(last, ta) if last else ta
+                fills.append({"model": m, "date": ta, "side": side,
+                              "symbol": sym.replace("NASDAQ:", "").replace("-EQ", ""),
+                              "expected": round(exp, 2), "fill": round(px, 2),
+                              "drift_pct": round(gain, 3), "cost_usd": round(cusd, 2)})
+            if not gains:
+                continue
+            all_g += gains
+            all_usd += usd
+            recent = gains[-20:]
+            models.append({
+                "model": m, "n": len(gains),
+                "mean_cost": round(sum(gains) / len(gains), 3),
+                "recent_cost": round(sum(recent) / len(recent), 3),
+                "worst_cost": round(min(gains), 3),
+                "cost_usd": round(usd, 2),
+                "last_date": last,
+            })
+        models.sort(key=lambda x: x["mean_cost"])  # worst (most loss) first
+        overall = ({"n": len(all_g),
+                    "mean_cost": round(sum(all_g) / len(all_g), 3),
+                    "cost_usd": round(all_usd, 2),
+                    "worst": round(min(all_g), 3)} if all_g
+                   else {"n": 0, "mean_cost": None, "cost_usd": 0, "worst": None})
+        fills.sort(key=lambda x: x["date"], reverse=True)
+        return jsonify({"success": True, "overall": overall,
+                        "models": models, "fills": fills[:200]})
+    except Exception as e:
+        logger.error(f"slippage-summary error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # =============================================================================
 # Per-model Balance Sheet + Transactions (T11)
 # =============================================================================
@@ -1640,6 +1631,43 @@ def model_trade_history_full(model_name):
         # Trades come newest-first from service; UI wants chronological too,
         # but newest-first is fine for transaction-list display.
 
+        # PIT-shaped cap tag (large/mid/other) per trade — current-snapshot US.
+        try:
+            from tools.shared.cap_tag import cap_for
+            for _t in trades:
+                _t["cap"] = cap_for(_t.get("symbol", ""),
+                                    _t.get("trade_at") or _t.get("trade_date"))
+        except Exception as _ce:
+            logger.debug(f"cap tag skipped: {_ce}")
+
+        # Per-trade fill drift: each trade's own fill price vs the backtest
+        # reference (daily open via exec_raw_open) for that (sym, date, side).
+        # GAIN convention: +ve = filled better than backtest (green), -ve = loss
+        # (red). drift_usd = qty x per-share edge.
+        try:
+            from tools.shared.intraday_fill import exec_raw_open
+            for _t in trades:
+                _t["drift_pct"] = None
+                _t["drift_usd"] = None
+                side = (_t.get("side") or "").upper()
+                if side not in ("BUY", "SELL"):
+                    continue
+                sym = _t.get("symbol") or ""
+                px = float(_t.get("price") or 0)
+                ta = str(_t.get("trade_at") or _t.get("trade_date") or "")[:10]
+                if not sym or px <= 0 or len(ta) != 10:
+                    continue
+                exp = exec_raw_open(sym, ta, model_name, side)
+                if not exp or exp <= 0:
+                    continue
+                drift = (px / exp - 1) * 100
+                gain = -drift if side == "BUY" else drift
+                edge = (exp - px) if side == "BUY" else (px - exp)
+                _t["drift_pct"] = round(gain, 3)
+                _t["drift_usd"] = round(float(_t.get("qty") or 0) * edge, 2)
+        except Exception as _de:
+            logger.debug(f"drift compute skipped: {_de}")
+
         # Summary roll-up
         total_buys = 0
         total_sells = 0
@@ -1734,9 +1762,6 @@ _SIGNAL_PATHS = {
     "n20_daily_large_only": [
         "/app/logs/n20_daily/signals/{date}_n20.json",
         "/app/logs/n20_daily_large_only/signals/{date}.json",
-    ],
-    "finnifty_ic_otm4_w300_lots5": [
-        "/app/logs/finnifty_ic_otm4_w300_lots5/signals/{date}.json",
     ],
 }
 

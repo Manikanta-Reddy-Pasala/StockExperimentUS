@@ -86,8 +86,19 @@ def is_mid_month_check_day(today: datetime) -> bool:
 
 
 def load_universe(path: str) -> List[Dict]:
-    with open(path) as f:
-        return json.load(f)["stocks"]
+    # Graceful: on a fresh deploy the universe snapshot may not exist yet
+    # (the data pipeline writes it). Return an empty universe instead of
+    # raising FileNotFoundError so the caller degrades to "no picks".
+    if not Path(path).exists():
+        print(f"[live_signal] universe file not found, treating as empty: {path}",
+              file=sys.stderr)
+        return []
+    try:
+        with open(path) as f:
+            return json.load(f).get("stocks", [])
+    except (OSError, ValueError) as e:
+        print(f"[live_signal] failed to read universe {path}: {e}", file=sys.stderr)
+        return []
 
 
 def get_close_at(symbol: str, target_ts: int) -> float:

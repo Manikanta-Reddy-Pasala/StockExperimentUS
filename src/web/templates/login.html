@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Automated Trading System</title>
+    <title>Login - Trading Journal US</title>
     <!-- PWA: surface manifest pre-login so iOS Safari "Add to Home Screen" works -->
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#15a36b">
+    <meta name="theme-color" content="#0B0C0E">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Trading">
@@ -25,36 +25,35 @@
     <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
+        :root { --accent:#4C8DFF; --accent-2:#7FB0FF; --ink:#0B0C0E; --text:#E8EAED; --text-mute:#6B737B; --hairline:rgba(255,255,255,0.10); }
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #0B0C0E;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', system-ui, sans-serif;
+            color: #E8EAED;
             position: relative;
             overflow: hidden;
         }
 
+        /* Subtle static azure glow behind the card (no movement) */
         body::before {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="50" cy="10" r="0.5" fill="rgba(255,255,255,0.05)"/><circle cx="10" cy="60" r="0.5" fill="rgba(255,255,255,0.05)"/><circle cx="90" cy="40" r="0.5" fill="rgba(255,255,255,0.05)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-            opacity: 0.3;
+            inset: 0;
+            background: radial-gradient(50vw 40vw at 80% -10%, rgba(76,141,255,0.10), transparent 60%);
+            pointer-events: none;
         }
 
         .login-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
+            background: #15171A;
             border-radius: 1.5rem;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 24px 60px -24px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.04) inset;
+            border: 1px solid #292E34;
             overflow: hidden;
             max-width: 450px;
             width: 100%;
@@ -75,12 +74,15 @@
         }
 
         .login-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: linear-gradient(135deg, rgba(76,141,255,0.16) 0%, rgba(76,141,255,0.04) 100%);
+            color: #E8EAED;
             padding: 3rem 2rem 2rem;
             text-align: center;
             position: relative;
+            border-bottom: 1px solid #292E34;
         }
+        .login-header h2 { font-family: 'Inter Tight', sans-serif; font-weight: 700; letter-spacing: -0.02em;
+            color: #FFFFFF; }
 
         .login-header::after {
             content: '';
@@ -96,27 +98,30 @@
             padding: 2.5rem 2rem;
         }
 
+        .login-body, .form-check-label, label { color: var(--text); }
         .form-control {
             border-radius: 0.75rem;
-            border: 2px solid #e2e8f0;
+            border: 1px solid #3A424B;
             padding: 0.875rem 1rem;
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.8);
+            transition: all 0.2s ease;
+            background: #1B1E22;
+            color: #E8EAED;
             font-weight: 500;
         }
+        .form-control::placeholder { color: #6B737B; }
 
         .form-control:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-            background: white;
-            transform: translateY(-2px);
+            border-color: #4C8DFF;
+            box-shadow: 0 0 0 3px rgba(76,141,255,0.22);
+            background: #1B1E22;
+            color: #E8EAED;
         }
 
         .input-group-text {
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-            border: 2px solid #e2e8f0;
+            background: #23272C;
+            border: 1px solid #3A424B;
             border-radius: 0.75rem 0 0 0.75rem;
-            color: #667eea;
+            color: #4C8DFF;
             font-weight: 600;
         }
 
@@ -126,7 +131,8 @@
         }
 
         .btn-login {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #4C8DFF;
+            color: #fff;
             border: none;
             border-radius: 0.75rem;
             padding: 0.875rem 2rem;
@@ -153,13 +159,15 @@
         }
 
         .btn-login:hover {
+            background: #5d99ff;
             transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 12px 28px rgba(76,141,255,0.4);
         }
 
         .btn-passkey {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            border: none;
+            background: #23272C;
+            color: #E8EAED;
+            border: 1px solid #3A424B;
             border-radius: 0.75rem;
             padding: 0.875rem 2rem;
             font-weight: 600;
@@ -167,8 +175,9 @@
         }
 
         .btn-passkey:hover {
+            background: #2a2f35;
             transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(26, 26, 46, 0.3);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.4);
         }
 
         .btn-passkey:disabled {
@@ -187,12 +196,12 @@
         .divider::after {
             content: '';
             flex: 1;
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid #292E34;
         }
 
         .divider span {
             padding: 0 1rem;
-            color: #94a3b8;
+            color: #6B737B;
             font-size: 0.875rem;
             font-weight: 500;
         }
@@ -204,14 +213,15 @@
             font-weight: 500;
         }
 
+        .form-check-input { background-color: #1B1E22; border-color: #3A424B; }
         .form-check-input:checked {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-color: #667eea;
+            background: #4C8DFF;
+            border-color: #4C8DFF;
         }
 
         .form-check-label {
             font-weight: 500;
-            color: #64748b;
+            color: #6B737B;
         }
 
         .floating-shapes {
@@ -226,7 +236,7 @@
 
         .shape {
             position: absolute;
-            background: rgba(255, 255, 255, 0.1);
+            background: radial-gradient(circle at 30% 30%, rgba(76,141,255,0.16), rgba(76,141,255,0.02));
             border-radius: 50%;
             animation: float 6s ease-in-out infinite;
         }
@@ -299,7 +309,7 @@
             <div class="brand-logo">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="width: 140px; height: auto;">
             </div>
-            <h2 class="mb-3 fw-bold">Trading System</h2>
+            <h2 class="mb-3 fw-bold">Trading Journal US</h2>
             <p class="mb-0 opacity-75">Sign in to your account</p>
         </div>
 

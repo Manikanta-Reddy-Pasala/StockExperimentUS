@@ -4,18 +4,17 @@
 
 {% block content %}
 <style>
-  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
-  .summary-card { border-left: 4px solid #5b8def; }
+  .summary-card { border-left: 4px solid var(--accent); }
   .row-disabled td { opacity: 0.55; }
 </style>
 
-<!-- Fyers broker funds (real-time available cash in trading account) -->
+<!-- eToro broker funds (real-time available cash in trading account) -->
 <div class="card mb-3" id="fyers-funds-card">
   <div class="card-body py-2">
     <div class="row g-2 align-items-center">
       <div class="col-auto"><i class="bi bi-bank2 text-primary"></i></div>
       <div class="col-md-auto">
-        <span class="text-muted small">Fyers Account · Available Cash</span>
+        <span class="text-muted small">eToro Account · Available Cash</span>
         <div class="fs-5 fw-bold" id="fyers_available_cash">--</div>
       </div>
       <div class="col-md-auto">
@@ -67,13 +66,13 @@
 </div>
 
 <div class="card">
-  <div class="card-header"><i class="bi bi-briefcase me-2"></i>Open Position(s) — Live Fyers</div>
+  <div class="card-header"><i class="bi bi-briefcase me-2"></i>Open Position(s) — eToro</div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
       <thead><tr>
         <th>Symbol</th><th>Model</th><th class="text-end">Qty</th><th class="text-end">Entry</th>
         <th class="text-end">Live</th><th class="text-end">Cost</th>
-        <th class="text-end">Market Value</th><th class="text-end">P&amp;L ₹</th><th class="text-end">P&amp;L %</th>
+        <th class="text-end">Market Value</th><th class="text-end">P&amp;L $</th><th class="text-end">P&amp;L %</th>
         <th class="text-center">Action</th>
       </tr></thead>
       <tbody id="positions"><tr><td colspan="10" class="text-center text-muted py-3">Loading…</td></tr></tbody>
@@ -83,7 +82,7 @@
 
 <div class="alert alert-warning mt-3 py-2 small">
   <i class="bi bi-exclamation-triangle me-1"></i>
-  <strong>LIVE trading active.</strong> Sell + Rebalance buttons place REAL Fyers orders. Confirm dialog required.
+  <strong>LIVE trading active.</strong> Sell + Rebalance buttons place REAL eToro orders. Confirm dialog required.
 </div>
 
 <!-- Dedicated rebalance modal — never shared with appModal to avoid
@@ -107,12 +106,11 @@
 
 {% block scripts %}
 <script>
-const fmtINR = n => "₹" + Number(n||0).toLocaleString('en-IN', {maximumFractionDigits:2});
+const fmtINR = n => "$" + Number(n||0).toLocaleString('en-US', {maximumFractionDigits:2});
 const fmtPct = n => (n>=0?"+":"") + Number(n||0).toFixed(2) + "%";
 const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 
 // Models with wired live_signal + executor (i.e., per-model rebalance works).
-// finnifty options model has different flow; rebalance button hidden for it.
 const WIRED_MODELS = new Set([
   'momentum_n100_top5_max1',
   'momentum_pseudo_n100_adv',
@@ -219,13 +217,13 @@ async function loadState() {
 
     const tb = document.getElementById('positions');
     if (!s.open_positions || s.open_positions.length === 0) {
-      tb.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">No open Fyers positions</td></tr>';
+      tb.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">No open eToro positions</td></tr>';
     } else {
       tb.innerHTML = s.open_positions.map(p => `
         <tr>
           <td><strong>${p.symbol}</strong></td>
           <td>${lookupModel(p.symbol)}</td>
-          <td class="text-end">${p.qty.toLocaleString('en-IN')}</td>
+          <td class="text-end">${p.qty.toLocaleString('en-US')}</td>
           <td class="text-end">${fmtINR(p.entry_price)}</td>
           <td class="text-end">${fmtINR(p.live_price)}</td>
           <td class="text-end">${fmtINR(p.cost)}</td>
@@ -308,7 +306,7 @@ async function rebalanceModel(model) {
   // Phase 1: confirm
   titleEl.textContent = 'LIVE Rebalance';
   headerEl.className = 'modal-header bg-danger text-white';
-  bodyEl.innerHTML = preview + '<hr><div class="small text-muted">Runs live_signal + LIVE fyers_executor. SELL/BUY orders placed on Fyers.</div>';
+  bodyEl.innerHTML = preview + '<hr><div class="small text-muted">Runs live_signal + LIVE executor. SELL/BUY orders placed on eToro.</div>';
   okBtn.textContent = 'Execute Rebalance';
   okBtn.className = 'btn btn-danger';
   okBtn.style.display = '';
@@ -415,7 +413,7 @@ async function rebalanceModel(model) {
       </div>
       <div class="mb-3">
         <div class="d-flex align-items-center justify-content-between">
-          <div><strong>2. Execute (Fyers)</strong> <code class="small">${exeId}</code></div>
+          <div><strong>2. Execute (eToro)</strong> <code class="small">${exeId}</code></div>
           ${stateBadge(exeT)}
         </div>
         ${exeSum}${errExe}
@@ -468,7 +466,7 @@ async function sellNow(symbol, qty) {
       `SELL placed: <strong>${symbol}</strong> qty=${qty}` + (oid ? `<br><code class="small">order_id: ${oid}</code>` : ''),
       'success');
   } else {
-    await appModal.alert('Order Failed', 'Fyers error: <strong>' + (d.error || 'unknown') + '</strong>', 'danger');
+    await appModal.alert('Order Failed', 'eToro error: <strong>' + (d.error || 'unknown') + '</strong>', 'danger');
   }
   setTimeout(() => loadState(), 3000);
 }

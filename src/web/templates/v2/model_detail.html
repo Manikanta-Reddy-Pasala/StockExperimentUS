@@ -4,28 +4,28 @@
 
 {% block content %}
 <style>
-  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
-  .bs-card { border-radius: 10px; border: 1px solid #e3e6ef; }
-  .bs-card .card-header { background: #fafbff; border-bottom: 1px solid #e3e6ef; }
+  /* Dark "Terminal Ledger" — palette tokens come from custom.css :root */
+  .bs-card { border-radius: 10px; border: 1px solid var(--hairline); }
+  .bs-card .card-header { background: var(--surface-2); border-bottom: 1px solid var(--hairline); }
   .metric-table td { padding: 8px 12px; font-variant-numeric: tabular-nums; }
-  .metric-table .k { color: #6c757d; width: 50%; }
-  .metric-table .v { font-weight: 600; text-align: right; }
+  .metric-table .k { color: var(--text-mute); width: 50%; }
+  .metric-table .v { font-weight: 600; text-align: right; color: var(--text); font-family: var(--font-mono); }
   .metric-table .v.headline { font-size: 1.15rem; }
-  .metric-table tr.bs-section td.bs-section-hdr { background: #f4f6fb; color: #4f5868; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 12px; }
+  .metric-table tr.bs-section td.bs-section-hdr { background: var(--surface-2); color: var(--text-mute); font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; padding: 6px 12px; }
   .pos-card .pos-line { font-size: 1rem; line-height: 1.5; }
   .pos-card .pos-line strong { font-size: 1.15rem; }
   .txn-table { font-size: 0.85rem; }
   .txn-table tbody td { padding: 6px 10px; vertical-align: middle; font-variant-numeric: tabular-nums; }
-  .txn-table thead th { background: #fafbff; font-weight: 600; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; padding: 8px 10px; }
-  .side-badge { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; letter-spacing: 0.5px; }
-  .side-BUY { background: #d4edda; color: #155724; }
-  .side-SELL { background: #f8d7da; color: #721c24; }
-  .side-DEPOSIT { background: #cfe2ff; color: #084298; }
-  .side-WITHDRAW { background: #fff3cd; color: #856404; }
-  .model-tag { font-size: 0.65rem; padding: 1px 6px; border-radius: 8px; background: #eef2ff; color: #3a4cc8; border: 1px solid #d8e0ff; }
-  .live-badge { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.5px; }
-  .disabled-badge { background: #f1f3f5; color: #6c757d; border: 1px solid #dee2e6; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; }
-  .empty-state { padding: 30px; text-align: center; color: #6c757d; font-style: italic; }
+  .txn-table thead th { background: var(--surface-2); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-mute); padding: 8px 10px; }
+  .side-badge { font-size: 0.7rem; font-weight: 700; padding: 2px 9px; border-radius: 999px; letter-spacing: 0.04em; }
+  .side-BUY { background: rgba(46,189,133,.16); color: var(--gain); }
+  .side-SELL { background: rgba(246,70,93,.16); color: var(--loss); }
+  .side-DEPOSIT { background: rgba(86,156,214,.16); color: #6FB6F0; }
+  .side-WITHDRAW { background: rgba(245,177,76,.18); color: var(--accent); }
+  .model-tag { font-size: 0.65rem; padding: 1px 7px; border-radius: 6px; background: var(--surface-3); color: var(--text-dim); border: 1px solid var(--hairline-2); }
+  .live-badge { background: rgba(46,189,133,.16); color: var(--gain); border: 1px solid rgba(46,189,133,.35); padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.04em; }
+  .disabled-badge { background: var(--surface-3); color: var(--text-mute); border: 1px solid var(--hairline-2); padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; }
+  .empty-state { padding: 30px; text-align: center; color: var(--text-mute); }
 </style>
 
 <!-- Header -->
@@ -116,16 +116,18 @@
             <th>Model</th>
             <th>Side</th>
             <th>Symbol</th>
+            <th>Cap</th>
             <th class="text-end">Qty</th>
             <th class="text-end">Price</th>
             <th class="text-end">Value</th>
             <th class="text-end">P&amp;L</th>
+            <th class="text-end" title="Live fill vs backtest daily open. +ve = filled better; −ve = slippage loss.">Drift</th>
             <th>Reason</th>
             <th>Order ID</th>
           </tr>
         </thead>
         <tbody id="txn_body">
-          <tr><td colspan="10" class="empty-state">Loading transactions…</td></tr>
+          <tr><td colspan="12" class="empty-state">Loading transactions…</td></tr>
         </tbody>
       </table>
     </div>
@@ -140,7 +142,7 @@ function fmtINR(v) {
   const n = Number(v);
   const sign = n < 0 ? '-' : '';
   const abs = Math.abs(n);
-  return sign + '₹' + abs.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  return sign + '$' + abs.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 function fmtPct(v) {
   if (v == null || v === '' || Number.isNaN(Number(v))) return '—';
@@ -148,9 +150,15 @@ function fmtPct(v) {
 }
 function fmtNum(v) {
   if (v == null || v === '' || Number.isNaN(Number(v))) return '—';
-  return Number(v).toLocaleString('en-IN');
+  return Number(v).toLocaleString('en-US');
 }
-// Render in IST regardless of viewer locale (markets are Asia/Kolkata).
+// PIT cap badge (large/mid/other), color-coded. '—' if untagged.
+const _CAP_BG = {large:'#0d6efd', mid:'#6f42c1', small:'#fd7e14', other:'#6c757d'};
+const capBadge = c => c ? `<span class="badge" style="background:${_CAP_BG[c]||'#6c757d'}">${c}</span>` : '<span class="text-muted">—</span>';
+// Fill drift: +ve = filled better than backtest (green), −ve = slippage loss (red).
+const driftCell = v => (v===null||v===undefined) ? '<span class="text-muted">—</span>'
+  : `<span class="${v>0?'pos':(v<0?'neg':'neutral')}">${v>0?'+':''}${Number(v).toFixed(2)}%</span>`;
+// Render in US Eastern (ET) regardless of viewer locale (US markets).
 const fmtDate = (iso) => window.fmtIST ? window.fmtIST(iso) : (iso || '—');
 function cls(v) {
   const n = Number(v);
@@ -302,7 +310,7 @@ async function loadTradeHistory() {
     const body = document.getElementById('txn_body');
     if (!trades.length) {
       body.innerHTML =
-        '<tr><td colspan="10" class="empty-state">No trades yet for this model.</td></tr>';
+        '<tr><td colspan="12" class="empty-state">No trades yet for this model.</td></tr>';
       return;
     }
 
@@ -322,10 +330,12 @@ async function loadTradeHistory() {
           <td><span class="model-tag">${t.model_name || MODEL_NAME}</span></td>
           <td><span class="side-badge side-${side}">${side || '—'}</span></td>
           <td><code>${sym}</code></td>
+          <td>${isCashflow ? '<span class="text-muted">—</span>' : capBadge(t.cap)}</td>
           <td class="text-end">${qty}</td>
           <td class="text-end">${px}</td>
           <td class="text-end">${fmtINR(t.value)}</td>
           <td class="text-end">${pnlCell}</td>
+          <td class="text-end">${isCashflow ? '<span class="text-muted">—</span>' : driftCell(t.drift_pct)}${(!isCashflow && t.drift_usd!=null)?`<div class="small ${t.drift_usd>0?'pos':(t.drift_usd<0?'neg':'neutral')}">$${t.drift_usd>0?'+':''}${Number(t.drift_usd).toLocaleString('en-US',{maximumFractionDigits:2})}</div>`:''}</td>
           <td><small class="text-muted">${t.reason || ''}</small></td>
           <td><small class="text-muted">${t.fyers_order_id || ''}</small></td>
         </tr>
@@ -335,7 +345,7 @@ async function loadTradeHistory() {
   } catch (e) {
     console.error('trade-history load failed', e);
     document.getElementById('txn_body').innerHTML =
-      `<tr><td colspan="10" class="empty-state text-danger">Error: ${e.message || e}</td></tr>`;
+      `<tr><td colspan="12" class="empty-state text-danger">Error: ${e.message || e}</td></tr>`;
   }
 }
 

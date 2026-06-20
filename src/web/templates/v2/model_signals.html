@@ -4,9 +4,8 @@
 
 {% block content %}
 <style>
-  .pos { color: #15a36b; } .neg { color: #d4453a; } .neutral { color: #4f5868; }
-  .small-mute { font-size: 0.78rem; color: #8b95a5; }
-  th.sticky { position: sticky; top: 0; background: #fff; z-index: 2; }
+  .small-mute { font-size: 0.78rem; color: var(--text-mute); }
+  th.sticky { position: sticky; top: 0; background: var(--surface); z-index: 2; }
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-2">
@@ -46,7 +45,7 @@
     <table class="table table-sm table-striped align-middle mb-0">
       <thead>
         <tr>
-          <th class="sticky">When (IST)</th>
+          <th class="sticky">When (ET)</th>
           <th class="sticky">Type</th>
           <th class="sticky">Symbol</th>
           <th class="sticky">Side</th>
@@ -104,7 +103,7 @@ async function loadSignals() {
           : s.signal_type && (s.signal_type.includes('STOP') || s.signal_type.includes('TARGET') || s.signal_type.includes('EXIT'))
             ? '<span class="badge bg-warning text-dark">' + s.signal_type + '</span>'
             : '<span class="badge bg-light text-dark">' + (s.signal_type || '—') + '</span>';
-      const px = s.price ? '₹' + Number(s.price).toLocaleString('en-IN', {maximumFractionDigits: 2}) : '—';
+      const px = s.price ? '$' + Number(s.price).toLocaleString('en-US', {maximumFractionDigits: 2}) : '—';
       return '<tr>' +
         '<td class="small">' + tsFmt(s.emitted_at) + '</td>' +
         '<td>' + typeBadge + '</td>' +

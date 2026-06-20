@@ -5,20 +5,17 @@
 
 {% block content %}
 <style>
-  .mr-card { border-left: 4px solid #5b8def; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.05); }
+  .mr-card { border-left: 4px solid var(--accent); border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,.4); }
   .mr-metric { font-size: 1.7rem; font-weight: 700; }
-  .mr-metric-sub { font-size: 0.78rem; color: #8b95a5; text-transform: uppercase; letter-spacing: 1px; }
-  .pos { color: #15a36b; }
-  .neg { color: #d4453a; }
-  .neutral { color: #4f5868; }
-  .badge-rank-1 { background: #ffd60a; color: #333; }
-  .table-momrot th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #6c757d; }
+  .mr-metric-sub { font-size: 0.78rem; color: var(--text-mute); text-transform: uppercase; letter-spacing: 1px; }
+  .badge-rank-1 { background: rgba(232,179,57,.16); color: #E8B339; }
+  .table-momrot th { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-mute); }
   .table-momrot td { vertical-align: middle; font-size: 0.92rem; }
-  .row-held { background: #fffbea !important; font-weight: 600; }
-  .log-tail { font-family: monospace; font-size: 0.78rem; background: #1a1a2e; color: #c0d8ff; padding: 10px; border-radius: 4px; white-space: pre-wrap; max-height: 350px; overflow-y: auto; }
-  .strategy-badge { background: linear-gradient(135deg,#667eea,#764ba2); color: white; padding: 4px 12px; border-radius: 16px; font-size: 0.75rem; font-weight: 600; }
+  .row-held { background: var(--surface-3) !important; font-weight: 600; }
+  .log-tail { font-family: monospace; font-size: 0.78rem; background: var(--surface-2); color: var(--text); padding: 10px; border-radius: 4px; white-space: pre-wrap; max-height: 350px; overflow-y: auto; }
+  .strategy-badge { background: rgba(76,141,255,.16); color: var(--accent-2); padding: 4px 12px; border-radius: 16px; font-size: 0.75rem; font-weight: 600; }
   .countdown { font-variant-numeric: tabular-nums; }
-  .small-mute { font-size: 0.78rem; color: #8b95a5; }
+  .small-mute { font-size: 0.78rem; color: var(--text-mute); }
 </style>
 
 <div class="container-fluid pb-5">
@@ -566,7 +563,7 @@ function _renderTriggerRow(m, st) {
     const tag = isWiringErr
       ? '<span class="badge bg-warning text-dark">NOT WIRED</span>'
       : '<span class="badge bg-danger">ERROR</span>';
-    return `<tr style="background:#fff8f0;">
+    return `<tr style="background:rgba(76,141,255,0.10);">
       <td><strong>${m.label}</strong><br><span class="small-mute">${m.key}</span></td>
       <td colspan="6" class="small ${cls}">
         ${tag}
@@ -576,7 +573,7 @@ function _renderTriggerRow(m, st) {
   const enabledBadge = st.enabled
     ? '<span class="badge bg-success">ON</span>'
     : '<span class="badge bg-secondary">DISABLED</span>';
-  const rowStyle = st.enabled ? '' : ' style="opacity:0.55;background:#fafbfc;"';
+  const rowStyle = st.enabled ? '' : ' style="opacity:0.55;background:var(--surface-2);"';
   const pnlCls = cls(st.pnl_pct);
   const pos = st.current_position
     ? `<code>${(st.current_position.sym||'').replace('NSE:','').replace('-EQ','')}</code>` +
@@ -824,7 +821,7 @@ async function loadDataStatus() {
   const rows = settled.map((r, i) => {
     if (r.status === 'fulfilled') return r.value;
     const m = models[i];
-    return `<tr style="background:#fff8f0;">
+    return `<tr style="background:rgba(76,141,255,0.10);">
       <td><strong>${m.model_name}</strong></td>
       <td colspan="7" class="text-danger small">render failed: ${String(r.reason || 'unknown').slice(0,200)}</td>
     </tr>`;

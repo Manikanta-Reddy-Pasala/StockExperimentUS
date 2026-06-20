@@ -1,0 +1,185 @@
+# NUC deployment — fully isolated from any other docker apps on the box.
+#   * dedicated bridge network  : stockexp_nuc_net
+#   * dedicated volume          : postgres_data_nuc
+#   * container names suffixed   _nuc
+#   * host ports offset + bound to 127.0.0.1 (reach via reverse proxy / SSH tunnel)
+#   * timezone America/New_York  (US market)
+# Run with an explicit project name so compose namespaces everything:
+#   docker compose -p stockexp_nuc -f docker-compose.nuc.yml up -d --build
+x-common-env: &common-env
+  TZ: ${TZ:-America/New_York}
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-trader}:${POSTGRES_PASSWORD:-trader_password}@database:5432/${POSTGRES_DB:-trading_system}
+  DRAGONFLY_URL: redis://dragonfly:6379/0
+  PYTHONPATH: /app
+  SECRET_KEY: ${SECRET_KEY:-}
+  MAX_CONCURRENT: ${MAX_CONCURRENT:-1}
+  MIN_PRICE: ${MIN_PRICE:-1.0}
+  LIMIT_TOL_PCT: ${LIMIT_TOL_PCT:-0.1}
+  LIMIT_RETRY_PCT: ${LIMIT_RETRY_PCT:-0.2}
+  LIMIT_FALLBACK_S: ${LIMIT_FALLBACK_S:-20}
+  TG_BOT_TOKEN: ${TG_BOT_TOKEN:-}
+  TG_CHAT_ID: ${TG_CHAT_ID:-}
+  DATA_PROVIDER_MODE: ${DATA_PROVIDER_MODE:-auto}
+  YFINANCE_HISTORICAL_ENABLED: ${YFINANCE_HISTORICAL_ENABLED:-true}
+
+services:
+  database:
+    image: postgres:15.10
+    container_name: stockexp_nuc_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-trading_system}
+      POSTGRES_USER: ${POSTGRES_USER:-trader}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trader_password}
+      TZ: ${TZ:-America/New_York}
+    ports:
+      - "127.0.0.1:${NUC_DB_PORT:-55432}:5432"
+    volumes:
+      - postgres_data_nuc:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+    networks:
+      - stockexp_nuc_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-trader} -d ${POSTGRES_DB:-trading_system}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  trading_system:
+    build:
+      context: .
+      network: host
+    container_name: stockexp_nuc_app
+    depends_on:
+      database:
+        condition: service_healthy
+      dragonfly:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+      FLASK_ENV: production
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
+      WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Trading System (NUC)}
+      WEBAUTHN_RP_ORIGIN: ${WEBAUTHN_RP_ORIGIN:-http://localhost:55001}
+    ports:
+      - "127.0.0.1:${NUC_WEB_PORT:-55001}:5001"
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - stockexp_nuc_net
+    command: >
+      gunicorn
+      --workers 1
+      --threads 8
+      --worker-class gthread
+      --timeout 120
+      --graceful-timeout 30
+      --keep-alive 5
+      --bind 0.0.0.0:5001
+      --access-logfile -
+      --error-logfile -
+      "src.web.app:create_app()"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  dragonfly:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly
+    container_name: stockexp_nuc_dragonfly
+    command: dragonfly --maxmemory=384mb --proactor_threads=1
+    environment:
+      - TZ=${TZ:-America/New_York}
+    ports:
+      - "127.0.0.1:${NUC_REDIS_PORT:-56379}:6379"
+    restart: unless-stopped
+    networks:
+      - stockexp_nuc_net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-h", "localhost", "-p", "6379", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  technical_scheduler:
+    build:
+      context: .
+      network: host
+    container_name: stockexp_nuc_technical_scheduler
+    depends_on:
+      database:
+        condition: service_healthy
+      dragonfly:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - stockexp_nuc_net
+    command: python scheduler.py
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import os; os.kill(1, 0)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  data_scheduler:
+    build:
+      context: .
+      network: host
+    container_name: stockexp_nuc_data_scheduler
+    depends_on:
+      database:
+        condition: service_healthy
+      dragonfly:
+        condition: service_healthy
+    environment:
+      <<: *common-env
+    volumes:
+      - ./logs:/app/logs
+      - ./exports:/app/exports
+    restart: unless-stopped
+    networks:
+      - stockexp_nuc_net
+    command: python data_scheduler.py
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import os; os.kill(1, 0)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+volumes:
+  postgres_data_nuc:
+    name: stockexp_nuc_pgdata
+
+networks:
+  stockexp_nuc_net:
+    name: stockexp_nuc_net
+    driver: bridge
