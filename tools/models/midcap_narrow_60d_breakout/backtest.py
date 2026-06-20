@@ -205,6 +205,8 @@ def run(start: date, end: date, capital: float, out_dir: Path | None = None):
                     continue
                 c_v = float(c_v); sma_v = float(sma_v); hh_v = float(hh_v)
                 va_v = float(va_v); v_v = float(v_v)
+                if va_v <= 0:   # no 20d avg volume (illiquid / data gap) — skip, avoids /0
+                    continue
                 if c_v <= hh_v or c_v <= sma_v:
                     continue
                 if v_v < VOL_MULT * va_v:
