@@ -322,6 +322,31 @@ def run_retest(cl, dv, dates, start, end, capital, pool=120, k=2, retain=4,
     return res
 
 
+def pick_n40_holdings(cl, dv, di, universe, topadv=40, top=3, mom_lb=63,
+                      signal="blend"):
+    """The n40 selection rule, factored out for reuse by live_signal.py.
+
+    Given the close panel `cl`, dollar-volume panel `dv`, and the integer bar
+    index `di`, return {symbol: weight} for the target top-`top` holdings:
+      1. take the top-`topadv` symbols of `universe` by trailing-20d ADV
+      2. score them by `signal` momentum (blend = avg(21/63/126d return))
+      3. keep only strictly-positive scores, sort desc, take top-`top`
+      4. equal-weight the survivors (empty dict if none qualify)
+
+    `universe` is the list of candidate symbols present in `cl.columns`.
+    This is the SAME logic the backtest's target_fn uses — keep them in sync
+    (the regime gate + leverage live in `simulate`, not here).
+    """
+    cand = adv_pool(dv, di, universe, topadv)
+    rk = momscore(cl, di, signal, mom_lb).reindex(cand)
+    rk = rk[rk > 0].dropna().sort_values(ascending=False)
+    if rk.empty:
+        return {}
+    picks = list(rk.index[:top])
+    w = 1.0 / len(picks)
+    return {s: w for s in picks}
+
+
 def run_n40(cl, dv, dates, start, end, capital, topadv=40, top=1, mom_lb=63,
             signal="ret", trail=0.0, out_dir=None, regime_on=None, regime=False, tag="",
             lev=1.0, margin_apr=0.0):
@@ -330,14 +355,8 @@ def run_n40(cl, dv, dates, start, end, capital, topadv=40, top=1, mom_lb=63,
     run_dates = dates[dates >= pd.Timestamp(start)]
 
     def target_fn(di, d, pos, risk_on):
-        cand = adv_pool(dv, di, n100, topadv)
-        rk = momscore(cl, di, signal, mom_lb).reindex(cand)
-        rk = rk[rk > 0].dropna().sort_values(ascending=False)
-        if rk.empty:
-            return {}
-        picks = list(rk.index[:top])
-        w = 1.0 / len(picks)
-        return {s: w for s in picks}
+        return pick_n40_holdings(cl, dv, di, n100, topadv=topadv, top=top,
+                                 mom_lb=mom_lb, signal=signal)
 
     res, trades, txns = simulate(cl, run_dates, dates, capital, target_fn, rebal,
                                  regime_on=regime_on, regime=regime, trail=trail,
