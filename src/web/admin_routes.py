@@ -22,6 +22,17 @@ logger = logging.getLogger(__name__)
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
 
+@admin_bp.route('/market/status', methods=['GET'])
+def market_status_api():
+    """US market state in ET: open/closed, hours, holidays, next open, rebalance."""
+    try:
+        from src.services.market.us_market import market_status
+        return jsonify({"success": True, "market": market_status()})
+    except Exception as e:
+        logger.error(f"market_status error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 def _tg_safe(text: str):
     """Best-effort Telegram alert. Never raises."""
     try:

@@ -57,6 +57,50 @@
   .totals-detail code { background: var(--surface); border: 1px solid var(--hairline); padding: 2px 6px; border-radius: 4px; font-size: 0.78rem; }
 </style>
 
+<!-- Market Status (US / ET) -->
+<div class="card mb-4" id="market-status-card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-clock-history text-primary me-1"></i><strong>Market Status</strong> <span class="text-muted small ms-1">NYSE / Nasdaq · ET</span></span>
+    <span class="badge bg-secondary" id="mkt_state">--</span>
+  </div>
+  <div class="card-body py-3">
+    <div class="row g-3 small" id="mkt_body"><div class="col text-muted">Loading…</div></div>
+  </div>
+</div>
+<script>
+(async function loadMarketStatus(){
+  const elState = document.getElementById('mkt_state');
+  const body = document.getElementById('mkt_body');
+  try {
+    const r = await fetch('/admin/market/status');
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error || 'failed');
+    const m = j.market;
+    const colors = {OPEN:'bg-success', EARLY_CLOSE:'bg-warning text-dark', PRE_MARKET:'bg-info',
+                    CLOSED:'bg-secondary', HOLIDAY:'bg-warning text-dark'};
+    elState.className = 'badge ' + (colors[m.state] || 'bg-secondary');
+    elState.textContent = m.is_open ? '● OPEN' : (m.state.replace('_',' '));
+    const cell = (lbl, val) => `<div class="col-6 col-md-3">
+        <div class="text-muted" style="font-size:.68rem;letter-spacing:.08em;text-transform:uppercase">${lbl}</div>
+        <div style="font-weight:600">${val}</div></div>`;
+    const nh = m.next_holiday ? `${m.next_holiday.name} <span class="text-muted">(${m.next_holiday.date}, ${m.next_holiday.days_away}d)</span>` : '—';
+    const rb = m.rebalance;
+    body.innerHTML =
+      cell('Now (ET)', m.now_et) +
+      cell('Session', `${m.session.open}–${m.session.close} ET${m.session.early_close?' (early)':''}`) +
+      cell(m.is_open ? 'Status' : 'Next Open', m.is_open ? m.reason : (m.next_open || '—')) +
+      cell('Today', m.today_holiday ? ('Holiday — '+m.today_holiday) : (m.today_is_trading_day ? 'Trading day' : 'Closed')) +
+      cell('Next Holiday', nh) +
+      cell('Rebalance', `${rb.next_rebalance} (${rb.days_away}d)`) +
+      cell('Cadence', rb.cadence) +
+      cell('Signal Emit', rb.signal_emit);
+  } catch(e){
+    elState.className='badge bg-danger'; elState.textContent='ERR';
+    body.innerHTML = `<div class="col text-muted">Market status unavailable: ${e.message}</div>`;
+  }
+})();
+</script>
+
 <!-- Today's signals widget (T10) -->
 <div class="card mb-4 signals-widget">
   <div class="card-header d-flex justify-content-between align-items-center">
