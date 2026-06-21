@@ -8,16 +8,16 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}?v=20260621-slate2">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter+Tight:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}?v=20260621-glass1">
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icon.svg') }}?v=5">
     <link rel="alternate icon" type="image/png" href="{{ url_for('static', filename='icon-192.png') }}?v=5">
     <!-- PWA: installable on Android / iOS. Manifest cache-busted so
          Chrome refetches it when icon URLs change. -->
     <link rel="manifest" href="/manifest.json?v=5">
-    <meta name="theme-color" content="#0B0C0E">
+    <meta name="theme-color" content="#EDF1FA">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Journal US">
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}?v=5">
     <script>
@@ -57,14 +57,14 @@
          showing return %, P&L, or unrealized values. !important so they
          beat Bootstrap table cell colour, .v cell rules, .fs-* utilities,
          etc. Used as: pos (gain) / neg (loss) / neutral (zero / N/A). */
-      .pos, .pos * { color: #22C55E !important; }
-      .neg, .neg * { color: #F0495A !important; }
-      .neutral { color: #6B737B !important; }
+      .pos, .pos * { color: #12B981 !important; }
+      .neg, .neg * { color: #F2415A !important; }
+      .neutral { color: #8A97AD !important; }
       /* Treat Bootstrap text-success / text-danger the same so a few legacy
          templates (settings.html) that still emit those classes match the
          rest of the UI exactly. */
-      .text-success { color: #22C55E !important; }
-      .text-danger  { color: #F0495A !important; }
+      .text-success { color: #12B981 !important; }
+      .text-danger  { color: #F2415A !important; }
     </style>
     {% block head %}{% endblock %}
 </head>
