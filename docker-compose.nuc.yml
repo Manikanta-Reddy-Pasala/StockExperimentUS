@@ -21,6 +21,11 @@ x-common-env: &common-env
   TG_CHAT_ID: ${TG_CHAT_ID:-}
   DATA_PROVIDER_MODE: ${DATA_PROVIDER_MODE:-auto}
   YFINANCE_HISTORICAL_ENABLED: ${YFINANCE_HISTORICAL_ENABLED:-true}
+  # eToro market-data API (sole data source). Interpolated from NUC .env — no
+  # secrets in this file. Needed by the daily data pull (price_history_provider).
+  ETORO_API_KEY: ${ETORO_API_KEY:-}
+  ETORO_USER_KEY: ${ETORO_USER_KEY:-}
+  ETORO_BASE_URL: ${ETORO_BASE_URL:-https://public-api.etoro.com/api/v1}
 
 services:
   database:
