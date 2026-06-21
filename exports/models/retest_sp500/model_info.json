@@ -1,16 +1,16 @@
 {
   "model": "retest_sp500",
   "strategy": "retest (S&P500 PIT top-2 blend)",
-  "performance": "112.4% CAGR / 34.1% DD / Calmar 3.30",
+  "note": "net of $1/txn",
   "window": "2021-06-01..2026-06-18",
-  "mode": "OBSERVER (signal-only, cash, no leverage)",
+  "mode": "OBSERVER (cash, no leverage, $1/txn)",
   "data_source": "eToro",
-  "regime": "QQQ 200d SMA gate",
+  "regime": "QQQ 200d",
   "metrics": {
     "cagr": 112.43,
     "mdd": 34.06,
     "calmar": 3.3,
-    "final": 44778842.89,
+    "final": 44776307.94,
     "yrs": 5.05,
     "trades": 66,
     "wr": 75.8,
@@ -21,6 +21,5 @@
     "large": 36,
     "mega": 30
   },
-  "win_rate_pct": 75.8,
-  "avg_pnl_pct": 78.0
+  "win_rate_pct": 75.8
 }
