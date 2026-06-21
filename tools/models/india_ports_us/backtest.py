@@ -349,14 +349,36 @@ def pick_n40_holdings(cl, dv, di, universe, topadv=40, top=3, mom_lb=63,
 
 def run_n40(cl, dv, dates, start, end, capital, topadv=40, top=1, mom_lb=63,
             signal="ret", trail=0.0, out_dir=None, regime_on=None, regime=False, tag="",
-            lev=1.0, margin_apr=0.0):
-    n100 = [s for s in cl.columns if s in set(load_csv(N100_CSV))]
+            lev=1.0, margin_apr=0.0, membership_csv=None):
+    """`membership_csv` (optional): path to a point-in-time index membership CSV
+    (schema symbol,start_date,end_date). When provided, the selection universe is
+    the FULL panel (cl.columns) restricted at EACH rebalance to the symbols that
+    were index members on that date (survivorship-correct). When None, behavior is
+    byte-for-byte unchanged: the universe is cl.columns ∩ Nasdaq-100."""
     rebal = build_rebal(dates, start, end, weekly=True)
     run_dates = dates[dates >= pd.Timestamp(start)]
 
-    def target_fn(di, d, pos, risk_on):
-        return pick_n40_holdings(cl, dv, di, n100, topadv=topadv, top=top,
-                                 mom_lb=mom_lb, signal=signal)
+    if membership_csv is None:
+        # legacy / non-PIT path — DO NOT CHANGE (existing models/results depend on it)
+        n100 = [s for s in cl.columns if s in set(load_csv(N100_CSV))]
+
+        def target_fn(di, d, pos, risk_on):
+            return pick_n40_holdings(cl, dv, di, n100, topadv=topadv, top=top,
+                                     mom_lb=mom_lb, signal=signal)
+    else:
+        # PIT path — full panel universe, gated to actual members at each bar's date
+        from tools.shared.us_index_membership import load_membership, eligible_at
+        intervals = load_membership(membership_csv)
+        panel = list(cl.columns)
+
+        def eligible_set_for_di(di):
+            members = eligible_at(intervals, dates[di])
+            return [s for s in panel if s in members]
+
+        def target_fn(di, d, pos, risk_on):
+            universe = eligible_set_for_di(di)
+            return pick_n40_holdings(cl, dv, di, universe, topadv=topadv, top=top,
+                                     mom_lb=mom_lb, signal=signal)
 
     res, trades, txns = simulate(cl, run_dates, dates, capital, target_fn, rebal,
                                  regime_on=regime_on, regime=regime, trail=trail,

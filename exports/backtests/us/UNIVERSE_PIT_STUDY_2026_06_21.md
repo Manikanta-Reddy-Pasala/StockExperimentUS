@@ -44,3 +44,32 @@ Un-leveraged n40 @ Nasdaq-100 = 98% / 37.6% DD. S&P 500 universe + 1.1× lev is 
 - Earlier 137%/132% figures were on the **3yr 2023-2026 AI-bull window** (survivorship-biased, current-snapshot universe) — inflated. The numbers above are full 5yr incl. the 2022 crash.
 - Survivorship: eToro (a broker) serves only currently-tradeable instruments, so ~75 delisted S&P names (ATVI, CTXS, SIVB…) are absent — a residual upward bias no broker feed can fix.
 - 100%+ is leverage-dependent; un-leveraged ceiling ≈ 98% (n40) / 60-75% (others).
+
+---
+
+## ADDENDUM — PIT membership wired (survivorship-corrected) 2026-06-21
+
+`tools/shared/us_index_membership.py` (`eligible_at(date)`) now feeds the n40
+engine via `--membership-csv`. At each rebalance the universe = panel ∩ members
+eligible on that date (no look-ahead). Regression-checked: non-PIT path unchanged.
+
+### Current-universe (inflated) vs PIT (honest), 2021-06→2026-06, matched vintage
+
+| Config | non-PIT CAGR/DD | **PIT CAGR/DD/Calmar** | inflation |
+|---|---|---|---|
+| n40 @ S&P 500 (1.1×)  | 132% / 38% | **57.1% / 40.3% / 1.42** | −75pp |
+| n40 @ Nasdaq 100 (1.1×) | 106% / 41% | **65.1% / 38.2% / 1.70** | −41pp |
+| n40 @ S&P 100 (1.25×) | 103% / 33% | **94.3% / 34.0% / 2.78** | −8pp |
+
+The "S&P 500" headline was the most inflated — non-PIT it was really
+sp500 ∩ today's-Nasdaq-100 (pre-selected mega-cap survivors). DD ~flat under PIT:
+survivorship inflated **returns, not risk**.
+
+### Honest 100%+ — leverage cost on PIT data
+- **S&P 100 @ 1.35× = 102.3% CAGR / 36.4% DD / Calmar 2.81** — the ONE config that clears 100% honestly at sane risk (stable OEX membership).
+- Nasdaq 100: 94.6% even @ 1.7× (55% DD). S&P 500: 86% even @ 1.9× (63% DD).
+
+**Conclusion:** survivorship-corrected, the honest ceiling is ~94% un-stressed
+(S&P 100, 1.25×) / ~102% at 1.35×. Three models >100% on honest data is NOT
+achievable at sane leverage — only S&P 100 makes it. Earlier 100-137% figures
+carried 40-75pp survivorship inflation.

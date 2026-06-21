@@ -47,6 +47,11 @@ def main():
     ap.add_argument("--to", dest="end", default=DEFAULT_END.isoformat())
     ap.add_argument("--capital", type=float, default=DEFAULT_CAP)
     ap.add_argument("--universe-csv", default=N100_CSV, help="large-cap pool (default Nasdaq-100)")
+    ap.add_argument("--membership-csv", default=None,
+                    help="point-in-time index membership CSV (symbol,start_date,end_date). "
+                         "When set, the universe is the FULL --universe-csv panel gated to "
+                         "actual members at each rebalance (survivorship-correct). When unset, "
+                         "behavior is unchanged (universe = panel ∩ Nasdaq-100).")
     ap.add_argument("--regime-sym", default="QQQ")
     # locked knobs (overridable for research)
     ap.add_argument("--top", type=int, default=3)
@@ -72,8 +77,10 @@ def main():
             signal=a.signal, trail=a.trail, out_dir=a.out,
             regime_on=reg, regime=a.regime, lev=a.lev,
             margin_apr=(a.margin_apr if a.lev > 1 else 0.0),
-            tag="_top%d_%s%s%s" % (a.top, a.signal, "_reg" if a.regime else "",
-                                   ("_lev%g" % a.lev) if a.lev != 1 else ""))
+            membership_csv=a.membership_csv,
+            tag="_top%d_%s%s%s%s" % (a.top, a.signal, "_reg" if a.regime else "",
+                                     ("_lev%g" % a.lev) if a.lev != 1 else "",
+                                     "_pit" if a.membership_csv else ""))
 
 
 if __name__ == "__main__":
