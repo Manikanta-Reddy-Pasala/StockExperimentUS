@@ -2192,6 +2192,10 @@ def admin_model_ranking(model_name):
             ranking = [{
                 "rank": t.get("rank", i + 1),
                 "symbol": t.get("symbol"),
+                # picks page reads `name`; observer signals carry no real company
+                # name (company == ticker), so leave name blank when it'd just
+                # duplicate the symbol — avoids a broken/"MU MU" display.
+                "name": (t.get("company") if t.get("company") and t.get("company") != t.get("symbol") else ""),
                 "company": t.get("company") or t.get("symbol"),
                 "weight": t.get("weight"),
                 "price": t.get("price"),
