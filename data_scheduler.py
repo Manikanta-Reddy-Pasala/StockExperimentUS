@@ -215,6 +215,29 @@ def run_data_pipeline():
     _run_subprocess_with_retry(['python3', 'run_pipeline.py'], 'Data Pipeline', timeout=3600, max_retries=2)
 
 
+def pull_us_etoro_daily():
+    """Daily incremental eToro OHLCV pull for the US universe.
+
+    This is the REAL US data-freshness job. The legacy saga (run_data_pipeline)
+    keys off the `stocks` table which is empty in the US deployment, so it pulls
+    nothing — historical_data only stays fresh via this direct eToro pull over
+    the combined US universe CSV (843 syms: S&P100/500 + Nasdaq100/500). Pulls a
+    rolling 45-day window so the latest closes append without re-fetching 4y.
+    """
+    from datetime import date, timedelta
+    start = (date.today() - timedelta(days=45)).isoformat()
+    end = date.today().isoformat()
+    logger.info("=" * 80)
+    logger.info(f"eToro US daily pull — combined universe, {start} → {end}")
+    logger.info("=" * 80)
+    _run_subprocess_with_retry(
+        ['python3', 'tools/pull_etoro_history.py',
+         '--universe', 'src/data/symbols/combined_us_universe.csv',
+         '--start', start, '--end', end],
+        'etoro_us_daily', timeout=3600, max_retries=2,
+    )
+
+
 def backfill_full_history():
     """Ensure ALL NSE-EQ stocks have 4 years (1500d) of daily OHLCV.
 
@@ -560,108 +583,48 @@ def run_scheduler():
                            metadata={"pid": os.getpid()})
     except Exception as _e:
         logger.debug(f"audit BOOT failed: {_e}")
-    logger.info("Scheduled Tasks:")
-    logger.info("  - Symbol Master Update:    Weekly (Monday) at 06:00 AM")
-    logger.info("  - Universe CSV Refresh:    Weekly (Saturday) at 06:00 AM (nifty100/500/midcap/smallcap)")
-    logger.info("  - Boot catch-up:           Auto-refresh any cache >7d old on startup")
-    logger.info("  - Per-model data jobs registered below")
-    logger.info("  - Data Pipeline (4 steps): Daily at 09:00 PM (after market close)")
-    logger.info("  - CSV Export:              Daily at 10:00 PM")
-    logger.info("  - Data Quality Check:      Daily at 10:00 PM (parallel with CSV)")
+    logger.info("Scheduled Tasks (US / eToro observer):")
+    logger.info("  - eToro US daily pull:     Daily at 09:00 PM (combined US universe ~843 syms)")
+    logger.info("  - Data coverage gate:      Daily at 09:00 AM")
+    logger.info("  - CSV Export + validate:   Daily at 10:00 PM")
+    logger.info("  - Boot catch-up:           eToro pull if historical_data >2d stale")
     logger.info("=" * 80)
 
-    # Daily Fyers TOTP token refresh (03:30 IST, pre-market). Without this,
-    # token expires silently → all downstream pulls/orders fail with no rows.
+    # ---- US eToro data jobs (observer deployment) ----
+    # Daily incremental eToro pull = the REAL data-freshness job (eToro is the
+    # sole source; the legacy stocks-table saga is empty in US → pulls nothing).
+    # US market closes 16:00 ET; 21:00 container-local runs after close.
+    schedule.every().day.at("21:00").do(pull_us_etoro_daily)
 
-    # Weekly symbol master update (Monday 6 AM) — refreshes NSE_CM_symbols.json cache
-    schedule.every().monday.at("06:00").do(update_symbol_master)
-
-    # Weekly universe CSV refresh (Saturday 06:00) — nifty100/500/midcap150/smallcap250
-    # Saturday is post-Friday-close + before Monday open, captures NSE rebalance announcements
-    schedule.every().saturday.at("06:00").do(refresh_universe_csvs)
-
-    # Daily universe CSV staleness check (06:00 IST). Refreshes any >7d-stale
-    # CSV that the Saturday job missed (e.g. job crashed, network down).
-    schedule.every().day.at("06:00").do(daily_universe_csv_check)
-
-    # Pre-market data quality gate (09:00 IST, 30 min before market open).
-    # Writes /app/logs/data_quality_gate.json — fyers_executor reads it
-    # before placing entries. Aborts trading if today's coverage < 400 syms.
+    # Data-coverage marker + CSV export/validation (read historical_data only —
+    # harmless health/backup jobs; the gate just records today's symbol count).
     schedule.every().day.at("09:00").do(pre_market_data_quality_gate)
-
-    # Catch-up on startup: if any universe CSV or symbol cache is >7 days old,
-    # refresh immediately (so container restarts heal stale files automatically).
-    try:
-        import datetime as _dt
-        cache_dir = "/app/src/data/symbols"
-        stale_threshold = _dt.timedelta(days=7)
-        now = _dt.datetime.now()
-        files_to_check = [
-            ("nifty100.csv", refresh_universe_csvs),
-            ("nifty500.csv", refresh_universe_csvs),
-            ("nifty_midcap150.csv", refresh_universe_csvs),
-            ("nifty_smallcap250.csv", refresh_universe_csvs),
-            ("NSE_CM_symbols.json", update_symbol_master),
-        ]
-        triggered = set()
-        for fname, fn in files_to_check:
-            fpath = os.path.join(cache_dir, fname)
-            if not os.path.exists(fpath):
-                age_msg = "missing"
-            else:
-                age = now - _dt.datetime.fromtimestamp(os.path.getmtime(fpath))
-                if age <= stale_threshold:
-                    continue
-                age_msg = f"{age.days}d old"
-            if fn.__name__ in triggered:
-                continue
-            triggered.add(fn.__name__)
-            logger.info(f"Boot catch-up: {fname} {age_msg} → running {fn.__name__}() now")
-            try:
-                fn()
-            except Exception as e:
-                logger.error(f"Boot catch-up {fn.__name__} failed: {e}", exc_info=True)
-    except Exception as _e:
-        logger.warning(f"Boot catch-up scan failed: {_e}")
-
-    # Per-model data jobs. The system is reduced to EXACTLY TWO OBSERVER-mode
-    # models (momentum_sp100, retest_sp500); their register_data_jobs is a no-op
-    # (static CSV universes; shared daily OHLCV pipeline keeps data fresh).
-    from tools.models.n40_largecap_weekly.cron import (
-        register_data_jobs as register_observer_data,
-    )
-    register_observer_data(schedule)  # no-op (static universes)
-
-    # Legacy 4-step saga (kept for admin UI compat — populates technical_indicators,
-    # stocks.market_cap/PE/PB/ROE used by /admin and /suggested-stocks dashboards).
-    # Model 3 needs only step 3 (HISTORICAL_DATA), which is also covered by the
-    # per-model data_pull above as a fallback.
-    schedule.every().day.at("21:00").do(run_data_pipeline)
-
-    # Export CSV & validate quality (10 PM - after pipeline completes)
     schedule.every().day.at("22:00").do(export_daily_csv)
     schedule.every().day.at("22:00").do(validate_data_quality)
     schedule.every().day.at("22:05").do(snapshot_data_quality_audit)
 
-    # US book signal — generate today's IBKR rebalance plan (DRY-RUN, logs only).
-    # Live placement stays manual (run us_executor.py --live) to avoid auto-trading.
-    schedule.every().day.at("13:45").do(generate_us_book_signal)
+    # Observer models' per-model data jobs = no-op (static US CSV universes).
+    from tools.models.n40_largecap_weekly.cron import (
+        register_data_jobs as register_observer_data,
+    )
+    register_observer_data(schedule)
 
-    # Weekly full-history backfill — fills gaps for stocks added after the
-    # initial seed (newly-listed midcaps, universe changes, etc.). Daily
-    # incremental pulls only fetch last 2 days, so any stock with <4y of
-    # history would stay short forever without this job.
-    schedule.every().sunday.at("03:00").do(backfill_full_history)
-    logger.info("  - Full History Backfill (4y): Weekly Sunday at 03:00 AM")
-
-    # Run backfill immediately on startup if env flag set. Useful for
-    # first-time deployment + manual recovery after data loss.
-    if os.environ.get("BACKFILL_ON_BOOT", "false").lower() == "true":
-        logger.info("BACKFILL_ON_BOOT=true → running backfill_full_history now")
-        try:
-            backfill_full_history()
-        except Exception as e:
-            logger.error(f"Boot backfill failed: {e}", exc_info=True)
+    # Boot catch-up: if historical_data is >2 days stale, pull eToro now so a
+    # container restart self-heals stale data.
+    try:
+        from sqlalchemy import text as _text
+        with get_database_manager().get_session() as _s:
+            _maxd = _s.execute(_text(
+                "SELECT MAX(date) FROM historical_data WHERE data_source='yfinance'"
+            )).scalar()
+        import datetime as _dt
+        if _maxd is None or (_dt.date.today() - _maxd).days > 2:
+            logger.info(f"Boot catch-up: historical_data max={_maxd} stale → eToro pull now")
+            pull_us_etoro_daily()
+        else:
+            logger.info(f"Boot catch-up: historical_data fresh (max={_maxd}), no pull needed")
+    except Exception as _e:
+        logger.warning(f"Boot data catch-up failed: {_e}")
     
     # Keep scheduler running
     logger.info("Data scheduler is now running. Press Ctrl+C to stop.")
