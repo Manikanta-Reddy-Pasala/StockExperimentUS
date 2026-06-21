@@ -43,13 +43,13 @@ KNOWN_MODELS = [
     # gate, weekly rebalance. OBSERVER: signals only — NO orders, NO executor.
     {
         "name": "momentum_sp100",
-        "default_capital": 30000,
+        "default_capital": 0,
         "enabled": True,
         "description": "OBSERVER (cash): n40 S&P100 top-3 of top-50 ADV by blend momentum, weekly, QQQ regime, weights .8/.1/.1 (70/30). PIT ~112% CAGR / 34.9% DD. No leverage/orders.",
     },
     {
         "name": "retest_sp500",
-        "default_capital": 30000,
+        "default_capital": 0,
         "enabled": True,
         "description": "OBSERVER (cash): India retest on S&P500 PIT, top-2 of top-120 ADV, BLEND momentum, retest zone, weekly, QQQ regime. PIT ~112% CAGR / 34% DD / Calmar 3.30. No leverage/orders.",
     },

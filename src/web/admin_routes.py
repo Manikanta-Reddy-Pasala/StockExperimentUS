@@ -1562,7 +1562,7 @@ MODEL_PATHS = {
         "extra_args": [
             "--universe-csv", "src/data/symbols/sp100.csv",
             "--lev", "1.0", "--top", "3", "--topadv", "50",
-            "--signal", "blend", "--weights", "0.7333,0.1333,0.1333",
+            "--signal", "blend", "--weights", "0.8,0.1,0.1",
         ],
         "label": "Momentum S&P 100 (n40 top-3 blend weights, OBSERVER)",
         "universe_path": "src/data/symbols/sp100.csv",
@@ -2175,6 +2175,45 @@ def admin_model_ranking(model_name):
                 logger.warning(f"auto live_signal for {model_name} timed out")
             except Exception as e:
                 logger.warning(f"auto live_signal for {model_name} crashed: {e}")
+
+        import json as _json
+        # OBSERVER models emit their target-holdings into signals_dir as
+        # {date}_{model}.json (targets[]). Prefer that — it's the real output;
+        # ranking_dir/top_n is legacy (executor models). Map targets -> the
+        # ranking shape the Today's Picks page expects. Price comes from the
+        # signal (eToro EOD) — no Fyers LTP overlay in the US observer build.
+        sig_dir = Path(paths.get("signals_dir") or "")
+        sig_files = (sorted(sig_dir.glob(f"*{model_name}.json"),
+                            key=lambda p: p.stat().st_mtime, reverse=True)
+                     if sig_dir.exists() else [])
+        if sig_files:
+            payload = _json.loads(sig_files[0].read_text() or "{}")
+            targets = payload.get("targets") or []
+            ranking = [{
+                "rank": t.get("rank", i + 1),
+                "symbol": t.get("symbol"),
+                "company": t.get("company") or t.get("symbol"),
+                "weight": t.get("weight"),
+                "price": t.get("price"),
+            } for i, t in enumerate(targets)][:top]
+            note = payload.get("note")
+            if not ranking:
+                note = ("Regime OFF — model in cash, no holdings today."
+                        if payload.get("regime_on") is False
+                        else (note or "No targets in latest signal."))
+            return jsonify({
+                "success": True, "model": model_name,
+                "label": paths.get("label", model_name),
+                "date": payload.get("asof") or payload.get("date"),
+                "universe_size": payload.get("universe_size"),
+                "ranking": ranking,
+                "note": note,
+                "regime_on": payload.get("regime_on"),
+                "source": str(sig_files[0]),
+                "generated_at": datetime.fromtimestamp(
+                    sig_files[0].stat().st_mtime).isoformat(),
+                "ran_now": ran_now,
+            })
 
         d = ranking_dir
         if not d.exists():
