@@ -149,9 +149,13 @@ def momscore(cl, di, mode="ret", lb=15):
 
 
 def simulate(cl, run_dates, dates, capital, target_fn, rebal_days, mid_days=None,
-             regime_on=None, regime=False, trail=0.0, lev=1.0, margin_apr=0.0):
+             regime_on=None, regime=False, trail=0.0, lev=1.0, margin_apr=0.0,
+             txn_charge=0.0):
     """lev>1 = apply margin to the target weights (cash goes negative = borrowing).
-    margin_apr = annual borrow cost charged daily on negative cash (e.g. 0.06 = IBKR-ish)."""
+    margin_apr = annual borrow cost charged daily on negative cash (e.g. 0.06 = IBKR-ish).
+    txn_charge = flat per-transaction fee in $ deducted from cash on EVERY fill
+                 (both buys and sells, including trailing-stop exits) — eToro charges
+                 a flat $1 per transaction each side. 0 = off (legacy numbers)."""
     slip = SLIPPAGE_BPS / 1e4
     trail_f = trail / 100.0
     daily_borrow = margin_apr / 252.0
@@ -182,7 +186,7 @@ def simulate(cl, run_dates, dates, capital, target_fn, rebal_days, mid_days=None
                 px = float(px)
                 peak_px[s] = max(peak_px.get(s, px), px)
                 if px <= peak_px[s] * (1 - trail_f):
-                    cash += pos[s] * px * (1 - slip)
+                    cash += pos[s] * px * (1 - slip) - txn_charge
                     txns.append({"date": d.date().isoformat(), "action": "SELL_TRAIL",
                                  "symbol": s, "price": round(px, 4), "shares": round(pos[s], 4)})
                     close_trade(s, d, px, pos[s], di)
@@ -205,12 +209,12 @@ def simulate(cl, run_dates, dates, capital, target_fn, rebal_days, mid_days=None
                 if abs(dsh) * px < 1e-6:
                     continue
                 if dsh < 0:
-                    sh = -dsh; cash += sh * px * (1 - slip)
+                    sh = -dsh; cash += sh * px * (1 - slip) - txn_charge
                     txns.append({"date": d.date().isoformat(), "action": "SELL", "symbol": s,
                                  "price": round(px, 4), "shares": round(sh, 4)})
                     close_trade(s, d, px, sh, di)
                 else:
-                    cash -= dsh * px * (1 + slip)
+                    cash -= dsh * px * (1 + slip) + txn_charge
                     txns.append({"date": d.date().isoformat(), "action": "BUY", "symbol": s,
                                  "price": round(px, 4), "shares": round(dsh, 4)})
                 if tgt <= 1e-9:
@@ -252,7 +256,7 @@ def adv_pool(dv, di, candidates, topn):
 def run_emerging(cl, dv, dates, start, end, capital, pool=100, top=1, retain=3,
                  lead_pp=5.0, signal="ret", siglb=15, trail=0.0,
                  out_dir=None, regime_on=None, regime=False, tag="",
-                 membership_csv=None):
+                 membership_csv=None, txn_charge=0.0):
     """top=1 = faithful single-position India spec. top>1 = IMPROVED diversified
     top-K equal-weight rotation (cuts the 80% single-name DD).
 
@@ -295,7 +299,8 @@ def run_emerging(cl, dv, dates, start, end, capital, pool=100, top=1, retain=3,
         return {held: 1.0}
 
     res, trades, txns = simulate(cl, run_dates, dates, capital, target_fn, rebal, mid,
-                                 regime_on=regime_on, regime=regime, trail=trail)
+                                 regime_on=regime_on, regime=regime, trail=trail,
+                                 txn_charge=txn_charge)
     _report(f"emerging{tag}", res, trades, txns, out_dir)
     return res
 
@@ -440,7 +445,7 @@ def pick_retest_holdings(cl, dv, ema20, di, universe, pos=None, pool=120, k=2,
 def run_retest(cl, dv, dates, start, end, capital, pool=120, k=2, retain=4,
                mom_lb=126, ema=20, band=0.20, signal="ret", trail=0.0,
                out_dir=None, regime_on=None, regime=False, tag="",
-               membership_csv=None, ker_min=0.0, cfresh=False):
+               membership_csv=None, ker_min=0.0, cfresh=False, txn_charge=0.0):
     """`membership_csv` (optional): PIT index membership CSV. When provided, the
     broad candidate pool (full panel) is restricted at EACH rebalance to symbols
     that were index members on that date (survivorship-correct). When None,
@@ -466,7 +471,8 @@ def run_retest(cl, dv, dates, start, end, capital, pool=120, k=2, retain=4,
                                     ker_min=ker_min, cfresh=cfresh)
 
     res, trades, txns = simulate(cl, run_dates, dates, capital, target_fn, rebal,
-                                 regime_on=regime_on, regime=regime, trail=trail)
+                                 regime_on=regime_on, regime=regime, trail=trail,
+                                 txn_charge=txn_charge)
     _report(f"retest{tag}", res, trades, txns, out_dir)
     return res
 
@@ -498,7 +504,7 @@ def pick_n40_holdings(cl, dv, di, universe, topadv=40, top=3, mom_lb=63,
 
 def run_n40(cl, dv, dates, start, end, capital, topadv=40, top=1, mom_lb=63,
             signal="ret", trail=0.0, out_dir=None, regime_on=None, regime=False, tag="",
-            lev=1.0, margin_apr=0.0, membership_csv=None):
+            lev=1.0, margin_apr=0.0, membership_csv=None, txn_charge=0.0):
     """`membership_csv` (optional): path to a point-in-time index membership CSV
     (schema symbol,start_date,end_date). When provided, the selection universe is
     the FULL panel (cl.columns) restricted at EACH rebalance to the symbols that
@@ -531,7 +537,7 @@ def run_n40(cl, dv, dates, start, end, capital, topadv=40, top=1, mom_lb=63,
 
     res, trades, txns = simulate(cl, run_dates, dates, capital, target_fn, rebal,
                                  regime_on=regime_on, regime=regime, trail=trail,
-                                 lev=lev, margin_apr=margin_apr)
+                                 lev=lev, margin_apr=margin_apr, txn_charge=txn_charge)
     _report(f"n40{tag}", res, trades, txns, out_dir)
     return res
 
@@ -575,6 +581,10 @@ def main():
     ap.add_argument("--cfresh", action="store_true",
                     help="retest only: India conditional-freshness gate "
                          "(drop stale names in flat tape unless breaking out)")
+    ap.add_argument("--txn-charge", type=float, default=1.0,
+                    help="flat $ per-transaction fee deducted on EVERY fill, both "
+                         "buys and sells (eToro charges $1/txn each side). 0 = off "
+                         "(legacy no-charge numbers).")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     s, e = date.fromisoformat(a.start), date.fromisoformat(a.end)
@@ -593,12 +603,12 @@ def main():
     if a.model in ("emerging", "all"):
         run_emerging(cl, dv, dates, s, e, a.capital, top=a.top, signal=a.signal, trail=a.trail,
                      out_dir=a.out, regime_on=reg, regime=a.regime,
-                     membership_csv=a.membership_csv,
+                     membership_csv=a.membership_csv, txn_charge=a.txn_charge,
                      tag=f"_top{a.top}_{a.signal}" + ("_reg" if a.regime else ""))
     if a.model in ("retest", "all"):
         run_retest(cl, dv, dates, s, e, a.capital, k=max(2, a.top), signal=a.signal, trail=a.trail,
                    out_dir=a.out, regime_on=reg, regime=a.regime,
-                   membership_csv=a.membership_csv,
+                   membership_csv=a.membership_csv, txn_charge=a.txn_charge,
                    ker_min=a.ker_min, cfresh=a.cfresh,
                    tag=f"_k{max(2,a.top)}_{a.signal}" + ("_reg" if a.regime else "")
                        + (f"_ker{a.ker_min}" if a.ker_min > 0 else "")
@@ -606,7 +616,7 @@ def main():
     if a.model in ("n40", "all"):
         run_n40(cl, dv, dates, s, e, a.capital, top=a.top, signal=a.signal, trail=a.trail,
                 out_dir=a.out, regime_on=reg, regime=a.regime,
-                membership_csv=a.membership_csv,
+                membership_csv=a.membership_csv, txn_charge=a.txn_charge,
                 tag=f"_top{a.top}_{a.signal}" + ("_reg" if a.regime else ""))
 
 

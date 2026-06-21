@@ -276,6 +276,15 @@ def main() -> int:
     out_path.write_text(json.dumps(payload, indent=2, default=str))
     log.info(f"Wrote OBSERVER signal -> {out_path}")
 
+    # Persist to Postgres (best-effort; JSON write above stays primary)
+    try:
+        from src.services.trading.observer_signal_store import save_signal
+        save_signal(args.model_name, payload)
+        log.info(f"Persisted OBSERVER signal to DB (observer_signals): "
+                 f"{args.model_name} asof={payload.get('asof')}")
+    except Exception as _e:
+        log.warning(f"observer_signals DB persist failed (JSON written): {_e}")
+
     # Audit hook (best-effort; observer signals are informational)
     try:
         from src.services.audit_service import write_rankings

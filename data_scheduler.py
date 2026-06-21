@@ -560,6 +560,23 @@ def snapshot_data_quality_audit():
         logger.error(f"snapshot_data_quality_audit error: {e}", exc_info=True)
 
 
+def refresh_sp500_job():
+    """Weekly S&P 500 constituent refresh (Saturday 07:00).
+
+    The S&P 500 reconstitutes throughout the year; this keeps sp500.csv (current
+    list) and sp500_membership.csv (PIT membership) fresh so the observer models'
+    universe gating tracks real index changes. refresh_sp500.py is idempotent and
+    leaves the existing files untouched on any fetch failure.
+    """
+    logger.info("=" * 80)
+    logger.info("Refreshing S&P 500 constituent list (current + PIT membership)")
+    logger.info("=" * 80)
+    _run_subprocess_with_retry(
+        ['python3', 'tools/refresh_sp500.py'],
+        'refresh_sp500', timeout=300, max_retries=2,
+    )
+
+
 def generate_us_book_signal():
     """Generate today's US book (MOM/TQQQ/BRK) IBKR rebalance plan — DRY-RUN, logs only."""
     logger.info("=" * 80)
@@ -587,6 +604,7 @@ def run_scheduler():
     logger.info("  - eToro US daily pull:     Daily at 09:00 PM (combined US universe ~843 syms)")
     logger.info("  - Data coverage gate:      Daily at 09:00 AM")
     logger.info("  - CSV Export + validate:   Daily at 10:00 PM")
+    logger.info("  - S&P 500 list refresh:    Weekly Saturday 07:00")
     logger.info("  - Boot catch-up:           eToro pull if historical_data >2d stale")
     logger.info("=" * 80)
 
@@ -602,6 +620,10 @@ def run_scheduler():
     schedule.every().day.at("22:00").do(export_daily_csv)
     schedule.every().day.at("22:00").do(validate_data_quality)
     schedule.every().day.at("22:05").do(snapshot_data_quality_audit)
+
+    # Weekly S&P 500 constituent refresh (Saturday 07:00) — keeps the observer
+    # models' universe (sp500.csv + sp500_membership.csv) tracking index changes.
+    schedule.every().saturday.at("07:00").do(refresh_sp500_job)
 
     # Observer models' per-model data jobs = no-op (static US CSV universes).
     from tools.models.n40_largecap_weekly.cron import (

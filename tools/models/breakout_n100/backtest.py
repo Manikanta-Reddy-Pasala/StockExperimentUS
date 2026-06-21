@@ -66,7 +66,8 @@ def max_drawdown(equity: pd.Series) -> float:
 
 def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
         regime=False, universe_csv=N100_CSV, regime_sym="QQQ",
-        label=None, out_dir=None, quiet=False, membership_csv=None):
+        label=None, out_dir=None, quiet=False, membership_csv=None,
+        txn_charge=0.0):
     """`membership_csv` (optional): path to a point-in-time index membership CSV
     (schema symbol,start_date,end_date). When provided, the entry candidate
     universe is restricted at EACH bar to the symbols that were index members on
@@ -135,7 +136,7 @@ def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
             peak_px[s] = max(peak_px.get(s, px), px)
             stop = peak_px[s] * (1 - trail_f)
             if px <= stop or px < float(sma100.iloc[di][s]):
-                cash += pos[s] * px * (1 - slip)
+                cash += pos[s] * px * (1 - slip) - txn_charge
                 log(d, "SELL", s, px, pos[s])
                 ep = entry_px[s]; sh = pos[s]
                 trades.append({"symbol": s, "entry_date": entry_date.get(s),
@@ -171,7 +172,7 @@ def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
             for _, s in cand[:slots]:
                 px = float(px_row[s])
                 sh = budget_per / px
-                cost = sh * px * (1 + slip)
+                cost = sh * px * (1 + slip) + txn_charge
                 if cost <= cash and sh > 0:
                     cash -= cost
                     pos[s] = sh; entry_px[s] = px; peak_px[s] = px
@@ -238,12 +239,15 @@ def main():
     ap.add_argument("--regime-sym", default="QQQ", help="regime index symbol (QQQ or SPY)")
     ap.add_argument("--membership-csv", default=None,
                     help="PIT index membership CSV (survivorship-correct universe gating)")
+    ap.add_argument("--txn-charge", type=float, default=1.0,
+                    help="flat $ per-transaction fee deducted on EVERY fill, both "
+                         "buys and sells (eToro charges $1/txn each side). 0 = off.")
     ap.add_argument("--out", default=None)
     ap.add_argument("--sweep", action="store_true")
     a = ap.parse_args()
     s, e = date.fromisoformat(a.start), date.fromisoformat(a.end)
     if a.sweep:
-        rows = [run(s, e, a.capital, quiet=True, **cfg) for cfg in SWEEP]
+        rows = [run(s, e, a.capital, quiet=True, txn_charge=a.txn_charge, **cfg) for cfg in SWEEP]
         print(f"\n=== breakout N100 sweep ({rows[0]['start']} -> {rows[0]['end']}, {rows[0]['years']}y) ===")
         print(f"{'variant':<28} {'CAGR%':>8} {'TrueDD%':>8} {'Calmar':>7} {'Trades':>7} {'WR%':>6}")
         print("-" * 72)
@@ -256,7 +260,7 @@ def main():
     else:
         run(s, e, a.capital, donchian=a.donchian, trail=a.trail, maxn=a.maxn, mom=a.mom,
             regime=a.regime, universe_csv=a.universe_csv, regime_sym=a.regime_sym,
-            membership_csv=a.membership_csv,
+            membership_csv=a.membership_csv, txn_charge=a.txn_charge,
             out_dir=Path(a.out) if a.out else None)
 
 

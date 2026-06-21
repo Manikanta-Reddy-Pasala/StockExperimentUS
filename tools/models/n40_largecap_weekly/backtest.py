@@ -63,6 +63,9 @@ def main():
                          "WARNING: lev>=2 => 75-90%% DD = margin-call territory.")
     ap.add_argument("--margin-apr", type=float, default=0.06, help="annual borrow cost on margin")
     ap.add_argument("--no-regime", dest="regime", action="store_false")
+    ap.add_argument("--txn-charge", type=float, default=1.0,
+                    help="flat $ per-transaction fee deducted on EVERY fill, both "
+                         "buys and sells (eToro charges $1/txn each side). 0 = off.")
     ap.add_argument("--out", default=None)
     ap.set_defaults(regime=True)
     a = ap.parse_args()
@@ -77,7 +80,7 @@ def main():
             signal=a.signal, trail=a.trail, out_dir=a.out,
             regime_on=reg, regime=a.regime, lev=a.lev,
             margin_apr=(a.margin_apr if a.lev > 1 else 0.0),
-            membership_csv=a.membership_csv,
+            membership_csv=a.membership_csv, txn_charge=a.txn_charge,
             tag="_top%d_%s%s%s%s" % (a.top, a.signal, "_reg" if a.regime else "",
                                      ("_lev%g" % a.lev) if a.lev != 1 else "",
                                      "_pit" if a.membership_csv else ""))
