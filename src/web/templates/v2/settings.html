@@ -385,9 +385,11 @@ async function loadAllocations() {
         </td>
         <td class="text-end col-actions">
           <div class="action-bar" role="group" aria-label="Capital actions for ${m.model_name}">
-            <button class="btn btn-success" onclick="openCap('${m.model_name}','deposit')" title="Deposit cash" aria-label="Deposit"><i class="bi bi-plus-lg"></i></button>
-            <button class="btn btn-warning" onclick="openCap('${m.model_name}','withdraw')" title="Withdraw cash" aria-label="Withdraw"><i class="bi bi-dash-lg"></i></button>
-            ${posBtn}
+            <!-- OBSERVER MODE: buy/sell actions (Deposit/Withdraw/Seed/Clear) disabled —
+                 signal-only, no orders. Admin actions (enable/disable/reset) stay in kebab. -->
+            <button class="btn btn-success" disabled title="Disabled — observer mode (signal-only, no orders)" aria-label="Deposit (disabled)"><i class="bi bi-plus-lg"></i></button>
+            <button class="btn btn-warning" disabled title="Disabled — observer mode (signal-only, no orders)" aria-label="Withdraw (disabled)"><i class="bi bi-dash-lg"></i></button>
+            <button class="btn btn-outline-primary" disabled title="Disabled — observer mode (signal-only, no orders)" aria-label="Seed (disabled)"><i class="bi bi-bookmark-plus"></i></button>
             <button class="btn btn-outline-secondary kebab-btn" type="button" id="${dropdownId}" data-menu='${menuHtml.replace(/'/g, "&#39;")}' aria-expanded="false" title="More actions" aria-label="More actions">
               <i class="bi bi-three-dots-vertical"></i>
             </button>
