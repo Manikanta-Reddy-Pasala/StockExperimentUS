@@ -374,9 +374,9 @@ async function loadAllocations() {
         <td class="col-model">
           <strong>${m.model_name}</strong>${enabledBadge}${warnBadge}
           <span class="universe-tag">${meta.universe} · ${meta.kind}</span>
-          <label class="form-check form-switch mt-1 mb-0" style="padding-left:2.4em" title="Per-model observer signal emission. ON = emits signals (observer). OFF = model disabled, no signals. (US is observer-only — no live orders either way.)">
+          <label class="form-check form-switch mt-1 mb-0" style="padding-left:2.4em" title="Enable/disable this model. ON = emits signals at next cron. OFF = paused, no signals. (Whole app is observer-only — no live orders either way.)">
             <input class="form-check-input" type="checkbox" role="switch" ${m.enabled ? 'checked' : ''} onchange="toggleEnabled('${m.model_name}', this.checked)">
-            <span class="small ${m.enabled ? 'text-success' : 'text-muted'}">${m.enabled ? '● Observer · active' : 'Off'}</span>
+            <span class="small ${m.enabled ? 'text-success' : 'text-muted'}">${m.enabled ? '● Enabled' : 'Disabled'}</span>
           </label>
         </td>
         <td class="text-end num">${fmtUSD(m.allocated_capital)}</td>
