@@ -613,7 +613,8 @@ def run_scheduler():
     # container restart self-heals stale data.
     try:
         from sqlalchemy import text as _text
-        with get_database_manager().get_session() as _s:
+        from src.models.database import get_database_manager as _gdm
+        with _gdm().get_session() as _s:
             _maxd = _s.execute(_text(
                 "SELECT MAX(date) FROM historical_data WHERE data_source='yfinance'"
             )).scalar()
