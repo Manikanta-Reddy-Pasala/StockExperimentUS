@@ -22,10 +22,8 @@
 <script>
 // 4 equity models to show. `schedule` drives the next-rebalance display.
 const MODELS = [
-  {key: "momentum_n100_top5_max1",     title: "Momentum N100 Top-5 (mc=1)",        desc: "Monthly rotation + mid-month check • real Nasdaq 100 • 30d return",        schedule: "monthly_midcheck"},
-  {key: "n20_daily_large_only",        title: "N20 Daily ADV ∩ N100",              desc: "Daily rotation • top-20 ADV ∩ N100 • uptrend",                            schedule: "daily"},
-  {key: "midcap_narrow_60d_breakout",  title: "Mid 60d Breakout",                  desc: "Event-driven • 60d-high + vol surge + 200d SMA",                          schedule: "event"},
-  {key: "momentum_pseudo_n100_adv",    title: "Pseudo-N100 ADV",                    desc: "Monthly rotation • top-100 ADV from Nasdaq 500 • yearly-PIT rebuild",      schedule: "monthly"},
+  {key: "momentum_sp100", title: "Momentum S&P 100", desc: "Weekly • top-3 of top-50 ADV • blend momentum • QQQ regime • cash (observer)", schedule: "weekly"},
+  {key: "retest_sp500",   title: "Retest S&P 500",   desc: "Weekly • top-2 • blend momentum • retest band • S&P 500 PIT • cash (observer)", schedule: "weekly"},
 ];
 
 // Format YYYY-MM-DD in local TZ (avoid toISOString → UTC date drift).
