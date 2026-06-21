@@ -481,7 +481,7 @@ async function loadPortfolio() {
     Object.keys(byName).forEach(name => {
       if (!MODEL_ORDER.includes(name)) cards.push(renderModelCard(byName[name], _signalsByModel[name]));
     });
-    grid.innerHTML = cards.length ? cards.join('') : '<div class="col-12 text-center text-muted py-3">No enabled models. Visit <a href="/admin/v2/settings">Settings</a> to enable one.</div>';
+    grid.innerHTML = cards.length ? cards.join('') : '<div class="col-12 text-center text-muted py-3">No enabled models. Visit <a href="/settings">Settings</a> to enable one.</div>';
     // Re-apply expanded state to cards still present after refresh.
     wasExpanded.forEach(id => {
       const el = document.getElementById(id);
