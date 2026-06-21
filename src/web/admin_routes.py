@@ -2201,7 +2201,23 @@ def admin_model_ranking(model_name):
                             key=lambda p: p.stat().st_mtime, reverse=True)
                      if sig_dir.exists() else [])
         if sig_files:
-            payload = _json.loads(sig_files[0].read_text() or "{}")
+            # Pick the newest signal that is a proper dict with targets. On a
+            # non-rebalance day the cron's --rebalance-only run self-skips and
+            # writes an empty list "[]"; tolerate that (and any list-form file)
+            # and fall back to the most recent real signal so Picks still shows
+            # the current holdings instead of 500ing on []. (fixes line-2205
+            # 'list' object has no attribute 'get').
+            payload = {}
+            for _f in sig_files:
+                try:
+                    _raw = _json.loads(_f.read_text() or "{}")
+                except Exception:
+                    continue
+                if isinstance(_raw, dict) and _raw.get("targets"):
+                    payload = _raw
+                    break
+                if isinstance(_raw, dict) and not payload:
+                    payload = _raw   # remember a dict-but-empty as last resort
             targets = payload.get("targets") or []
             ranking = [{
                 "rank": t.get("rank", i + 1),

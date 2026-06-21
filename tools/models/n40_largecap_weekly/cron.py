@@ -130,9 +130,10 @@ def register_trading_jobs(schedule):
     """Register the weekly OBSERVER signal emit for BOTH final models.
 
     OBSERVER: signal-only. No execute job is registered — these models never
-    place orders. live_signal self-skips on non-Monday days, so daily firing is
-    safe; 13:50 sits just after the 13:45 US-book DRY-RUN signal slot.
+    place orders. Emits the CURRENT target holdings DAILY (force=True) so
+    Today's Picks always shows live holdings — not an empty "[]" self-skip on
+    non-rebalance days (which broke the picks ranking endpoint).
     """
-    schedule.every().day.at("13:50").do(emit_momentum_sp100)
-    schedule.every().day.at("13:50").do(emit_retest_sp500)
+    schedule.every().day.at("13:50").do(lambda: emit_momentum_sp100(force=True))
+    schedule.every().day.at("13:50").do(lambda: emit_retest_sp500(force=True))
     log.debug("registered observer trading jobs: momentum_sp100, retest_sp500")
