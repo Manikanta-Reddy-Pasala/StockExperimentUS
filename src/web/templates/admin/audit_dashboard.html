@@ -19,7 +19,7 @@
   .pill-skip  { background: var(--surface-3); color: var(--text-mute); }
 </style>
 
-<h2 class="h5 mb-3"><i class="bi bi-journal-check me-2"></i>Audit Forensics</h2>
+<h2 class="h5 mb-3"><i data-lucide="clipboard-check" class="me-2"></i>Audit Forensics</h2>
 
 <ul class="nav nav-tabs audit-tabs" id="auditTab" role="tablist">
   <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-orders">Orders</button></li>
@@ -44,7 +44,7 @@
       <select id="orders-days" class="form-select form-select-sm" style="width:auto;">
         <option>7</option><option selected>30</option><option>90</option>
       </select>
-      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadOrders()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadOrders()"><i data-lucide="refresh-cw"></i> Refresh</button>
     </div>
     <div class="table-responsive">
       <table class="table table-sm audit-table"><thead><tr>
@@ -59,7 +59,7 @@
     <div class="filter-bar d-flex gap-2 align-items-center">
       <label class="small mb-0">Model:</label>
       <select id="dec-model" class="form-select form-select-sm" style="width:auto;"><option value="">All</option></select>
-      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadDecisions()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadDecisions()"><i data-lucide="refresh-cw"></i> Refresh</button>
     </div>
     <div class="table-responsive">
       <table class="table table-sm audit-table"><thead><tr>
@@ -75,7 +75,7 @@
       <select id="rk-model" class="form-select form-select-sm" style="width:auto;"><option value="">All</option></select>
       <label class="small mb-0">Date (YYYY-MM-DD):</label>
       <input id="rk-date" type="date" class="form-control form-control-sm" style="width:auto;">
-      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadRankings()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadRankings()"><i data-lucide="refresh-cw"></i> Refresh</button>
     </div>
     <div class="table-responsive">
       <table class="table table-sm audit-table"><thead><tr>
@@ -90,7 +90,7 @@
     <div class="filter-bar d-flex gap-2 align-items-center">
       <label class="small mb-0">Model:</label>
       <select id="sig-model" class="form-select form-select-sm" style="width:auto;"><option value="">All</option></select>
-      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadSignals()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadSignals()"><i data-lucide="refresh-cw"></i> Refresh</button>
     </div>
     <div class="table-responsive">
       <table class="table table-sm audit-table"><thead><tr>
@@ -104,7 +104,7 @@
     <div class="filter-bar d-flex gap-2 align-items-center">
       <label class="small mb-0">Model:</label>
       <select id="cfg-model" class="form-select form-select-sm" style="width:auto;"><option value="">All</option></select>
-      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadConfig()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadConfig()"><i data-lucide="refresh-cw"></i> Refresh</button>
     </div>
     <div class="table-responsive">
       <table class="table table-sm audit-table"><thead><tr>
@@ -114,7 +114,7 @@
   </div>
 
   <div class="tab-pane fade" id="tab-data">
-    <div class="filter-bar"><button class="btn btn-sm btn-outline-primary" onclick="loadDataQ()"><i class="bi bi-arrow-clockwise"></i> Refresh</button></div>
+    <div class="filter-bar"><button class="btn btn-sm btn-outline-primary" onclick="loadDataQ()"><i data-lucide="refresh-cw"></i> Refresh</button></div>
     <div class="table-responsive">
       <table class="table table-sm audit-table"><thead><tr>
         <th>Snapshot (IST)</th><th>Model</th><th>Wired</th><th>Sufficient</th>
@@ -125,7 +125,7 @@
   </div>
 
   <div class="tab-pane fade" id="tab-system">
-    <div class="filter-bar"><button class="btn btn-sm btn-outline-primary" onclick="loadSysEvents()"><i class="bi bi-arrow-clockwise"></i> Refresh</button></div>
+    <div class="filter-bar"><button class="btn btn-sm btn-outline-primary" onclick="loadSysEvents()"><i data-lucide="refresh-cw"></i> Refresh</button></div>
     <div class="table-responsive">
       <table class="table table-sm audit-table"><thead><tr>
         <th>When (IST)</th><th>Type</th><th>Component</th><th>Metadata</th>
@@ -140,7 +140,7 @@
         <option>30</option><option>90</option><option selected>365</option><option>3650</option>
       </select>
       <span class="text-muted small">Brokerage + STT + GST + exchange + SEBI + stamp + DP (SEBI rates, CNC delivery)</span>
-      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadCharges()"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+      <button class="btn btn-sm btn-outline-primary ms-auto" onclick="loadCharges()"><i data-lucide="refresh-cw"></i> Refresh</button>
     </div>
     <div class="table-responsive">
       <table class="table table-sm audit-table"><thead><tr>

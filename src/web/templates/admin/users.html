@@ -10,9 +10,9 @@
     <div class="col-12">
         <div class="card hover-lift animate-fade-in-up">
             <div class="card-header bg-gradient-primary text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0 text-white"><i class="bi bi-people-fill"></i> User Management</h5>
+                <h5 class="mb-0 text-white"><i data-lucide="users"></i> User Management</h5>
                 <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addUserModal">
-                    <i class="bi bi-person-plus-fill"></i> Add User
+                    <i data-lucide="user-plus"></i> Add User
                 </button>
             </div>
             <div class="card-body">
@@ -170,7 +170,7 @@
                 <input type="hidden" id="reset_user_id" name="user_id">
                 <div class="modal-body">
                     <div class="alert alert-warning">
-                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <i data-lucide="triangle-alert"></i>
                         <strong>Warning:</strong> This will immediately reset the password for user: <strong id="reset_username"></strong>
                         <br>The user will need to use the new password to log in.
                     </div>
@@ -368,18 +368,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td>${user.last_login ? (window.fmtIST ? window.fmtIST(user.last_login) : new Date(user.last_login).toLocaleDateString()) : 'Never'}</td>
                     <td>
                         <button class="btn btn-sm btn-outline-primary" onclick="editUser(${user.id})" title="Edit User">
-                            <i class="bi bi-pencil-fill"></i>
+                            <i data-lucide="square-pen"></i>
                         </button>
                         <button class="btn btn-sm btn-outline-warning" onclick="resetPassword(${user.id})" title="Reset Password">
-                            <i class="bi bi-key-fill"></i>
+                            <i data-lucide="key-round"></i>
                         </button>
                         <button class="btn btn-sm btn-outline-danger" onclick="deleteUser(${user.id})" ${user.id === 0 ? 'disabled' : ''} title="Delete User">
-                            <i class="bi bi-trash-fill"></i>
+                            <i data-lucide="trash-2"></i>
                         </button>
                     </td>
                 `;
                 tbody.appendChild(row);
             });
+            window.renderIcons();
         })
         .catch(error => {
             console.error('Error:', error);

@@ -454,7 +454,7 @@
     <div class="col-12">
         <div class="card task-card">
             <div class="card-header bg-gradient-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>System Status</h5>
+                <h5 class="mb-0"><i data-lucide="trending-up" class="me-2"></i>System Status</h5>
             </div>
             <div class="card-body">
                 <div class="row g-3" id="systemStatus">
@@ -493,9 +493,9 @@
     <div class="col-12">
         <div class="card task-card">
             <div class="card-header bg-gradient-success text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-bar-chart-line-fill me-2"></i>Per-Model Data Status</h5>
+                <h5 class="mb-0"><i data-lucide="bar-chart-3" class="me-2"></i>Per-Model Data Status</h5>
                 <button class="btn btn-sm btn-outline-light" onclick="loadModelStatus()">
-                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                    <i data-lucide="refresh-cw"></i> Refresh
                 </button>
             </div>
             <div class="card-body">
@@ -510,9 +510,9 @@
     <div class="col-12">
         <div class="card task-card">
             <div class="card-header bg-gradient-dark text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-terminal-fill me-2"></i>Task Log</h5>
+                <h5 class="mb-0"><i data-lucide="terminal" class="me-2"></i>Task Log</h5>
                 <button class="btn btn-sm btn-outline-light" onclick="clearLog()">
-                    <i class="bi bi-trash3-fill"></i> Clear
+                    <i data-lucide="trash-2"></i> Clear
                 </button>
             </div>
             <div class="card-body p-0">
@@ -559,6 +559,7 @@ async function loadModelStatus() {
             return;
         }
         root.innerHTML = data.models.map(renderModelCard).join('');
+        window.renderIcons();
     } catch (error) {
         root.innerHTML = '<div class="col-12 text-danger">Error: ' + error.message + '</div>';
     }
@@ -573,8 +574,8 @@ function renderModelCard(m) {
         : '<span class="badge bg-secondary ms-1">UNWIRED</span>';
     const rows = (m.items || []).map(it => {
         const icon = it.ok
-            ? '<i class="bi bi-check-circle-fill text-success"></i>'
-            : '<i class="bi bi-x-circle-fill text-danger"></i>';
+            ? '<i data-lucide="circle-check" class="text-success"></i>'
+            : '<i data-lucide="x-circle" class="text-danger"></i>';
         const val = (typeof it.value === 'number') ? it.value.toLocaleString() : it.value;
         const extra = it.extra ? `<span class="text-muted small ms-2">(${it.extra})</span>` : '';
         return `<tr><td>${icon} ${it.label}</td><td class="text-end"><strong>${val}</strong>${extra}</td><td class="text-muted small">${it.required}</td></tr>`;
@@ -596,7 +597,7 @@ function renderModelCard(m) {
             </div>
             <div class="card-footer text-end">
                 <button class="btn btn-sm btn-primary" onclick="triggerModelDataPull('${m.name}')">
-                    <i class="bi bi-arrow-down-circle"></i> Pull Data Now
+                    <i data-lucide="circle-arrow-down"></i> Pull Data Now
                 </button>
             </div>
         </div>
@@ -850,7 +851,7 @@ function renderStepProgress(steps) {
     html += `
         <div class="overall-progress">
             <div class="overall-progress-label">
-                <i class="bi bi-speedometer2 me-2"></i>Overall Progress
+                <i data-lucide="gauge" class="me-2"></i>Overall Progress
             </div>
             <div class="overall-progress-value">
                 ${completedSteps} / ${totalSteps} Steps
@@ -946,13 +947,13 @@ function renderStepProgress(steps) {
         if (step.status === 'failed') {
             actionButton = `
                 <button class="btn btn-sm btn-outline-danger" onclick="retrySingleStep('${step.name}', '${step.description}')">
-                    <i class="bi bi-arrow-clockwise"></i> Retry
+                    <i data-lucide="refresh-cw"></i> Retry
                 </button>
             `;
         }
 
         const errorDetail = step.error
-            ? `<div class="step-error-detail"><i class="bi bi-exclamation-triangle me-2"></i>${step.error}</div>`
+            ? `<div class="step-error-detail"><i data-lucide="triangle-alert" class="me-2"></i>${step.error}</div>`
             : '';
 
         html += `
@@ -989,7 +990,7 @@ function renderConsoleOutput(taskInfo) {
 
     let html = '<div class="task-console" style="margin-top: 20px; background: #1e1e1e; color: #d4d4d4; border-radius: 8px; padding: 15px; font-family: \'Courier New\', monospace; font-size: 13px; max-height: 400px; overflow-y: auto;">';
     html += '<div style="display: flex; justify-content: between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #444; padding-bottom: 10px;">';
-    html += '<div style="font-weight: bold; color: #4EC9B0;"><i class="bi bi-terminal-fill me-2"></i>Console Output</div>';
+    html += '<div style="font-weight: bold; color: #4EC9B0;"><i data-lucide="terminal" class="me-2"></i>Console Output</div>';
     html += '</div>';
 
     if (taskInfo.output) {
@@ -1007,7 +1008,7 @@ function renderConsoleOutput(taskInfo) {
 
     if (taskInfo.error) {
         html += `<div style="color: #f48771; font-weight: bold; margin-top: 10px; padding: 10px; background: rgba(244, 135, 113, 0.1); border-left: 3px solid #f48771;">`;
-        html += `<i class="bi bi-exclamation-triangle-fill me-2"></i>ERROR: ${escapeHtml(taskInfo.error)}`;
+        html += `<i data-lucide="triangle-alert" class="me-2"></i>ERROR: ${escapeHtml(taskInfo.error)}`;
         html += `</div>`;
     }
 
@@ -1059,26 +1060,26 @@ function updateActiveTasks() {
             statusBadge = '<span class="badge-status badge-completed">Completed</span>';
             buttonsHtml = `
                 <button class="btn btn-sm btn-outline-secondary" onclick="closeTask('${taskId}')">
-                    <i class="bi bi-x-lg"></i> Close
+                    <i data-lucide="x"></i> Close
                 </button>
             `;
         } else if (taskInfo.failed) {
             statusBadge = '<span class="badge-status badge-failed">Failed</span>';
             buttonsHtml = `
                 <button class="btn btn-sm btn-warning me-2" onclick="retryTask('${taskId}', '${taskInfo.type}', '${taskInfo.name}')">
-                    <i class="bi bi-arrow-clockwise"></i> Retry All
+                    <i data-lucide="refresh-cw"></i> Retry All
                 </button>
             `;
             if (taskInfo.failedSteps && taskInfo.failedSteps.length > 0) {
                 buttonsHtml += `
                     <button class="btn btn-sm btn-info me-2" onclick="retryFailedSteps('${taskId}')">
-                        <i class="bi bi-arrow-repeat"></i> Retry Failed Steps Only
+                        <i data-lucide="refresh-cw"></i> Retry Failed Steps Only
                     </button>
                 `;
             }
             buttonsHtml += `
                 <button class="btn btn-sm btn-outline-secondary" onclick="closeTask('${taskId}')">
-                    <i class="bi bi-x-lg"></i> Close
+                    <i data-lucide="x"></i> Close
                 </button>
             `;
         } else {
