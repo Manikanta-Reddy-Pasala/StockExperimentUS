@@ -37,6 +37,8 @@ COLUMNS = ["Open", "High", "Low", "Close", "Adj Close", "Volume"]
 
 # Module-level symbol -> eToro instrumentId cache (avoids a lookup per history call).
 _ETORO_ID_CACHE: dict[str, Optional[int]] = {}
+# Module-level symbol -> eToro company displayName cache (e.g. AAPL -> "Apple").
+_ETORO_NAME_CACHE: dict[str, Optional[str]] = {}
 
 
 def _as_date(d) -> date:
@@ -73,13 +75,34 @@ def _etoro_instrument_id(symbol: str, session) -> Optional[int]:
             logger.info("eToro instrument lookup %s -> HTTP %s", key, resp.status_code)
             _ETORO_ID_CACHE[key] = None
             return None
-        iid = resp.json().get("instrumentId")
+        j = resp.json()
+        iid = j.get("instrumentId")
         iid = int(iid) if iid is not None else None
         _ETORO_ID_CACHE[key] = iid
+        _ETORO_NAME_CACHE[key] = j.get("displayName") or None
         return iid
     except Exception as e:  # noqa: BLE001
         logger.warning("eToro instrument lookup error for %s: %s", key, e)
         return None
+
+
+def etoro_display_name(symbol: str) -> Optional[str]:
+    """Resolve a ticker to eToro's company displayName (e.g. AAPL -> 'Apple').
+
+    Cached. Returns None if eToro has no entry. Used by live_signal to label
+    holdings with the real company name on Today's Picks.
+    """
+    key = (symbol or "").upper().replace("NSE:", "").replace("-EQ", "")
+    if key in _ETORO_NAME_CACHE:
+        return _ETORO_NAME_CACHE[key]
+    try:
+        import requests
+        with requests.Session() as s:
+            _etoro_instrument_id(key, s)   # populates _ETORO_NAME_CACHE
+    except Exception as e:  # noqa: BLE001
+        logger.warning("eToro name lookup error for %s: %s", key, e)
+        _ETORO_NAME_CACHE[key] = None
+    return _ETORO_NAME_CACHE.get(key)
 
 
 def _etoro_daily_bars(symbol: str, start: date, end: date) -> Optional[pd.DataFrame]:

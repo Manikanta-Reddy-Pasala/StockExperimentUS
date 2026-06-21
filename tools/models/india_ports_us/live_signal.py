@@ -135,12 +135,17 @@ def build_signal_payload(model_name: str, universe_csv: str, membership_csv: str
 
     Always observer/dry_run=True — there is NO executor path for these models.
     """
+    try:
+        from src.services.data.price_history_provider import etoro_display_name
+    except Exception:
+        etoro_display_name = None
     targets = []
     for i, (sym, w) in enumerate(sorted(holdings.items(), key=lambda kv: -kv[1]), 1):
+        nm = (etoro_display_name(sym) if etoro_display_name else None) or sym
         targets.append({
             "rank": i,
             "symbol": sym,
-            "company": sym,
+            "company": nm,
             "weight": round(w, 6),
             "lev_weight": round(w, 6),    # cash, no leverage (lev 1.0)
             "price": round(float(prices.get(sym, 0.0)), 4),
@@ -275,7 +280,7 @@ def main() -> int:
     try:
         from src.services.audit_service import write_rankings
         top_n = [
-            {"rank": t["rank"], "symbol": t["symbol"], "name": t["symbol"],
+            {"rank": t["rank"], "symbol": t["symbol"], "name": t.get("company") or t["symbol"],
              "ret_30d_pct": 0.0, "price": t["price"]}
             for t in payload["targets"]
         ]

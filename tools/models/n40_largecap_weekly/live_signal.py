@@ -163,12 +163,17 @@ def build_signal_payload(model_name: str, universe_csv: str, lev: float,
     # Holdings arrive in rank order (momentum-desc); keep that order so blend
     # weights map rank-1 -> heaviest. (Sorting by weight would scramble equal
     # weights and break the ranked-weight mapping.)
+    try:
+        from src.services.data.price_history_provider import etoro_display_name
+    except Exception:
+        etoro_display_name = None
     targets = []
     for i, (sym, w) in enumerate(holdings.items(), 1):
+        nm = (etoro_display_name(sym) if etoro_display_name else None) or sym
         targets.append({
             "rank": i,
             "symbol": sym,
-            "company": sym,
+            "company": nm,
             "weight": round(w, 6),               # equal weight within the basket
             "lev_weight": round(w * lev, 6),     # weight after margin multiplier
             "price": round(float(prices.get(sym, 0.0)), 4),
