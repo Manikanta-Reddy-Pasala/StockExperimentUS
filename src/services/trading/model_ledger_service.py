@@ -45,7 +45,7 @@ KNOWN_MODELS = [
         "name": "momentum_sp100",
         "default_capital": 30000,
         "enabled": True,
-        "description": "OBSERVER (cash): n40 S&P100 top-3 of top-50 ADV by blend momentum, weekly, QQQ regime, weights .733/.133/.133. PIT ~107% CAGR / 33.5% DD. No leverage/orders.",
+        "description": "OBSERVER (cash): n40 S&P100 top-3 of top-50 ADV by blend momentum, weekly, QQQ regime, weights .8/.1/.1 (70/30). PIT ~112% CAGR / 34.9% DD. No leverage/orders.",
     },
     {
         "name": "retest_sp500",

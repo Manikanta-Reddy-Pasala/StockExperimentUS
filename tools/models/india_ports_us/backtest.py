@@ -300,33 +300,122 @@ def run_emerging(cl, dv, dates, start, end, capital, pool=100, top=1, retain=3,
     return res
 
 
+# --------------------------------------------------------------------------- #
+# India retest filters ported into the US engine (2026-06-21).
+#   1. KER (Kaufman Efficiency Ratio) chop filter — pre-ADV-cut candidate filter
+#   2. Conditional-freshness + breakout exemption — drop stale names in flat tape
+# Both default OFF (ker_min=0.0, cfresh=False) so baseline is byte-identical.
+# Constants copied verbatim from India tools/models/momentum_retest_n500/strategy.py
+# --------------------------------------------------------------------------- #
+KER_WIN = 14                 # India KER_WIN
+# cfresh (India CFRESH_*):
+CFRESH_MOM10_MIN = 4.0       # India CFRESH_MOM10_MIN
+CFRESH_FRESH_DAYS = 10       # India CFRESH_FRESH_DAYS
+CFRESH_BREADTH_SMA = 50      # India CFRESH_BREADTH_SMA
+CFRESH_BREADTH_PCTILE = 0.50 # India CFRESH_BREADTH_PCTILE
+CFRESH_BREAKOUT_P60 = 0.98   # India CFRESH_BREAKOUT_P60
+_CFRESH_BREADTH_CACHE: dict = {}
+
+
+def _ker_keep(cl, s, di, ker_min, ker_win=KER_WIN):
+    """India KER chop filter: keep iff efficiency-ratio >= ker_min over `ker_win`
+    bars. KER = |close[di]-close[di-ker_win]| / sum(|daily diffs|). NaN/insufficient
+    history passes (matches India: `(ker != ker) or ker >= KER_MIN`)."""
+    seg = cl[s].iloc[di - ker_win:di + 1]
+    net = abs(float(seg.iloc[-1]) - float(seg.iloc[0]))
+    pathsum = float(seg.diff().abs().sum())
+    ker = net / pathsum if pathsum > 0 else float("nan")
+    return (ker != ker) or ker >= ker_min  # ker!=ker => NaN passes
+
+
+def _cfresh_breadth(cl):
+    """(breadth, trailing-quantile) series memoized per `cl`. Breadth = % of the
+    loaded panel trading above its own SMA(CFRESH_BREADTH_SMA). India computes this
+    over PIT eligible_at("n500"); the US engine has no per-date PIT breadth set
+    passed in here (membership gating happens upstream on the candidate pool), so
+    breadth is taken over the full loaded panel — the closest faithful analogue."""
+    key = id(cl)
+    cached = _CFRESH_BREADTH_CACHE.get(key)
+    if cached is not None:
+        return cached
+    sma = cl.rolling(CFRESH_BREADTH_SMA, min_periods=20).mean()
+    above = (cl > sma)
+    valid = cl.notna() & sma.notna()
+    b = above.where(valid).sum(axis=1) / valid.sum(axis=1).replace(0, np.nan)
+    cut = b.rolling(252, min_periods=60).quantile(CFRESH_BREADTH_PCTILE)
+    _CFRESH_BREADTH_CACHE[key] = (b, cut)
+    return b, cut
+
+
+def _cfresh_gate_active(cl, di):
+    """True iff breadth is in its low (flat-tape) regime at row `di`. India parity."""
+    b, cut = _cfresh_breadth(cl)
+    bv, cv = b.iloc[di], cut.iloc[di]
+    return bool(pd.notna(bv) and pd.notna(cv) and bv <= cv)
+
+
+def _cfresh_keep(cl, s, di):
+    """India freshness cut: keep iff recent CFRESH_FRESH_DAYS-day return >=
+    CFRESH_MOM10_MIN OR price >= CFRESH_BREAKOUT_P60 * 60d high (breakout exemption)."""
+    if s not in cl.columns:
+        return False
+    px = cl[s].iloc[di]
+    base = cl[s].iloc[di - CFRESH_FRESH_DAYS]
+    if pd.notna(px) and pd.notna(base) and base > 0 and (px / base - 1) * 100 >= CFRESH_MOM10_MIN:
+        return True
+    if di >= 60:
+        hh = cl[s].iloc[di - 59:di + 1].max()
+        if pd.notna(hh) and hh > 0 and pd.notna(px) and px / hh >= CFRESH_BREAKOUT_P60:
+            return True
+    return False
+
+
 def pick_retest_holdings(cl, dv, ema20, di, universe, pos=None, pool=120, k=2,
-                         retain=4, mom_lb=126, band=0.20, signal="ret"):
+                         retain=4, mom_lb=126, band=0.20, signal="ret",
+                         ker_min=0.0, cfresh=False):
     """The retest selection rule, factored out for reuse by live_signal.py.
 
     Given the close panel `cl`, dollar-volume panel `dv`, the precomputed EMA
     panel `ema20` (= cl.ewm(span=ema).mean()), the integer bar index `di`, and
     the candidate `universe` (list of symbols present in cl.columns), return
     {symbol: weight} for the target retest holdings:
-      1. take the top-`pool` symbols of `universe` by trailing-20d ADV
+      0. (optional, India KER chop filter) if `ker_min` > 0: drop universe names
+         whose Kaufman Efficiency Ratio over KER_WIN bars is < ker_min, BEFORE the
+         top-`pool` ADV cut (India ordering: KER-before-ADV). NaN/short-history passes.
+      1. take the top-`pool` symbols of (filtered) `universe` by trailing-20d ADV
       2. score them by `signal` momentum over `mom_lb` days, rank desc
       3. retain held names that are still inside the top-`retain` rank
       4. fill remaining slots (up to `k`) with the highest-ranked names that are
          in a "retest" zone: price <= EMA20 * (1 + band)
+      4b. (optional, India conditional-freshness) if `cfresh` and breadth is in
+          its flat-tape regime, drop ranked candidates that are stale (recent 10d
+          return < CFRESH_MOM10_MIN) UNLESS breaking out (>= 0.98 * 60d high).
       5. equal-weight the survivors (empty dict if none qualify)
 
     `pos` is the current holdings dict ({symbol: weight} or {symbol: shares});
     only its KEYS are used (which names are currently held). Pass {} or None for
     a fresh basket (live observer has no positions to retain).
 
+    `ker_min` (default 0.0 = OFF) and `cfresh` (default False = OFF) keep this
+    byte-identical to the pre-port behavior when both are at their defaults.
+
     This is the SAME logic the backtest's run_retest target_fn uses — keep them
     in sync (the regime gate lives in `simulate`, not here).
     """
     pos = pos or {}
-    cand = adv_pool(dv, di, universe, pool)
+    # 0. KER chop filter BEFORE the ADV cut (India KER-before-ADV ordering).
+    cand_univ = universe
+    if ker_min > 0 and di >= KER_WIN:
+        cand_univ = [s for s in universe
+                     if s in cl.columns and _ker_keep(cl, s, di, ker_min)]
+    cand = adv_pool(dv, di, cand_univ, pool)
     sig = momscore(cl, di, signal, mom_lb) if signal == "blend" else \
         (cl.iloc[di] / cl.iloc[di - mom_lb] - 1 if di - mom_lb >= 0 else cl.iloc[di] * np.nan)
     rk = sig.reindex(cand).dropna().sort_values(ascending=False)
+    # 4b. conditional-freshness: in flat/low-breadth tape, drop stale ranked names
+    # unless they are breaking out (India _cfresh_gate_active + _cfresh_keep).
+    if cfresh and di >= CFRESH_FRESH_DAYS and _cfresh_gate_active(cl, di):
+        rk = rk[[s for s in rk.index if _cfresh_keep(cl, s, di)]]
     top_set = set(rk.index[:retain])
     px = cl.iloc[di]
     e = ema20.iloc[di]
@@ -351,7 +440,7 @@ def pick_retest_holdings(cl, dv, ema20, di, universe, pos=None, pool=120, k=2,
 def run_retest(cl, dv, dates, start, end, capital, pool=120, k=2, retain=4,
                mom_lb=126, ema=20, band=0.20, signal="ret", trail=0.0,
                out_dir=None, regime_on=None, regime=False, tag="",
-               membership_csv=None):
+               membership_csv=None, ker_min=0.0, cfresh=False):
     """`membership_csv` (optional): PIT index membership CSV. When provided, the
     broad candidate pool (full panel) is restricted at EACH rebalance to symbols
     that were index members on that date (survivorship-correct). When None,
@@ -373,7 +462,8 @@ def run_retest(cl, dv, dates, start, end, capital, pool=120, k=2, retain=4,
             pool_syms = [s for s in n500 if s in members]
         return pick_retest_holdings(cl, dv, ema20, di, pool_syms, pos=pos,
                                     pool=pool, k=k, retain=retain, mom_lb=mom_lb,
-                                    band=band, signal=signal)
+                                    band=band, signal=signal,
+                                    ker_min=ker_min, cfresh=cfresh)
 
     res, trades, txns = simulate(cl, run_dates, dates, capital, target_fn, rebal,
                                  regime_on=regime_on, regime=regime, trail=trail)
@@ -479,6 +569,12 @@ def main():
     ap.add_argument("--membership-csv", default=None,
                     help="PIT index membership CSV (survivorship-correct universe gating); "
                          "applies to whichever model(s) run")
+    ap.add_argument("--ker-min", type=float, default=0.0,
+                    help="retest only: India KER chop filter min efficiency-ratio "
+                         "(>0 enables, e.g. 0.25; 0=off). Applied pre-ADV-cut.")
+    ap.add_argument("--cfresh", action="store_true",
+                    help="retest only: India conditional-freshness gate "
+                         "(drop stale names in flat tape unless breaking out)")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     s, e = date.fromisoformat(a.start), date.fromisoformat(a.end)
@@ -503,7 +599,10 @@ def main():
         run_retest(cl, dv, dates, s, e, a.capital, k=max(2, a.top), signal=a.signal, trail=a.trail,
                    out_dir=a.out, regime_on=reg, regime=a.regime,
                    membership_csv=a.membership_csv,
-                   tag=f"_k{max(2,a.top)}_{a.signal}" + ("_reg" if a.regime else ""))
+                   ker_min=a.ker_min, cfresh=a.cfresh,
+                   tag=f"_k{max(2,a.top)}_{a.signal}" + ("_reg" if a.regime else "")
+                       + (f"_ker{a.ker_min}" if a.ker_min > 0 else "")
+                       + ("_cfresh" if a.cfresh else ""))
     if a.model in ("n40", "all"):
         run_n40(cl, dv, dates, s, e, a.capital, top=a.top, signal=a.signal, trail=a.trail,
                 out_dir=a.out, regime_on=reg, regime=a.regime,

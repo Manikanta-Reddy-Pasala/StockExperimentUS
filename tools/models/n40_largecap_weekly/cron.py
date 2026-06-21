@@ -41,7 +41,7 @@ SIGNALS_DIR = Path("/app/logs/observer/signals")
 
 # Blend weights for momentum_sp100: rank1=0.7333, rank2=0.1333, rank3=0.1333.
 # This equals the 60/40 blend of the top-1 + top-3 S&P100 sleeves.
-SP100_BLEND_WEIGHTS = "0.7333,0.1333,0.1333"
+SP100_BLEND_WEIGHTS = "0.8,0.1,0.1"   # 70/30 blend (fine-tuned): 112% CAGR / 34.9% DD (was 60/40 .733/.133/.133 = 107%/33.5%)
 
 
 def emit_momentum_sp100(force: bool = False):
