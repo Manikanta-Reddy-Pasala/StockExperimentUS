@@ -279,14 +279,6 @@ function renderCard(m, idx, ranking, status) {
 async function load() {
   const container = document.getElementById('picks_container');
 
-  // Use portfolio.enabled as authoritative source for which models render.
-  // triggers/status remains useful for ranking page context (NAV, P&L, pos).
-  const pf = await fetchJSON('/admin/models/portfolio');
-  const enabledMap = {};
-  if (pf.success) {
-    (pf.models || []).forEach(m => { enabledMap[m.model_name] = !!m.enabled; });
-  }
-
   // Fire all fetches in parallel — 4 models × 2 endpoints
   const fetches = MODELS.map(async (m, idx) => {
     const [ranking, status] = await Promise.all([
@@ -298,21 +290,14 @@ async function load() {
   const results = await Promise.all(fetches);
   results.sort((a, b) => a.idx - b.idx);
 
-  // Hide disabled models entirely (authoritative via portfolio.enabled).
-  // Fallback to triggers/status.enabled if portfolio not reachable.
-  const isEnabled = r => {
-    if (r.m.key in enabledMap) return enabledMap[r.m.key];
-    return !(r.status && r.status.success && r.status.enabled === false);
-  };
-  const visible = results.filter(isEnabled);
-
-  if (visible.length === 0) {
-    container.innerHTML = '<div class="alert alert-warning text-center">' +
-      'All models are disabled. Re-enable one from <a href="/admin/v2/settings" class="alert-link">Settings</a> to see picks.</div>';
+  // Observer mode: ALL models emit signals regardless of enabled flag, so
+  // show every model in Picks. Disabled models stay visible (badged DISABLED
+  // in renderCard) — they still emit, the toggle is informational only.
+  if (results.length === 0) {
+    container.innerHTML = '<div class="alert alert-warning text-center">No models configured.</div>';
     return;
   }
-  // Re-index visible cards so the first stays open by default.
-  container.innerHTML = visible.map((r, i) => renderCard(r.m, i, r.ranking, r.status)).join('');
+  container.innerHTML = results.map((r, i) => renderCard(r.m, i, r.ranking, r.status)).join('');
 }
 
 async function runSignal(modelKey, ev) {
