@@ -75,6 +75,15 @@ function nextRebalance(schedule) {
     return {label: _ymdLocal(target), days, kind: 'daily'};
   }
 
+  if (schedule === "weekly") {
+    let target = new Date(today);
+    const dow = target.getDay();          // 0=Sun..6=Sat
+    const add = ((8 - dow) % 7) || 7;     // days to next Monday
+    target.setDate(target.getDate() + add);
+    const days = Math.ceil((target - startOfToday) / 86400000);
+    return {label: _ymdLocal(target), days, kind: 'weekly'};
+  }
+
   return {label: 'event-driven', days: null, kind: 'event'};
 }
 
