@@ -624,32 +624,13 @@ def run_scheduler():
     except Exception as _e:
         logger.warning(f"Boot catch-up scan failed: {_e}")
 
-    # Per-model data jobs. Add new models by creating
-    # tools/models/<name>/cron.py with register_data_jobs(schedule).
-    from tools.models.momentum_n100_top5_max1.cron import (
-        register_data_jobs as register_momentum_n100_data,
-    )
-    from tools.models.momentum_pseudo_n100_adv.cron import (
-        register_data_jobs as register_pseudo_n100_data,
-    )
-    from tools.models.midcap_narrow_60d_breakout.cron import (
-        register_data_jobs as register_midcap_narrow_data,
-    )
-    from tools.models.n20_daily_large_only.cron import (
-        register_data_jobs as register_n20_daily_data,
-    )
-    # N40 large-cap WEEKLY OBSERVER models — register_data_jobs is a no-op
+    # Per-model data jobs. The system is reduced to EXACTLY TWO OBSERVER-mode
+    # models (momentum_sp100, retest_sp500); their register_data_jobs is a no-op
     # (static CSV universes; shared daily OHLCV pipeline keeps data fresh).
     from tools.models.n40_largecap_weekly.cron import (
-        register_data_jobs as register_n40_observer_data,
+        register_data_jobs as register_observer_data,
     )
-    # NOTE: finnifty_ic_otm4_w300_lots5 is an India FINNIFTY options model with no
-    # US equivalent — not present in this repo, so it is not registered here.
-    register_momentum_n100_data(schedule)
-    register_pseudo_n100_data(schedule)
-    register_midcap_narrow_data(schedule)
-    register_n20_daily_data(schedule)
-    register_n40_observer_data(schedule)  # no-op (static universes)
+    register_observer_data(schedule)  # no-op (static universes)
 
     # Legacy 4-step saga (kept for admin UI compat — populates technical_indicators,
     # stocks.market_cap/PE/PB/ROE used by /admin and /suggested-stocks dashboards).

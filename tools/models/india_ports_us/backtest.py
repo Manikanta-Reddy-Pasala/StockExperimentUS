@@ -300,6 +300,54 @@ def run_emerging(cl, dv, dates, start, end, capital, pool=100, top=1, retain=3,
     return res
 
 
+def pick_retest_holdings(cl, dv, ema20, di, universe, pos=None, pool=120, k=2,
+                         retain=4, mom_lb=126, band=0.20, signal="ret"):
+    """The retest selection rule, factored out for reuse by live_signal.py.
+
+    Given the close panel `cl`, dollar-volume panel `dv`, the precomputed EMA
+    panel `ema20` (= cl.ewm(span=ema).mean()), the integer bar index `di`, and
+    the candidate `universe` (list of symbols present in cl.columns), return
+    {symbol: weight} for the target retest holdings:
+      1. take the top-`pool` symbols of `universe` by trailing-20d ADV
+      2. score them by `signal` momentum over `mom_lb` days, rank desc
+      3. retain held names that are still inside the top-`retain` rank
+      4. fill remaining slots (up to `k`) with the highest-ranked names that are
+         in a "retest" zone: price <= EMA20 * (1 + band)
+      5. equal-weight the survivors (empty dict if none qualify)
+
+    `pos` is the current holdings dict ({symbol: weight} or {symbol: shares});
+    only its KEYS are used (which names are currently held). Pass {} or None for
+    a fresh basket (live observer has no positions to retain).
+
+    This is the SAME logic the backtest's run_retest target_fn uses — keep them
+    in sync (the regime gate lives in `simulate`, not here).
+    """
+    pos = pos or {}
+    cand = adv_pool(dv, di, universe, pool)
+    sig = momscore(cl, di, signal, mom_lb) if signal == "blend" else \
+        (cl.iloc[di] / cl.iloc[di - mom_lb] - 1 if di - mom_lb >= 0 else cl.iloc[di] * np.nan)
+    rk = sig.reindex(cand).dropna().sort_values(ascending=False)
+    top_set = set(rk.index[:retain])
+    px = cl.iloc[di]
+    e = ema20.iloc[di]
+    retest_ok = {s for s in rk.index
+                 if pd.notna(px.get(s)) and pd.notna(e.get(s)) and e.get(s) > 0
+                 and px[s] <= e[s] * (1 + band)}
+    keep = [s for s in pos if s in top_set]
+    slots = k - len(keep)
+    for s in rk.index:
+        if slots <= 0:
+            break
+        if s in keep or s not in retest_ok:
+            continue
+        keep.append(s)
+        slots -= 1
+    if not keep:
+        return {}
+    w = 1.0 / len(keep)
+    return {s: w for s in keep}
+
+
 def run_retest(cl, dv, dates, start, end, capital, pool=120, k=2, retain=4,
                mom_lb=126, ema=20, band=0.20, signal="ret", trail=0.0,
                out_dir=None, regime_on=None, regime=False, tag="",
@@ -323,27 +371,9 @@ def run_retest(cl, dv, dates, start, end, capital, pool=120, k=2, retain=4,
         if intervals is not None:
             members = eligible_at(intervals, dates[di])
             pool_syms = [s for s in n500 if s in members]
-        cand = adv_pool(dv, di, pool_syms, pool)
-        sig = momscore(cl, di, signal, mom_lb) if signal == "blend" else \
-            (cl.iloc[di] / cl.iloc[di - mom_lb] - 1 if di - mom_lb >= 0 else cl.iloc[di] * np.nan)
-        rk = sig.reindex(cand).dropna().sort_values(ascending=False)
-        top_set = set(rk.index[:retain])
-        px = cl.iloc[di]; e = ema20.iloc[di]
-        retest_ok = {s for s in rk.index
-                     if pd.notna(px.get(s)) and pd.notna(e.get(s)) and e.get(s) > 0
-                     and px[s] <= e[s] * (1 + band)}
-        keep = [s for s in pos if s in top_set]
-        slots = k - len(keep)
-        for s in rk.index:
-            if slots <= 0:
-                break
-            if s in keep or s not in retest_ok:
-                continue
-            keep.append(s); slots -= 1
-        if not keep:
-            return {}
-        w = 1.0 / len(keep)
-        return {s: w for s in keep}
+        return pick_retest_holdings(cl, dv, ema20, di, pool_syms, pos=pos,
+                                    pool=pool, k=k, retain=retain, mom_lb=mom_lb,
+                                    band=band, signal=signal)
 
     res, trades, txns = simulate(cl, run_dates, dates, capital, target_fn, rebal,
                                  regime_on=regime_on, regime=regime, trail=trail)

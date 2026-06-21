@@ -38,51 +38,21 @@ def _normalize_symbol(sym: str) -> str:
 # `enabled` controls auto-seeding default (per-row UI toggle still wins later).
 # `default_capital` ₹30K = small live test slug; user can deposit more via UI.
 KNOWN_MODELS = [
+    # The system is reduced to EXACTLY TWO observer-mode (signal-only) models.
+    # Both are cash (NO leverage, lev 1.0), PIT-aware backtest, QQQ 200d regime
+    # gate, weekly rebalance. OBSERVER: signals only — NO orders, NO executor.
     {
-        "name": "momentum_n100_top5_max1",
+        "name": "momentum_sp100",
         "default_capital": 30000,
         "enabled": True,
-        "description": "Equity monthly rotation top-1 from Nasdaq 100 by 30d return",
+        "description": "OBSERVER (signal-only, cash): n40 recipe on S&P 100 — top-3 of top-50 ADV by blend momentum, weekly, QQQ 200d regime, held at blend weights [0.7333, 0.1333, 0.1333] (= 60/40 blend of top-1+top-3 sleeves). PIT: ~107% CAGR / 33.5% DD / Calmar 3.21. NO leverage, NO orders.",
     },
     {
-        "name": "momentum_pseudo_n100_adv",
-        "default_capital": 30000,
-        # LIVE. Universe is rebuilt at each year-start using only data
-        # observable at that date — PIT-safe for live deployment.
-        "enabled": True,
-        "description": "Equity monthly rotation top-1 from pseudo-N100 (top-100 ADV from Nasdaq 500, yearly PIT rebuild)",
-    },
-    {
-        "name": "midcap_narrow_60d_breakout",
+        "name": "retest_sp500",
         "default_capital": 30000,
         "enabled": True,
-        "description": "Equity 60d-high swing on Nasdaq mid (event-driven)",
+        "description": "OBSERVER (signal-only, cash): India retest engine on S&P 500 — top-2 equal-weight of top-120 ADV by 126d momentum in retest zone (<= EMA20 +20%), weekly, QQQ 200d regime, nasdaq500 pool PIT-filtered by sp500_membership. PIT: ~134% CAGR / 34% DD. NO leverage, NO orders.",
     },
-    {
-        "name": "n20_daily_large_only",
-        "default_capital": 30000,
-        "enabled": True,
-        "description": "Equity daily rotation top-20-ADV ∩ Nasdaq 100 by 30d return",
-    },
-    # --- N40 S&P 100 cash BLEND OBSERVER models (signal-only, NO leverage, NO orders) ---
-    # Honest, survivorship-corrected (PIT) blend that meets ≥100% CAGR AND <35% DD:
-    # 60% top-1 sleeve (return) + 40% top-3 sleeve (stability) = 107% CAGR / 33.5%
-    # DD / Calmar 3.21 combined (cash, ~4yr eToro). Each = n40 recipe (top-50 ADV →
-    # top-K blend → weekly → QQQ 200d regime), lev 1.0. OBSERVER: signals only.
-    {
-        "name": "n40_sp100_top1_cash",
-        "default_capital": 18000,   # 60% of the 30k blend
-        "enabled": True,
-        "description": "OBSERVER (signal-only, cash): n40 S&P 100 top-1 of top-50 ADV, blend momentum, QQQ 200d regime, NO leverage. Return sleeve (60%) of the S&P100 cash blend. Standalone PIT: ~125% CAGR / 39% DD.",
-    },
-    {
-        "name": "n40_sp100_top3_cash",
-        "default_capital": 12000,   # 40% of the 30k blend
-        "enabled": True,
-        "description": "OBSERVER (signal-only, cash): n40 S&P 100 top-3 of top-50 ADV, blend momentum, QQQ 200d regime, NO leverage. Stability sleeve (40%) of the S&P100 cash blend. Standalone PIT: ~76% CAGR / 27% DD. Blend (60/40 w/ top-1) = 107% / 33.5% / Calmar 3.21.",
-    },
-    # NOTE: finnifty_ic_otm4_w300_lots5 (India FINNIFTY options Iron Condor) is
-    # removed — US has no options model and no option_universe table.
 ]
 
 

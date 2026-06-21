@@ -1,30 +1,33 @@
-"""N40 large-cap WEEKLY momentum — OBSERVER-MODE live signal generator.
+"""Retest S&P 500 WEEKLY — OBSERVER-MODE live signal generator.
 
 Signal-only. Writes a target-holdings JSON; places NO orders, invokes NO
-executor. This is the live shadow of tools/models/n40_largecap_weekly/backtest.py
-(itself the IMPROVED US port of the India `n40` archetype).
+executor. This is the live shadow of the India `retest` engine ported to the
+S&P 500 (run via tools/models/india_ports_us/backtest.py run_retest, top-2,
+weekly, QQQ 200d regime, PIT-gated to actual S&P 500 members each bar).
 
 Strategy (LOCKED — identical to the backtest's selection rule):
-  universe : top-40 by trailing-20d ADV from a static large-cap CSV
-  signal   : blend = avg(21/63/126-day return)
-  hold     : top-3 equal-weight, rebalanced WEEKLY (first trading day of ISO week)
+  universe : broad nasdaq500 pool, PIT-restricted to S&P 500 members each bar
+             via src/data/symbols/sp500_membership.csv
+  candidate: top-120 by trailing-20d ADV from that PIT universe
+  signal   : 126-day return (ret); retain held names still in the top-4 rank,
+             then fill up to K=2 with the highest-ranked names sitting within
+             20% above their 20-EMA (pullback/retest)
+  hold     : top-2 equal-weight, rebalanced WEEKLY (first trading day of ISO week)
   regime   : 100% cash when the regime symbol (QQQ) < its 200d SMA
-  lev      : margin multiplier applied to the equal weights (observer note only —
-             no borrowing happens, this just scales the reported target weights so
-             the emitted plan matches the backtested book)
 
 The selection logic is REUSED from the backtest via
-`tools.models.india_ports_us.backtest.pick_n40_holdings` — do NOT duplicate it
-here, so live and backtest can never drift.
+`tools.models.india_ports_us.backtest.pick_retest_holdings` — do NOT duplicate
+it here, so live and backtest can never drift.
 
 Data: historical_data, data_source='yfinance' (eToro-sourced label), plain US
 tickers (AAPL). QQQ present for the regime gate.
 
 Usage (dry/observer):
-  PYTHONPATH=. python tools/models/n40_largecap_weekly/live_signal.py \
-    --universe-csv src/data/symbols/sp500.csv --lev 1.10 \
-    --model-name n40_sp500_lev11 \
-    --signals-out /app/logs/n40_observer/signals/$(date +%F)_n40_sp500_lev11.json \
+  PYTHONPATH=. python tools/models/india_ports_us/live_signal.py \
+    --universe-csv src/data/symbols/nasdaq500.csv \
+    --membership-csv src/data/symbols/sp500_membership.csv \
+    --model-name retest_sp500 \
+    --signals-out /app/logs/retest_observer/signals/$(date +%F)_retest_sp500.json \
     --force
 """
 from __future__ import annotations
@@ -45,36 +48,40 @@ sys.path.insert(0, str(ROOT))
 
 # Reuse the backtest's shared engine + selection rule so live can't diverge.
 from tools.models.india_ports_us.backtest import (  # noqa: E402
-    get_engine, load_csv, pick_n40_holdings,
+    get_engine, load_csv, pick_retest_holdings,
+)
+from tools.shared.us_index_membership import (  # noqa: E402
+    load_membership, eligible_at,
 )
 
-log = logging.getLogger("n40_observer_signal")
+log = logging.getLogger("retest_observer_signal")
 
-# Locked knobs (match the backtest defaults).
-TOP = 3
-TOPADV = 40
-MOM_LB = 63
-SIGNAL = "blend"
+# Locked knobs (match the backtest defaults for run_retest).
+K = 2               # top-2 holdings
+POOL = 120          # top-120 ADV candidate pool
+RETAIN = 4          # held names retained while in top-4 rank
+MOM_LB = 126        # 126-day momentum lookback
+EMA = 20            # retest EMA span
+BAND = 0.20         # within 20% above EMA = retest zone
+SIGNAL = "ret"
 REGIME_SMA = 200
 DATA_SOURCE = "yfinance"
 
 
 def is_weekly_rebalance_day(today: datetime) -> bool:
-    """True on the first weekday (Mon-Fri) of the current ISO week.
+    """True on the first weekday (Monday) of the current ISO week.
 
     Mirrors the backtest's weekly rebalance (first trading day each ISO week).
-    Calendar Monday is the first weekday; if Monday is a holiday the real first
-    trading day shifts, but the cron fires daily and the observer simply emits a
-    fresh plan — being a touch early/late only matters for live orders, and this
-    is observer-only. We anchor on Monday and treat it as the rebalance trigger.
+    Observer-only — being a touch early/late only matters for live orders.
     """
     return today.weekday() == 0  # Monday
 
 
-def load_panels(symbols: List[str], days_back: int = 420):
+def load_panels(symbols: List[str], days_back: int = 600):
     """Load (close, dollar_vol) pivots for `symbols`, ffilled, indexed by date.
 
-    Same shape/labels as the backtest's load_panels but ending today.
+    Same shape/labels as the backtest's load_panels but ending today. Needs a
+    deeper history than n40 (126d momentum + 20-EMA warmup), so days_back=600.
     """
     eng = get_engine()
     end = datetime.now().date()
@@ -120,81 +127,46 @@ def load_regime_on(regime_sym: str, days_back: int = 420) -> bool:
     return bool(s.iloc[-1] > sma.iloc[-1])
 
 
-def apply_ranked_weights(holdings: Dict[str, float],
-                         weights: List[float]) -> Dict[str, float]:
-    """Override equal-weight holdings with explicit ranked weights.
-
-    `holdings` is {symbol: equal_weight} as returned by pick_n40_holdings, which
-    builds the dict in momentum-descending order. We rely on that insertion
-    order: rank-1 = first key, rank-2 = second, etc.
-
-    rank-1 gets weights[0], rank-2 weights[1], etc. If there are FEWER holdings
-    than weights, only the present ranks are used and re-normalized to sum to the
-    weight mass they cover (so a 2-name day on a 3-weight scheme keeps the same
-    relative split). If MORE holdings than weights, extras are dropped (the
-    scheme defines the basket size).
-    """
-    syms = list(holdings.keys())  # preserve insertion (momentum-desc) order
-    n = min(len(syms), len(weights))
-    if n == 0:
-        return {}
-    chosen = syms[:n]
-    w = weights[:n]
-    total = sum(w)
-    if total <= 0:
-        return {}
-    return {s: w[i] / total for i, s in enumerate(chosen)}
-
-
-def build_signal_payload(model_name: str, universe_csv: str, lev: float,
+def build_signal_payload(model_name: str, universe_csv: str, membership_csv: str,
                          regime_sym: str, risk_on: bool,
                          holdings: Dict[str, float], prices: Dict[str, float],
-                         universe_size: int, asof: str,
-                         top: int = TOP, topadv: int = TOPADV,
-                         signal: str = SIGNAL,
-                         weights: List[float] = None) -> Dict:
-    """Observer signal: target top-3 holdings + leverage-scaled weights.
+                         universe_size: int, members_size: int, asof: str) -> Dict:
+    """Observer signal: target top-2 equal-weight retest holdings.
 
     Always observer/dry_run=True — there is NO executor path for these models.
-    When `weights` is provided the holdings are blend-weighted (rank-1 heavy)
-    instead of equal-weight; otherwise the equal weights from pick_n40_holdings
-    flow through unchanged.
     """
-    # Holdings arrive in rank order (momentum-desc); keep that order so blend
-    # weights map rank-1 -> heaviest. (Sorting by weight would scramble equal
-    # weights and break the ranked-weight mapping.)
     targets = []
-    for i, (sym, w) in enumerate(holdings.items(), 1):
+    for i, (sym, w) in enumerate(sorted(holdings.items(), key=lambda kv: -kv[1]), 1):
         targets.append({
             "rank": i,
             "symbol": sym,
             "company": sym,
-            "weight": round(w, 6),               # equal weight within the basket
-            "lev_weight": round(w * lev, 6),     # weight after margin multiplier
+            "weight": round(w, 6),
+            "lev_weight": round(w, 6),    # cash, no leverage (lev 1.0)
             "price": round(float(prices.get(sym, 0.0)), 4),
         })
     return {
         "model": model_name,
-        "strategy": "n40_largecap_weekly",
+        "strategy": "retest_sp500",
         "observer": True,        # signal-only; no orders are ever placed
         "dry_run": True,
         "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "asof": asof,
         "universe_csv": universe_csv,
+        "membership_csv": membership_csv,
         "universe_size": universe_size,
+        "members_size": members_size,
         "params": {
-            "top": top, "topadv": topadv, "signal": signal,
-            "mom_lb": MOM_LB, "lev": lev,
+            "k": K, "pool": POOL, "retain": RETAIN, "mom_lb": MOM_LB,
+            "ema": EMA, "band": BAND, "signal": SIGNAL, "lev": 1.0,
             "regime_sym": regime_sym, "regime_sma": REGIME_SMA,
-            "weights": list(weights) if weights else None,
         },
         "regime_on": risk_on,
         "targets": targets,
         "note": (
-            f"OBSERVER n40 weekly: top-{top} of top-{topadv} ADV by {signal} "
-            f"momentum, "
-            + (f"blend weights {weights}, " if weights else "equal-weight, ")
-            + f"lev {lev:g}, {regime_sym} 200d regime "
+            f"OBSERVER retest weekly: top-{K} of top-{POOL} ADV (S&P 500 PIT) by "
+            f"{MOM_LB}d momentum in retest zone (<= EMA{EMA} +{int(BAND * 100)}%), "
+            f"equal-weight cash, {regime_sym} 200d regime "
             f"{'ON' if risk_on else 'OFF (100% cash)'}."
         ),
     }
@@ -203,19 +175,15 @@ def build_signal_payload(model_name: str, universe_csv: str, lev: float,
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--universe-csv", required=True,
-                    help="large-cap pool CSV (Symbol,Series)")
-    ap.add_argument("--lev", type=float, default=1.0,
-                    help="margin multiplier reported on target weights (observer only)")
+                    help="broad pool CSV (Symbol,Series) — e.g. nasdaq500.csv")
+    ap.add_argument("--membership-csv", required=True,
+                    help="PIT S&P 500 membership CSV (symbol,start_date,end_date)")
     ap.add_argument("--model-name", required=True,
-                    help="registered model name (e.g. n40_sp500_lev11)")
+                    help="registered model name (e.g. retest_sp500)")
     ap.add_argument("--signals-out", required=True)
-    ap.add_argument("--top", type=int, default=TOP)
-    ap.add_argument("--topadv", type=int, default=TOPADV)
+    ap.add_argument("--k", type=int, default=K)
+    ap.add_argument("--pool", type=int, default=POOL)
     ap.add_argument("--signal", choices=["ret", "blend"], default=SIGNAL)
-    ap.add_argument("--weights", default=None,
-                    help='comma-separated ranked weights, e.g. "0.7333,0.1333,0.1333". '
-                         "When set, holdings are blend-weighted (rank-1 heaviest) and "
-                         "re-normalized; default is equal-weight.")
     ap.add_argument("--regime-sym", default="QQQ")
     ap.add_argument("--rebalance-only", action="store_true",
                     help="Skip (write empty file) unless today is the weekly rebalance day")
@@ -226,19 +194,10 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s %(levelname)s %(message)s")
 
-    weights = None
-    if args.weights:
-        try:
-            weights = [float(x) for x in args.weights.split(",") if x.strip()]
-        except ValueError:
-            log.error(f"invalid --weights '{args.weights}' (need comma-separated floats)")
-            Path(args.signals_out).parent.mkdir(parents=True, exist_ok=True)
-            Path(args.signals_out).write_text(json.dumps([]))
-            return 1
-
     today = datetime.now()
     log.info(f"{args.model_name} OBSERVER run: today={today.date()} "
-             f"weekday={today.strftime('%A')} universe={args.universe_csv} lev={args.lev}")
+             f"weekday={today.strftime('%A')} universe={args.universe_csv} "
+             f"membership={args.membership_csv}")
 
     out_path = Path(args.signals_out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -249,7 +208,7 @@ def main() -> int:
         out_path.write_text(json.dumps([]))
         return 0
 
-    # Universe pool
+    # Broad universe pool
     try:
         universe = sorted(set(load_csv(args.universe_csv)))
     except FileNotFoundError:
@@ -262,6 +221,14 @@ def main() -> int:
         return 1
     log.info(f"Universe pool: {len(universe)} symbols")
 
+    # PIT membership intervals
+    try:
+        intervals = load_membership(args.membership_csv)
+    except FileNotFoundError:
+        log.error(f"membership CSV not found: {args.membership_csv}")
+        out_path.write_text(json.dumps([]))
+        return 1
+
     # OHLCV panels (close + dollar volume) up to today
     cl, dv = load_panels(universe)
     if cl.empty:
@@ -269,20 +236,22 @@ def main() -> int:
         out_path.write_text(json.dumps([]))
         return 1
     di = len(cl) - 1  # latest bar index
+    ema20 = cl.ewm(span=EMA, adjust=False).mean()
 
     # Regime gate (QQQ 200d). Cash when risk-off.
     risk_on = load_regime_on(args.regime_sym)
     log.info(f"{args.regime_sym} 200d regime: {'ON' if risk_on else 'OFF (100% cash)'}")
 
+    # PIT-restrict candidates to actual S&P 500 members on the latest bar's date.
+    members = eligible_at(intervals, cl.index[di])
+    present = [s for s in universe if s in cl.columns and s in members]
+    log.info(f"S&P 500 members present in panel today: {len(present)}")
+
     if risk_on:
-        # Candidate symbols must be present in the loaded panel columns.
-        present = [s for s in universe if s in cl.columns]
-        # pick_n40_holdings returns {symbol: equal_weight} in momentum-desc order.
-        holdings = pick_n40_holdings(cl, dv, di, present, topadv=args.topadv,
-                                     top=args.top, mom_lb=MOM_LB, signal=args.signal)
-        if weights:
-            # Override equal weights with the ranked blend scheme (order kept).
-            holdings = apply_ranked_weights(holdings, weights)
+        # Observer has no positions to retain → pos={} (fresh top-K basket).
+        holdings = pick_retest_holdings(cl, dv, ema20, di, present, pos={},
+                                        pool=args.pool, k=args.k, retain=RETAIN,
+                                        mom_lb=MOM_LB, band=BAND, signal=args.signal)
     else:
         holdings = {}
 
@@ -292,15 +261,12 @@ def main() -> int:
     asof = cl.index[di].date().isoformat()
 
     log.info(f"Target holdings ({len(holdings)}):")
-    # Keep rank order (insertion = momentum-desc); do NOT re-sort by weight.
-    for sym, w in holdings.items():
-        log.info(f"  {sym:<8} w={w:.4f} lev_w={w * args.lev:.4f} @ ${prices.get(sym, 0):.2f}")
+    for sym, w in sorted(holdings.items(), key=lambda kv: -kv[1]):
+        log.info(f"  {sym:<8} w={w:.4f} @ ${prices.get(sym, 0):.2f}")
 
     payload = build_signal_payload(
-        args.model_name, args.universe_csv, args.lev, args.regime_sym,
-        risk_on, holdings, prices, len(universe), asof,
-        top=args.top, topadv=args.topadv, signal=args.signal,
-        weights=weights,
+        args.model_name, args.universe_csv, args.membership_csv, args.regime_sym,
+        risk_on, holdings, prices, len(universe), len(present), asof,
     )
     out_path.write_text(json.dumps(payload, indent=2, default=str))
     log.info(f"Wrote OBSERVER signal -> {out_path}")
@@ -313,7 +279,7 @@ def main() -> int:
              "ret_30d_pct": 0.0, "price": t["price"]}
             for t in payload["targets"]
         ]
-        write_rankings(args.model_name, today.date(), len(universe), 0, top_n)
+        write_rankings(args.model_name, today.date(), len(present), 0, top_n)
     except Exception as _e:
         log.debug(f"audit hook failed: {_e}")
     return 0

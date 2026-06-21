@@ -1,21 +1,28 @@
-"""Cron registration for the n40 large-cap WEEKLY OBSERVER models.
+"""Cron registration for the TWO final WEEKLY OBSERVER models.
 
-Three signal-only variants of the n40 strategy (top-40 ADV → top-3 blend →
-weekly → QQQ 200d regime), each on a different large-cap universe + leverage:
+The system is reduced to exactly two signal-only (observer) models — NO orders,
+NO executor, NO leverage (all cash, lev 1.0):
 
-  n40_sp500_lev11      src/data/symbols/sp500.csv      lev 1.10  (5yr ~129.9% / 37.8% DD)
-  n40_nasdaq100_lev11  src/data/symbols/nasdaq100.csv  lev 1.10  (~108.4% / 41.1% DD)
-  n40_sp100_lev125     src/data/symbols/sp100.csv      lev 1.25  (~102.7% / 33.2% DD)
+  momentum_sp100  n40 recipe on S&P 100: top-40-by-ADV (topadv 50) -> top-3 by
+                  blend momentum, weekly, QQQ 200d regime, held at the BLEND
+                  WEIGHTS [0.7333, 0.1333, 0.1333] (= the 60/40 blend of the
+                  top-1 + top-3 S&P100 sleeves = 107% CAGR / 33.5% DD).
+                  Universe src/data/symbols/sp100.csv.
+                  -> tools/models/n40_largecap_weekly/live_signal.py --weights
+
+  retest_sp500    India retest engine on S&P 500: top-2, weekly, QQQ 200d regime,
+                  nasdaq500 pool PIT-filtered by sp500_membership = 134% CAGR /
+                  34% DD. -> tools/models/india_ports_us/live_signal.py
 
 OBSERVER MODE: these emit a target-holdings JSON only. There is NO execute job,
 NO executor call, NO order placement — they shadow the live book for monitoring.
 
 Two register functions (matching the other US models):
-  register_data_jobs(schedule)    -- called by data_scheduler.py (no-op; US uses
-                                     static CSV universes + the shared daily OHLCV
-                                     refresh, so there is nothing model-specific)
-  register_trading_jobs(schedule) -- called by scheduler.py; registers the weekly
-                                     observer signal emit for all three variants
+  register_data_jobs(schedule)    -- no-op (US uses static CSV universes + the
+                                     shared daily OHLCV refresh, nothing
+                                     model-specific to pull)
+  register_trading_jobs(schedule) -- registers the weekly observer signal emit
+                                     for BOTH final models
 """
 from __future__ import annotations
 
@@ -30,29 +37,22 @@ sys.path.insert(0, str(ROOT))
 
 log = logging.getLogger(__name__)
 
-SIGNALS_DIR = Path("/app/logs/n40_observer/signals")
+SIGNALS_DIR = Path("/app/logs/observer/signals")
 
-# HONEST cash blend (no leverage, PIT survivorship-corrected). Two S&P 100
-# sleeves: top-1 (return) 60% + top-3 (stability) 40% = 107% CAGR / 33.5% DD /
-# Calmar 3.21 combined. Each sleeve = n40 recipe (topadv-40-by-ADV -> top-K blend
-# -> weekly -> QQQ 200d regime), cash (lev 1.0).
-# (model_name, universe_csv, leverage, top, topadv)
-VARIANTS = [
-    ("n40_sp100_top1_cash", "src/data/symbols/sp100.csv", 1.0, 1, 50),  # 60% sleeve
-    ("n40_sp100_top3_cash", "src/data/symbols/sp100.csv", 1.0, 3, 50),  # 40% sleeve
-]
+# Blend weights for momentum_sp100: rank1=0.7333, rank2=0.1333, rank3=0.1333.
+# This equals the 60/40 blend of the top-1 + top-3 S&P100 sleeves.
+SP100_BLEND_WEIGHTS = "0.7333,0.1333,0.1333"
 
 
-def emit_observer_signal(model_name: str, universe_csv: str, lev: float,
-                         top: int = 3, topadv: int = 40, force: bool = False):
-    """Emit one variant's OBSERVER signal. Weekly-gated unless force=True.
+def emit_momentum_sp100(force: bool = False):
+    """Emit momentum_sp100 OBSERVER signal (n40 S&P100 top-3, blend weights).
 
     Signal-only — never calls an executor. The live_signal self-skips on
     non-rebalance days (writes an empty file), so this is safe to fire daily.
     """
+    model_name = "momentum_sp100"
     log.info("\n" + "=" * 80)
-    log.info(f"RUNNING n40 OBSERVER signal: {model_name} "
-             f"(universe={universe_csv} lev={lev:g})"
+    log.info(f"RUNNING OBSERVER signal: {model_name} (S&P100 top-3 blend weights)"
              + (" [FORCE]" if force else " [weekly-gated]"))
     log.info("=" * 80)
     SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
@@ -60,14 +60,47 @@ def emit_observer_signal(model_name: str, universe_csv: str, lev: float,
     signals_out = SIGNALS_DIR / f"{today}_{model_name}.json"
     cmd = [
         "python3", "tools/models/n40_largecap_weekly/live_signal.py",
-        "--universe-csv", universe_csv,
-        "--lev", str(lev),
-        "--top", str(top),
-        "--topadv", str(topadv),
+        "--universe-csv", "src/data/symbols/sp100.csv",
+        "--lev", "1.0",
+        "--top", "3",
+        "--topadv", "50",
+        "--signal", "blend",
+        "--weights", SP100_BLEND_WEIGHTS,
         "--model-name", model_name,
         "--signals-out", str(signals_out),
     ]
     cmd.append("--force" if force else "--rebalance-only")
+    _run(model_name, cmd, signals_out)
+
+
+def emit_retest_sp500(force: bool = False):
+    """Emit retest_sp500 OBSERVER signal (India retest engine, S&P500 PIT top-2).
+
+    Signal-only — never calls an executor. The live_signal self-skips on
+    non-rebalance days (writes an empty file), so this is safe to fire daily.
+    """
+    model_name = "retest_sp500"
+    log.info("\n" + "=" * 80)
+    log.info(f"RUNNING OBSERVER signal: {model_name} (S&P500 PIT retest top-2)"
+             + (" [FORCE]" if force else " [weekly-gated]"))
+    log.info("=" * 80)
+    SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
+    today = datetime.now().strftime("%Y-%m-%d")
+    signals_out = SIGNALS_DIR / f"{today}_{model_name}.json"
+    cmd = [
+        "python3", "tools/models/india_ports_us/live_signal.py",
+        "--universe-csv", "src/data/symbols/nasdaq500.csv",
+        "--membership-csv", "src/data/symbols/sp500_membership.csv",
+        "--k", "2",
+        "--model-name", model_name,
+        "--signals-out", str(signals_out),
+    ]
+    cmd.append("--force" if force else "--rebalance-only")
+    _run(model_name, cmd, signals_out)
+
+
+def _run(model_name: str, cmd: list, signals_out: Path):
+    """Run an observer live_signal subprocess and log the result."""
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         if r.returncode == 0:
@@ -90,20 +123,16 @@ def register_data_jobs(schedule):
     US universes are static CSVs (no per-model universe refresh) and OHLCV is
     kept fresh by the shared daily pipeline in data_scheduler.py. Nothing to do.
     """
-    log.debug("n40_observer: no model-specific data jobs (static CSV universes)")
+    log.debug("observer models: no model-specific data jobs (static CSV universes)")
 
 
 def register_trading_jobs(schedule):
-    """Register the weekly OBSERVER signal emit for all three variants.
+    """Register the weekly OBSERVER signal emit for BOTH final models.
 
     OBSERVER: signal-only. No execute job is registered — these models never
     place orders. live_signal self-skips on non-Monday days, so daily firing is
     safe; 13:50 sits just after the 13:45 US-book DRY-RUN signal slot.
     """
-    for model_name, universe_csv, lev, top, topadv in VARIANTS:
-        # Bind loop vars via defaults so the closure captures the right values.
-        schedule.every().day.at("13:50").do(
-            lambda m=model_name, u=universe_csv, l=lev, t=top, a=topadv:
-                emit_observer_signal(m, u, l, top=t, topadv=a)
-        )
-        log.debug(f"registered n40 observer trading job: {model_name}")
+    schedule.every().day.at("13:50").do(emit_momentum_sp100)
+    schedule.every().day.at("13:50").do(emit_retest_sp500)
+    log.debug("registered observer trading jobs: momentum_sp100, retest_sp500")

@@ -174,17 +174,13 @@ const cls = n => n>0?"pos":(n<0?"neg":"neutral");
 // optional warning. Kept independent of backend description text so the UI
 // can evolve without redeploying the service.
 const MODEL_META = {
-  'momentum_n100_top5_max1':     { universe: 'Nasdaq 100',             kind: 'equity'  },
-  'momentum_pseudo_n100_adv':    { universe: 'Pseudo-N100 ADV',        kind: 'equity' },
-  'midcap_narrow_60d_breakout':  { universe: 'Nasdaq mid 60d HH',      kind: 'equity'  },
-  'n20_daily_large_only':        { universe: 'Top-20 ADV ∩ N100',      kind: 'equity'  },
+  'momentum_sp100':  { universe: 'S&P 100',          kind: 'equity' },
+  'retest_sp500':    { universe: 'S&P 500 (PIT)',    kind: 'equity' },
 };
-// Display order: equity models.
+// Display order: the two OBSERVER-mode models.
 const MODEL_ORDER = [
-  'momentum_n100_top5_max1',
-  'momentum_pseudo_n100_adv',
-  'midcap_narrow_60d_breakout',
-  'n20_daily_large_only',
+  'momentum_sp100',
+  'retest_sp500',
 ];
 
 let _signalsByModel = {};

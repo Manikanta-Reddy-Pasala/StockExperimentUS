@@ -16,8 +16,8 @@ from datetime import datetime, timedelta
 sys.path.insert(0, str(Path(__file__).parent))
 
 from src.models.database import get_database_manager
-# EMA crossover runner removed (rejected model). Model 3 momentum rotation
-# is invoked as subprocess via tools/models/momentum_n100_top5_max1/live_signal.py.
+# OBSERVER-only models. Their weekly signal emits are invoked as subprocesses
+# from tools/models/n40_largecap_weekly/cron.py (momentum_sp100 + retest_sp500).
 import subprocess
 
 # Configure logging with rotation (max 50MB per file, keep 5 backups)
@@ -131,8 +131,8 @@ def check_data_freshness(max_age_days: int = 3) -> dict:
         }
 
 
-# Model 3 trading-side jobs are defined in
-# tools/models/momentum_n100_top5_max1/cron.py and registered below in
+# Observer trading-side jobs are defined in
+# tools/models/n40_largecap_weekly/cron.py and registered below in
 # run_scheduler() via register_trading_jobs(schedule).
 
 
@@ -278,12 +278,9 @@ def run_scheduler():
     logger.info("=" * 80)
     logger.info("📊 TECHNICAL SCHEDULER — per-model trading jobs")
     logger.info("=" * 80)
-    logger.info("Registered models (trading-side):")
-    logger.info("  - momentum_n100_top5_max1:    signal 09:25 + execute 09:30 (always live)")
-    logger.info("  - momentum_pseudo_n100_adv:   signal 09:25 + execute 09:30 (monthly rebal)")
-    logger.info("  - midcap_narrow_60d_breakout: signal 09:25 + execute 09:32 + EOD signal 15:25")
-    logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (daily rotation)")
-    logger.info("  - n40 S&P100 cash blend (x2): signal 13:50 weekly (OBSERVER — top1+top3, no leverage, no orders)")
+    logger.info("Registered models (trading-side) — EXACTLY 2, OBSERVER-only:")
+    logger.info("  - momentum_sp100: signal 13:50 weekly (OBSERVER — n40 S&P100 top-3 blend weights, cash, no orders)")
+    logger.info("  - retest_sp500:   signal 13:50 weekly (OBSERVER — India retest S&P500 PIT top-2, cash, no orders)")
     logger.info("")
     logger.info("Maintenance:")
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
@@ -298,33 +295,15 @@ def run_scheduler():
     freshness = check_data_freshness(max_age_days=3)
     logger.info(f"\n{freshness['message']}\n")
 
-    # Per-model trading-side jobs (signal + execute). Add new models by
-    # creating tools/models/<name>/cron.py with a register_trading_jobs()
-    # function, then add an import + register call below.
-    from tools.models.momentum_n100_top5_max1.cron import (
-        register_trading_jobs as register_momentum_n100_jobs,
-    )
-    from tools.models.momentum_pseudo_n100_adv.cron import (
-        register_trading_jobs as register_pseudo_n100_jobs,
-    )
-    from tools.models.midcap_narrow_60d_breakout.cron import (
-        register_trading_jobs as register_midcap_narrow_jobs,
-    )
-    from tools.models.n20_daily_large_only.cron import (
-        register_trading_jobs as register_n20_daily_jobs,
-    )
-    # N40 large-cap WEEKLY OBSERVER models (signal-only, NO order placement).
-    # Registers 3 variants (sp500/nasdaq100/sp100 + modest leverage).
+    # Per-model trading-side jobs. The system is reduced to EXACTLY TWO
+    # OBSERVER-mode models (signal-only, NO orders, NO executor). Both are
+    # registered from tools/models/n40_largecap_weekly/cron.py:
+    #   momentum_sp100  (n40 S&P100 top-3 blend weights)
+    #   retest_sp500    (India retest S&P500 PIT top-2)
     from tools.models.n40_largecap_weekly.cron import (
-        register_trading_jobs as register_n40_observer_jobs,
+        register_trading_jobs as register_observer_jobs,
     )
-    # NOTE: finnifty_ic_otm4_w300_lots5 is an India FINNIFTY options model with no
-    # US equivalent — not present in this repo, so it is not registered here.
-    register_momentum_n100_jobs(schedule)
-    register_pseudo_n100_jobs(schedule)
-    register_midcap_narrow_jobs(schedule)
-    register_n20_daily_jobs(schedule)
-    register_n40_observer_jobs(schedule)  # OBSERVER: emits signals only
+    register_observer_jobs(schedule)  # OBSERVER: emits signals only
 
     # Position reconciler — mirrors Fyers truth into model_ledger every 5 min
     # during market hours (09:30–15:30 IST). Catches drift when record_buy /
