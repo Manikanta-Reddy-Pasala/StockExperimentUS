@@ -670,14 +670,17 @@ def system_status():
 
         db_manager = get_database_manager()
         with db_manager.get_session() as session:
-            # Get database stats
+            # Get database stats. US deploy pulls eToro straight into
+            # historical_data (the `stocks` master table is unused/empty), so the
+            # tradeable-universe count = distinct symbols in historical_data.
             stocks_stats = session.execute(text("""
                 SELECT
-                    COUNT(*) as total_stocks,
-                    COUNT(current_price) as with_price,
-                    COUNT(market_cap) as with_market_cap,
-                    MAX(last_updated) as last_updated
-                FROM stocks
+                    COUNT(DISTINCT symbol) as total_stocks,
+                    COUNT(DISTINCT symbol) as with_price,
+                    0 as with_market_cap,
+                    MAX(date) as last_updated
+                FROM historical_data
+                WHERE data_source = 'yfinance'
             """)).fetchone()
 
             history_stats = session.execute(text("""
