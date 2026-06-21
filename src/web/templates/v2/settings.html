@@ -304,7 +304,7 @@ const MODEL_META = {
     universe: 'S&P 100', kind: 'equity',
     title: 'Momentum S&P 100 (n40 blend)',
     rules: { top_n: 3, max_concurrent: 3, lookback: 'blend 21/63/126d',
-             rebalance: 'Weekly · 1st trading day/ISO week · signal 13:50 ET',
+             rebalance: 'Weekly · Mon 13:50 ET (1st trading day/ISO week)',
              stop: 'None', target: 'None',
              exit: 'Weekly re-pick (QQQ 200d cash gate)' },
     strategy: [
@@ -321,7 +321,7 @@ const MODEL_META = {
     universe: 'S&P 500 (PIT)', kind: 'equity',
     title: 'Retest S&P 500 (India port)',
     rules: { top_n: 2, max_concurrent: 2, lookback: '126d',
-             rebalance: 'Weekly · 1st trading day/ISO week · signal 13:50 ET',
+             rebalance: 'Weekly · Mon 13:50 ET (1st trading day/ISO week)',
              stop: 'None', target: 'None',
              exit: 'Rank drop-out of top-4 (QQQ 200d cash gate)' },
     strategy: [
