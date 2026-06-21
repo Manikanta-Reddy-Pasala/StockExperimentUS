@@ -251,16 +251,31 @@ def adv_pool(dv, di, candidates, topn):
 # --------------------------------------------------------------------------- #
 def run_emerging(cl, dv, dates, start, end, capital, pool=100, top=1, retain=3,
                  lead_pp=5.0, signal="ret", siglb=15, trail=0.0,
-                 out_dir=None, regime_on=None, regime=False, tag=""):
+                 out_dir=None, regime_on=None, regime=False, tag="",
+                 membership_csv=None):
     """top=1 = faithful single-position India spec. top>1 = IMPROVED diversified
-    top-K equal-weight rotation (cuts the 80% single-name DD)."""
+    top-K equal-weight rotation (cuts the 80% single-name DD).
+
+    `membership_csv` (optional): PIT index membership CSV. When provided, the
+    emerging pool (panel MINUS n100) is restricted at EACH rebalance to symbols
+    that were index members on that date (survivorship-correct). When None,
+    behavior is byte-for-byte unchanged (full current-panel emerging pool)."""
     n100 = set(load_csv(N100_CSV))
     emerging = [s for s in cl.columns if s not in n100]
     rebal, mid = build_rebal(dates, start, end, mid_month=True)
     run_dates = dates[dates >= pd.Timestamp(start)]
 
+    intervals = None
+    if membership_csv is not None:
+        from tools.shared.us_index_membership import load_membership, eligible_at
+        intervals = load_membership(membership_csv)
+
     def target_fn(di, d, pos, risk_on):
-        cand = adv_pool(dv, di, emerging, pool)
+        pool_syms = emerging
+        if intervals is not None:
+            members = eligible_at(intervals, dates[di])
+            pool_syms = [s for s in emerging if s in members]
+        cand = adv_pool(dv, di, pool_syms, pool)
         rk = momscore(cl, di, signal, siglb).reindex(cand)
         rk = rk[rk > 0].dropna().sort_values(ascending=False)
         if rk.empty:
@@ -287,14 +302,28 @@ def run_emerging(cl, dv, dates, start, end, capital, pool=100, top=1, retain=3,
 
 def run_retest(cl, dv, dates, start, end, capital, pool=120, k=2, retain=4,
                mom_lb=126, ema=20, band=0.20, signal="ret", trail=0.0,
-               out_dir=None, regime_on=None, regime=False, tag=""):
+               out_dir=None, regime_on=None, regime=False, tag="",
+               membership_csv=None):
+    """`membership_csv` (optional): PIT index membership CSV. When provided, the
+    broad candidate pool (full panel) is restricted at EACH rebalance to symbols
+    that were index members on that date (survivorship-correct). When None,
+    behavior is byte-for-byte unchanged (full current panel)."""
     n500 = [s for s in cl.columns]
     rebal, _ = build_rebal(dates, start, end, mid_month=False)
     run_dates = dates[dates >= pd.Timestamp(start)]
     ema20 = cl.ewm(span=ema, adjust=False).mean()
 
+    intervals = None
+    if membership_csv is not None:
+        from tools.shared.us_index_membership import load_membership, eligible_at
+        intervals = load_membership(membership_csv)
+
     def target_fn(di, d, pos, risk_on):
-        cand = adv_pool(dv, di, n500, pool)
+        pool_syms = n500
+        if intervals is not None:
+            members = eligible_at(intervals, dates[di])
+            pool_syms = [s for s in n500 if s in members]
+        cand = adv_pool(dv, di, pool_syms, pool)
         sig = momscore(cl, di, signal, mom_lb) if signal == "blend" else \
             (cl.iloc[di] / cl.iloc[di - mom_lb] - 1 if di - mom_lb >= 0 else cl.iloc[di] * np.nan)
         rk = sig.reindex(cand).dropna().sort_values(ascending=False)
@@ -417,6 +446,9 @@ def main():
                     help="blend = avg(21/63/126d return), the US v2 alpha signal")
     ap.add_argument("--trail", type=float, default=0.0, help="per-position trailing stop %%")
     ap.add_argument("--sweep", action="store_true", help="grid search improved configs")
+    ap.add_argument("--membership-csv", default=None,
+                    help="PIT index membership CSV (survivorship-correct universe gating); "
+                         "applies to whichever model(s) run")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     s, e = date.fromisoformat(a.start), date.fromisoformat(a.end)
@@ -435,14 +467,17 @@ def main():
     if a.model in ("emerging", "all"):
         run_emerging(cl, dv, dates, s, e, a.capital, top=a.top, signal=a.signal, trail=a.trail,
                      out_dir=a.out, regime_on=reg, regime=a.regime,
+                     membership_csv=a.membership_csv,
                      tag=f"_top{a.top}_{a.signal}" + ("_reg" if a.regime else ""))
     if a.model in ("retest", "all"):
         run_retest(cl, dv, dates, s, e, a.capital, k=max(2, a.top), signal=a.signal, trail=a.trail,
                    out_dir=a.out, regime_on=reg, regime=a.regime,
+                   membership_csv=a.membership_csv,
                    tag=f"_k{max(2,a.top)}_{a.signal}" + ("_reg" if a.regime else ""))
     if a.model in ("n40", "all"):
         run_n40(cl, dv, dates, s, e, a.capital, top=a.top, signal=a.signal, trail=a.trail,
                 out_dir=a.out, regime_on=reg, regime=a.regime,
+                membership_csv=a.membership_csv,
                 tag=f"_top{a.top}_{a.signal}" + ("_reg" if a.regime else ""))
 
 

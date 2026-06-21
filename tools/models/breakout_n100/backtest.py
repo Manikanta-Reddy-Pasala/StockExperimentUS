@@ -66,7 +66,12 @@ def max_drawdown(equity: pd.Series) -> float:
 
 def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
         regime=False, universe_csv=N100_CSV, regime_sym="QQQ",
-        label=None, out_dir=None, quiet=False):
+        label=None, out_dir=None, quiet=False, membership_csv=None):
+    """`membership_csv` (optional): path to a point-in-time index membership CSV
+    (schema symbol,start_date,end_date). When provided, the entry candidate
+    universe is restricted at EACH bar to the symbols that were index members on
+    that bar's date (survivorship-correct). When None, behavior is byte-for-byte
+    unchanged: candidates are the full static `present` list (Nasdaq-100 CSV)."""
     eng = get_engine()
     syms = load_n100(universe_csv)
     with eng.connect() as c:
@@ -84,6 +89,14 @@ def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
     cl = df.pivot(index="date", columns="symbol", values="close").ffill()
     dates = cl.index
     present = [s for s in syms if s in cl.columns]
+
+    # PIT membership gating (optional). When set, the entry candidate universe is
+    # the full panel (cl.columns) restricted to actual index members at each bar.
+    intervals = None
+    if membership_csv is not None:
+        from tools.shared.us_index_membership import load_membership, eligible_at
+        intervals = load_membership(membership_csv)
+        present = list(cl.columns)
 
     roll_high = cl.rolling(donchian).max()
     sma200 = cl.rolling(200).mean()
@@ -139,8 +152,11 @@ def run(start, end, capital, donchian=100, trail=20.0, maxn=5, mom=60,
         slots = maxn - len(pos)
         if risk_on and slots > 0:
             cand = []
+            members = eligible_at(intervals, dates[di]) if intervals is not None else None
             for s in present:
                 if s in pos:
+                    continue
+                if members is not None and s not in members:
                     continue
                 px = px_row[s]
                 if pd.isna(px) or pd.isna(roll_high.iloc[di][s]) or pd.isna(sma200.iloc[di][s]):
@@ -220,6 +236,8 @@ def main():
     ap.add_argument("--regime", action="store_true")
     ap.add_argument("--universe-csv", default=N100_CSV, help="universe CSV (default Nasdaq-100)")
     ap.add_argument("--regime-sym", default="QQQ", help="regime index symbol (QQQ or SPY)")
+    ap.add_argument("--membership-csv", default=None,
+                    help="PIT index membership CSV (survivorship-correct universe gating)")
     ap.add_argument("--out", default=None)
     ap.add_argument("--sweep", action="store_true")
     a = ap.parse_args()
@@ -238,6 +256,7 @@ def main():
     else:
         run(s, e, a.capital, donchian=a.donchian, trail=a.trail, maxn=a.maxn, mom=a.mom,
             regime=a.regime, universe_csv=a.universe_csv, regime_sym=a.regime_sym,
+            membership_csv=a.membership_csv,
             out_dir=Path(a.out) if a.out else None)
 
 
