@@ -45,13 +45,13 @@ KNOWN_MODELS = [
         "name": "momentum_sp100",
         "default_capital": 30000,
         "enabled": True,
-        "description": "OBSERVER (signal-only, cash): n40 recipe on S&P 100 — top-3 of top-50 ADV by blend momentum, weekly, QQQ 200d regime, held at blend weights [0.7333, 0.1333, 0.1333] (= 60/40 blend of top-1+top-3 sleeves). PIT: ~107% CAGR / 33.5% DD / Calmar 3.21. NO leverage, NO orders.",
+        "description": "OBSERVER (cash): n40 S&P100 top-3 of top-50 ADV by blend momentum, weekly, QQQ regime, weights .733/.133/.133. PIT ~107% CAGR / 33.5% DD. No leverage/orders.",
     },
     {
         "name": "retest_sp500",
         "default_capital": 30000,
         "enabled": True,
-        "description": "OBSERVER (signal-only, cash): India retest engine on S&P 500 — top-2 equal-weight of top-120 ADV by 126d momentum in retest zone (<= EMA20 +20%), weekly, QQQ 200d regime, nasdaq500 pool PIT-filtered by sp500_membership. PIT: ~134% CAGR / 34% DD. NO leverage, NO orders.",
+        "description": "OBSERVER (cash): India retest on S&P500 PIT, top-2 of top-120 ADV by 126d momentum in retest zone, weekly, QQQ regime. PIT ~134% CAGR / 34% DD. No leverage/orders.",
     },
 ]
 
