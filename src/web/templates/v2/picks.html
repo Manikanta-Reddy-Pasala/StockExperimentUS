@@ -116,7 +116,7 @@ function renderCard(m, idx, ranking, status) {
     rows = `<tr><td colspan="5" class="text-center text-muted py-3">
       <div class="mb-2">${note}</div>
       <button class="btn btn-sm btn-primary" onclick="runSignal('${m.key}', event)" title="Force re-run live_signal with latest data">
-        <i class="bi bi-arrow-clockwise"></i> Re-calculate ${m.title}
+        <i data-lucide="refresh-cw"></i> Re-calculate ${m.title}
       </button>
     </td></tr>`;
   } else {
@@ -172,7 +172,7 @@ function renderCard(m, idx, ranking, status) {
   // Model-emitted note (e.g. midcap "no breakout today, showing near-miss")
   const noteHtml = (ranking && ranking.note)
     ? `<div class="alert alert-info py-2 px-3 small mb-0 rounded-0 border-0">
-         <i class="bi bi-info-circle me-1"></i>${ranking.note}
+         <i data-lucide="info" class="me-1"></i>${ranking.note}
        </div>`
     : '';
 
@@ -223,7 +223,7 @@ function renderCard(m, idx, ranking, status) {
     heldBannerHtml = `
       <div class="alert ${bannerCls} py-2 px-3 small mb-0 rounded-0 border-0">
         <div>${originLine}</div>
-        <div class="mt-1"><i class="bi bi-arrow-right me-1"></i>${actionLine}</div>
+        <div class="mt-1"><i data-lucide="arrow-right" class="me-1"></i>${actionLine}</div>
         <div class="small-mute mt-1">${rebalLine}</div>
       </div>`;
   }
@@ -234,7 +234,7 @@ function renderCard(m, idx, ranking, status) {
            data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false">
         <div>
           <strong>${m.title}</strong>${badges}${schedPill}
-          <i class="bi bi-chevron-down ms-1 small-mute"></i>
+          <i data-lucide="chevron-down" class="ms-1 small-mute"></i>
           <div class="small-mute mt-1">${m.desc}</div>
           ${topPickHtml}
         </div>
@@ -243,7 +243,7 @@ function renderCard(m, idx, ranking, status) {
           <button class="btn btn-sm btn-outline-primary mt-1"
                   onclick="runSignal('${m.key}', event)"
                   title="Force re-run live_signal with latest data">
-            <i class="bi bi-arrow-clockwise"></i> Re-calculate
+            <i data-lucide="refresh-cw"></i> Re-calculate
           </button>
         </div>
       </div>
@@ -263,12 +263,12 @@ function renderCard(m, idx, ranking, status) {
         </div>
         <div class="border-top px-3 py-2 d-flex justify-content-between align-items-center">
           <span class="small-mute">
-            <i class="bi bi-clock-history me-1"></i>Scheduled signals (cron emissions only)
+            <i data-lucide="history" class="me-1"></i>Scheduled signals (cron emissions only)
           </span>
           <a href="/picks/${encodeURIComponent(m.key)}/signals"
              class="btn btn-sm btn-outline-info"
              onclick="event.stopPropagation()">
-            <i class="bi bi-list-ul"></i> View Signals (30d) →
+            <i data-lucide="list"></i> View Signals (30d) →
           </a>
         </div>
       </div>
@@ -298,6 +298,7 @@ async function load() {
     return;
   }
   container.innerHTML = results.map((r, i) => renderCard(r.m, i, r.ranking, r.status)).join('');
+  window.renderIcons();
 }
 
 async function runSignal(modelKey, ev) {

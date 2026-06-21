@@ -37,10 +37,10 @@
   <div class="d-flex align-items-center gap-2">
     <span id="enabled_badge" class="live-badge">…</span>
     <a href="/" class="btn btn-sm btn-outline-secondary">
-      <i class="bi bi-arrow-left"></i> Back to Dashboard
+      <i data-lucide="arrow-left"></i> Back to Dashboard
     </a>
     <button id="refresh_btn" class="btn btn-sm btn-outline-primary">
-      <i class="bi bi-arrow-clockwise"></i> Refresh
+      <i data-lucide="refresh-cw"></i> Refresh
     </button>
   </div>
 </div>
@@ -51,7 +51,7 @@
   <div class="col-12 col-lg-6">
     <div class="card bs-card h-100">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <strong><i class="bi bi-cash-stack me-1 text-primary"></i> Balance Sheet</strong>
+        <strong><i data-lucide="banknote" class="me-1 text-primary"></i> Balance Sheet</strong>
         <small class="text-muted" id="as_of">—</small>
       </div>
       <div class="card-body p-2">
@@ -92,7 +92,7 @@
   <div class="col-12 col-lg-6">
     <div class="card bs-card h-100 pos-card">
       <div class="card-header">
-        <strong><i class="bi bi-graph-up-arrow me-1 text-success"></i> Open Position</strong>
+        <strong><i data-lucide="trending-up" class="me-1 text-success"></i> Open Position</strong>
       </div>
       <div class="card-body" id="pos_body">
         <div class="empty-state">Loading…</div>
@@ -104,7 +104,7 @@
 <!-- Transaction History -->
 <div class="card bs-card">
   <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-    <strong><i class="bi bi-list-ul me-1 text-primary"></i> Transaction History</strong>
+    <strong><i data-lucide="list" class="me-1 text-primary"></i> Transaction History</strong>
     <div class="d-flex gap-3 small text-muted" id="txn_summary">—</div>
   </div>
   <div class="card-body p-0">
@@ -351,6 +351,7 @@ async function loadTradeHistory() {
 
 async function loadAll() {
   await Promise.all([loadBalanceSheet(), loadTradeHistory()]);
+  window.renderIcons();
 }
 
 document.getElementById('refresh_btn').addEventListener('click', loadAll);

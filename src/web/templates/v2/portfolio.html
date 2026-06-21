@@ -12,7 +12,7 @@
 <div class="card mb-3" id="fyers-funds-card">
   <div class="card-body py-2">
     <div class="row g-2 align-items-center">
-      <div class="col-auto"><i class="bi bi-bank2 text-primary"></i></div>
+      <div class="col-auto"><i data-lucide="landmark" class="text-primary"></i></div>
       <div class="col-md-auto">
         <span class="text-muted small">eToro Account · Available Cash</span>
         <div class="fs-5 fw-bold" id="fyers_available_cash">--</div>
@@ -66,7 +66,7 @@
 </div>
 
 <div class="card">
-  <div class="card-header"><i class="bi bi-briefcase me-2"></i>Open Position(s) — eToro</div>
+  <div class="card-header"><i data-lucide="briefcase" class="me-2"></i>Open Position(s) — eToro</div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
       <thead><tr>
@@ -81,7 +81,7 @@
 </div>
 
 <div class="alert alert-warning mt-3 py-2 small">
-  <i class="bi bi-exclamation-triangle me-1"></i>
+  <i data-lucide="triangle-alert" class="me-1"></i>
   <strong>LIVE trading active.</strong> Sell + Rebalance buttons place REAL eToro orders. Confirm dialog required.
 </div>
 
@@ -168,7 +168,7 @@ async function loadAggregate() {
       const wired = WIRED_MODELS.has(m.model_name);
       const rebalBtn = wired
         ? `<button class="btn btn-sm btn-danger" onclick="rebalanceModel('${m.model_name}')">
-             <i class="bi bi-arrow-repeat"></i> Rebalance</button>`
+             <i data-lucide="refresh-cw"></i> Rebalance</button>`
         : '<span class="text-muted small">n/a</span>';
       const posCost = (Number(m.open_qty||0) * Number(m.open_entry_px||0)) || 0;
       tr.innerHTML = `
@@ -190,6 +190,7 @@ async function loadAggregate() {
     if (!tbody.children.length) {
       tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted py-3">No enabled models. <a href="/settings">Enable one in Settings</a>.</td></tr>';
     }
+    window.renderIcons();
   } catch(e) { console.error(e); }
 }
 
@@ -230,10 +231,11 @@ async function loadState() {
           <td class="text-end">${fmtINR(p.market_value)}</td>
           <td class="text-end ${cls(p.unrealized_pnl)}">${fmtINR(p.unrealized_pnl)}</td>
           <td class="text-end ${cls(p.unrealized_pct)}">${fmtPct(p.unrealized_pct)}</td>
-          <td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="sellNow('${p.symbol}', ${p.qty})"><i class="bi bi-cash"></i> Sell</button></td>
+          <td class="text-center"><button class="btn btn-sm btn-outline-danger" onclick="sellNow('${p.symbol}', ${p.qty})"><i data-lucide="banknote"></i> Sell</button></td>
         </tr>
       `).join('');
     }
+    window.renderIcons();
   } catch(e) { console.error(e); }
 }
 

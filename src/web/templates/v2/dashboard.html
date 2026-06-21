@@ -45,8 +45,8 @@
   /* Click-to-expand header (picks-style) — no buttons */
   .expand-header { cursor: pointer; }
   .expand-header:hover { background: var(--surface-3); border-radius: 6px; }
-  .expand-header .bi-chevron-down { transition: transform 0.15s ease; font-size: 0.85rem; color: var(--text-mute); }
-  .expand-header[aria-expanded="true"] .bi-chevron-down { transform: rotate(180deg); }
+  .expand-header [data-lucide="chevron-down"], .expand-header .lucide-chevron-down { transition: transform 0.15s ease; color: var(--text-mute); }
+  .expand-header[aria-expanded="true"] [data-lucide="chevron-down"], .expand-header[aria-expanded="true"] .lucide-chevron-down { transform: rotate(180deg); }
   .model-headline { display: flex; gap: 16px; flex-wrap: wrap; align-items: baseline; padding: 6px 0 8px; border-bottom: 1px dashed var(--hairline); margin-bottom: 6px; font-size: 0.85rem; }
   .model-headline .lbl { color: var(--text-mute); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.4px; margin-right: 4px; }
   .model-headline .val { font-weight: 700; font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
@@ -60,7 +60,7 @@
 <!-- Market Status (US / ET) -->
 <div class="card mb-4" id="market-status-card">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <span><i class="bi bi-clock-history text-primary me-1"></i><strong>Market Status</strong> <span class="text-muted small ms-1">NYSE / Nasdaq · ET</span></span>
+    <span><i data-lucide="history" class="text-primary me-1"></i><strong>Market Status</strong> <span class="text-muted small ms-1">NYSE / Nasdaq · ET</span></span>
     <span class="badge bg-secondary" id="mkt_state">--</span>
   </div>
   <div class="card-body py-3">
@@ -104,7 +104,7 @@
 <!-- Today's signals widget (T10) -->
 <div class="card mb-4 signals-widget">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <span><i class="bi bi-broadcast text-primary me-1"></i><strong>Today's Signals</strong> <span class="text-muted small ms-1">across all wired models</span></span>
+    <span><i data-lucide="activity" class="text-primary me-1"></i><strong>Today's Signals</strong> <span class="text-muted small ms-1">across all wired models</span></span>
     <div>
       <span class="badge bg-light text-dark me-1" id="sig_date">--</span>
       <span class="badge bg-primary" id="sig_total">0</span>
@@ -124,7 +124,7 @@
     <div>
       <span class="strategy-pill">Multi-Model Portfolio</span>
       <span class="text-muted small ms-2">2 equity · per-model cash silos</span>
-      <i class="bi bi-chevron-down ms-2"></i>
+      <i data-lucide="chevron-down" class="ms-2"></i>
     </div>
     <div class="row text-end g-3 flex-grow-1 justify-content-end align-items-center">
       <div class="col-auto"><div class="text-muted small" title="Original capital invested across all models">Invested</div><div class="fs-5 fw-bold" id="tot_invested">--</div></div>
@@ -132,7 +132,7 @@
       <div class="col-auto"><div class="text-muted small" title="+ Current open positions: Live MTM − Cost Basis">+ Current P&amp;L (open pos)</div><div class="fs-5 fw-bold" id="tot_current_pnl">--</div></div>
       <div class="col-auto"><div class="text-muted small" title="= NAV − Invested. Charges already deducted from cash.">= Total P&amp;L</div><div class="fs-5 fw-bold" id="tot_pnl">--</div></div>
       <div class="col-auto align-self-center">
-        <a href="/settings" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation()"><i class="bi bi-sliders"></i> Manage Allocations</a>
+        <a href="/settings" class="btn btn-sm btn-outline-secondary" onclick="event.stopPropagation()"><i data-lucide="sliders-horizontal"></i> Manage Allocations</a>
       </div>
     </div>
   </div>
@@ -169,7 +169,7 @@
 <!-- Slippage / live-vs-backtest: execution gap from the backtest daily-open reference -->
 <div class="card mb-4">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <span><i class="bi bi-speedometer2 me-2"></i>Slippage — live vs backtest</span>
+    <span><i data-lucide="gauge" class="me-2"></i>Slippage — live vs backtest</span>
     <small class="text-muted" id="slip_overall">—</small>
   </div>
   <div class="table-responsive">
@@ -279,7 +279,7 @@ function renderModelCard(m, sig) {
                title="Click to expand balance sheet">
             <div class="d-flex justify-content-between align-items-start">
               <div>
-                <div class="ttl">${m.model_name}${warn} <i class="bi bi-chevron-down ms-1"></i></div>
+                <div class="ttl">${m.model_name}${warn} <i data-lucide="chevron-down" class="ms-1"></i></div>
                 <div class="uni">${meta.universe} · ${meta.kind}</div>
               </div>
               <div class="text-end">${enableBadge}${refOnly}</div>
@@ -342,7 +342,7 @@ function renderModelCard(m, sig) {
           </div>
           <div class="mt-2 text-end">
             <a href="${detailHref}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:0.72rem;">
-              <i class="bi bi-receipt"></i> Balance Sheet &amp; Transactions
+              <i data-lucide="receipt"></i> Balance Sheet &amp; Transactions
             </a>
           </div>
         </div>
@@ -493,6 +493,7 @@ async function loadPortfolio() {
         hdr.classList.remove('collapsed');
       }
     });
+    window.renderIcons();
   } catch(e) {
     console.error('portfolio load failed', e);
   }

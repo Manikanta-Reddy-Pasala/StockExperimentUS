@@ -8,7 +8,7 @@
     <div class="col-lg-6">
         <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-shield-lock me-2"></i>Data Source</span>
+                <span><i data-lucide="shield-check" class="me-2"></i>Data Source</span>
                 <span id="fyers-conn-badge" class="badge bg-info">Observer Mode</span>
             </div>
             <div class="card-body">
@@ -31,7 +31,7 @@
                     </div>
                 </div>
                 <div class="alert alert-info small mb-0">
-                    <i class="bi bi-info-circle me-1"></i>
+                    <i data-lucide="info" class="me-1"></i>
                     This US deployment runs in observer mode: eToro supplies market data and all
                     models emit signals only. No broker credentials or live order placement are configured.
                 </div>
@@ -42,7 +42,7 @@
     <!-- Capital (model ledgers) -->
     <div class="col-lg-6">
         <div class="card h-100">
-            <div class="card-header"><i class="bi bi-piggy-bank me-2"></i>Capital (Model Ledgers)</div>
+            <div class="card-header"><i data-lucide="piggy-bank" class="me-2"></i>Capital (Model Ledgers)</div>
             <div class="card-body">
                 <div class="mb-3">
                     <label class="form-label small">Available Cash + Holdings Value</label>
@@ -59,7 +59,7 @@
                     <div class="d-flex justify-content-between border-bottom pb-1 mb-1"><span class="text-muted">Open Position:</span> <strong id="mr-pos">--</strong></div>
                     <div class="d-flex justify-content-between"><span class="text-muted">Unrealized P&L:</span> <strong id="mr-pnl">--</strong></div>
                 </div>
-                <a href="/dashboard" class="btn btn-primary btn-sm"><i class="bi bi-graph-up-arrow me-1"></i> Open Dashboard</a>
+                <a href="/dashboard" class="btn btn-primary btn-sm"><i data-lucide="trending-up" class="me-1"></i> Open Dashboard</a>
             </div>
         </div>
     </div>
@@ -68,12 +68,12 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <span><i class="bi bi-wallet2 me-2"></i>Model Capital Allocations</span>
+                <span><i data-lucide="wallet" class="me-2"></i>Model Capital Allocations</span>
                 <span class="badge bg-info">Observer Mode</span>
             </div>
             <div class="card-body">
                 <div class="alert alert-info small mb-2 py-2">
-                    <i class="bi bi-info-circle me-1"></i>
+                    <i data-lucide="info" class="me-1"></i>
                     <strong>Observer mode — no live trading.</strong> These models emit signals only; no orders are placed.
                     Allocations are <strong>informational</strong> (used to size the signal preview), not real capital. Deposit/Withdraw just adjust that notional amount.
                 </div>
@@ -221,7 +221,7 @@
     <!-- Rotation Rules — per-model -->
     <div class="col-12">
         <div class="card">
-            <div class="card-header"><i class="bi bi-arrow-repeat me-2"></i>Rotation Rules — All Models</div>
+            <div class="card-header"><i data-lucide="refresh-cw" class="me-2"></i>Rotation Rules — All Models</div>
             <div class="card-body">
                 <div class="table-responsive">
                     <table class="table table-sm align-middle mb-0">
@@ -248,7 +248,7 @@
     <!-- Strategy info — per-model -->
     <div class="col-12">
         <div class="card">
-            <div class="card-header"><i class="bi bi-info-circle me-2"></i>Strategy: Trading Models</div>
+            <div class="card-header"><i data-lucide="info" class="me-2"></i>Strategy: Trading Models</div>
             <div class="card-body">
                 <div class="row g-3" id="strategy_info_container"></div>
             </div>
@@ -359,16 +359,16 @@ async function loadAllocations() {
       const warnBadge = meta.warn ? ` <span class="lookahead-pill" title="Strategy note">${meta.warn}</span>` : '';
       // Position-state-dependent button: clear/sell-mark if holding, seed if flat.
       const posBtn = m.open_symbol
-        ? `<button class="btn btn-outline-danger" onclick="resetPos('${m.model_name}')" title="Mark flat (no broker order)" aria-label="Clear position"><i class="bi bi-x-circle"></i></button>`
-        : `<button class="btn btn-outline-primary" onclick="openSeed('${m.model_name}')" title="Seed existing position into ledger" aria-label="Seed position"><i class="bi bi-bookmark-plus"></i></button>`;
+        ? `<button class="btn btn-outline-danger" onclick="resetPos('${m.model_name}')" title="Mark flat (no broker order)" aria-label="Clear position"><i data-lucide="x-circle"></i></button>`
+        : `<button class="btn btn-outline-primary" onclick="openSeed('${m.model_name}')" title="Seed existing position into ledger" aria-label="Seed position"><i data-lucide="bookmark-plus"></i></button>`;
       const dropdownId = `act_${m.model_name}`;
       // B1 fix v2: build menu HTML separately. Markup is appended to <body>
       // on click (see openKebabMenu) to escape the .table-responsive clip box.
       const menuHtml = `
-        <li><a class="dropdown-item" href="#" data-action="bootstrap" data-model="${m.model_name}"><i class="bi bi-arrow-down-square me-2"></i>Bootstrap from legacy ledger</a></li>
-        <li><a class="dropdown-item" href="#" data-action="toggle" data-model="${m.model_name}" data-enabled="${m.enabled ? '1' : '0'}"><i class="bi ${m.enabled ? 'bi-pause-circle text-warning' : 'bi-play-circle text-success'} me-2"></i>${m.enabled ? 'Disable model' : 'Enable model'}</a></li>
+        <li><a class="dropdown-item" href="#" data-action="bootstrap" data-model="${m.model_name}"><i data-lucide="download" class="me-2"></i>Bootstrap from legacy ledger</a></li>
+        <li><a class="dropdown-item" href="#" data-action="toggle" data-model="${m.model_name}" data-enabled="${m.enabled ? '1' : '0'}"><i data-lucide="${m.enabled ? 'circle-pause' : 'circle-play'}" class="${m.enabled ? 'text-warning' : 'text-success'} me-2"></i>${m.enabled ? 'Disable model' : 'Enable model'}</a></li>
         <li><hr class="dropdown-divider"></li>
-        <li><a class="dropdown-item text-danger" href="#" data-action="reset" data-model="${m.model_name}"><i class="bi bi-trash me-2"></i>Hard reset (zero all)</a></li>
+        <li><a class="dropdown-item text-danger" href="#" data-action="reset" data-model="${m.model_name}"><i data-lucide="trash-2" class="me-2"></i>Hard reset (zero all)</a></li>
       `;
       tr.innerHTML = `
         <td class="col-model">
@@ -391,17 +391,18 @@ async function loadAllocations() {
           <div class="action-bar" role="group" aria-label="Capital actions for ${m.model_name}">
             <!-- OBSERVER MODE: buy/sell actions (Deposit/Withdraw/Seed/Clear) disabled —
                  signal-only, no orders. Admin actions (enable/disable/reset) stay in kebab. -->
-            <button class="btn btn-success" disabled title="Disabled — observer mode (signal-only, no orders)" aria-label="Deposit (disabled)"><i class="bi bi-plus-lg"></i></button>
-            <button class="btn btn-warning" disabled title="Disabled — observer mode (signal-only, no orders)" aria-label="Withdraw (disabled)"><i class="bi bi-dash-lg"></i></button>
-            <button class="btn btn-outline-primary" disabled title="Disabled — observer mode (signal-only, no orders)" aria-label="Seed (disabled)"><i class="bi bi-bookmark-plus"></i></button>
+            <button class="btn btn-success" disabled title="Disabled — observer mode (signal-only, no orders)" aria-label="Deposit (disabled)"><i data-lucide="plus"></i></button>
+            <button class="btn btn-warning" disabled title="Disabled — observer mode (signal-only, no orders)" aria-label="Withdraw (disabled)"><i data-lucide="minus"></i></button>
+            <button class="btn btn-outline-primary" disabled title="Disabled — observer mode (signal-only, no orders)" aria-label="Seed (disabled)"><i data-lucide="bookmark-plus"></i></button>
             <button class="btn btn-outline-secondary kebab-btn" type="button" id="${dropdownId}" data-menu='${menuHtml.replace(/'/g, "&#39;")}' aria-expanded="false" title="More actions" aria-label="More actions">
-              <i class="bi bi-three-dots-vertical"></i>
+              <i data-lucide="ellipsis-vertical"></i>
             </button>
           </div>
         </td>
       `;
       tbody.appendChild(tr);
     });
+    window.renderIcons();
   } catch(e) { console.error('alloc load failed', e); }
 }
 
@@ -633,6 +634,7 @@ function renderRotationRules(models) {
       <td>${r.exit || '—'}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="8" class="text-center text-muted">No models.</td></tr>';
+  window.renderIcons();
 }
 
 function renderStrategyInfo(models) {
@@ -650,7 +652,7 @@ function renderStrategyInfo(models) {
     return `<div class="col-lg-6"${disabledCls}>
       <div class="card h-100">
         <div class="card-header small">
-          <i class="bi bi-graph-up me-1"></i><strong>${meta.title || m.model_name}</strong>${badge}
+          <i data-lucide="trending-up" class="me-1"></i><strong>${meta.title || m.model_name}</strong>${badge}
           <span class="text-muted ms-2">${meta.kind}</span>
         </div>
         <div class="card-body small">
@@ -659,6 +661,7 @@ function renderStrategyInfo(models) {
       </div>
     </div>`;
   }).join('');
+  window.renderIcons();
 }
 
 loadAllocations();
@@ -689,6 +692,7 @@ function openKebabMenu(btn) {
   ul.className = 'alloc-menu-floating';
   ul.innerHTML = menuHtml;
   document.body.appendChild(ul);
+  window.renderIcons();
 
   // Position: align menu's RIGHT edge to button's right edge, drop below.
   // Use scroll-adjusted page coords so it stays glued when user scrolls.

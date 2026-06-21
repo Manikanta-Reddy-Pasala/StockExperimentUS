@@ -8,14 +8,16 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter+Tight:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}?v=20260621-glass1">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;450;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}?v=20260622-flatlight1">
+    <!-- Theme init (Light default / Cream) — set before paint to avoid a flash -->
+    <script>(function(){try{var t=localStorage.getItem('se-theme');if(t==='cream')document.documentElement.setAttribute('data-theme','cream');}catch(e){}})();</script>
     <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icon.svg') }}?v=5">
     <link rel="alternate icon" type="image/png" href="{{ url_for('static', filename='icon-192.png') }}?v=5">
     <!-- PWA: installable on Android / iOS. Manifest cache-busted so
          Chrome refetches it when icon URLs change. -->
     <link rel="manifest" href="/manifest.json?v=5">
-    <meta name="theme-color" content="#EDF1FA">
+    <meta name="theme-color" content="#F4F6FB">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Journal US">
@@ -57,14 +59,14 @@
          showing return %, P&L, or unrealized values. !important so they
          beat Bootstrap table cell colour, .v cell rules, .fs-* utilities,
          etc. Used as: pos (gain) / neg (loss) / neutral (zero / N/A). */
-      .pos, .pos * { color: #12B981 !important; }
-      .neg, .neg * { color: #F2415A !important; }
+      .pos, .pos * { color: #10A86A !important; }
+      .neg, .neg * { color: #E23D54 !important; }
       .neutral { color: #8A97AD !important; }
       /* Treat Bootstrap text-success / text-danger the same so a few legacy
          templates (settings.html) that still emit those classes match the
          rest of the UI exactly. */
-      .text-success { color: #12B981 !important; }
-      .text-danger  { color: #F2415A !important; }
+      .text-success { color: #10A86A !important; }
+      .text-danger  { color: #E23D54 !important; }
     </style>
     {% block head %}{% endblock %}
 </head>
@@ -78,7 +80,7 @@
                     <span class="fw-semibold">Trading Journal US</span>
                 </a>
                 <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar">
-                    <i class="bi bi-list fs-5"></i>
+                    <i data-lucide="menu"></i>
                 </button>
             </nav>
 
@@ -90,15 +92,15 @@
                 </div>
                 <div class="offcanvas-body p-0">
                     <ul class="nav flex-column p-3" id="mobile-nav">
-                        <li class="nav-item"><a class="nav-link" href="/"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/picks"><i class="bi bi-lightbulb"></i> Today's Picks</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/portfolio"><i class="bi bi-journal-text"></i> Portfolio</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/history"><i class="bi bi-clock-history"></i> History</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/settings"><i class="bi bi-gear"></i> Settings</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/"><i data-lucide="layout-dashboard"></i> Dashboard</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/picks"><i data-lucide="target"></i> Today's Picks</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/portfolio"><i data-lucide="briefcase"></i> Portfolio</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/history"><i data-lucide="history"></i> History</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/settings"><i data-lucide="settings-2"></i> Settings</a></li>
                         {% if current_user.is_admin %}
-                        <li class="nav-item"><a class="nav-link" href="/admin"><i class="bi bi-sliders"></i> Admin Triggers</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/audit"><i class="bi bi-journal-check"></i> Audit</a></li>
-                        <li class="nav-item"><a class="nav-link" href="/admin/users"><i class="bi bi-people-fill"></i> Manage Users</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin"><i data-lucide="sliders-horizontal"></i> Admin Triggers</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/audit"><i data-lucide="clipboard-check"></i> Audit</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/admin/users"><i data-lucide="users"></i> Manage Users</a></li>
                         {% endif %}
                     </ul>
                 </div>
@@ -114,29 +116,29 @@
 
                     <ul class="nav flex-column" id="sidebar-nav">
                         <li class="nav-item">
-                            <a class="nav-link" href="/"><i class="bi bi-speedometer2"></i> Dashboard</a>
+                            <a class="nav-link" href="/"><i data-lucide="layout-dashboard"></i> Dashboard</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/picks"><i class="bi bi-lightbulb"></i> Today's Picks</a>
+                            <a class="nav-link" href="/picks"><i data-lucide="target"></i> Today's Picks</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/portfolio"><i class="bi bi-journal-text"></i> Portfolio</a>
+                            <a class="nav-link" href="/portfolio"><i data-lucide="briefcase"></i> Portfolio</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/history"><i class="bi bi-clock-history"></i> History</a>
+                            <a class="nav-link" href="/history"><i data-lucide="history"></i> History</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/settings"><i class="bi bi-gear"></i> Settings</a>
+                            <a class="nav-link" href="/settings"><i data-lucide="settings-2"></i> Settings</a>
                         </li>
                         {% if current_user.is_admin %}
                         <li class="nav-item">
-                            <a class="nav-link" href="/admin"><i class="bi bi-sliders"></i> Admin Triggers</a>
+                            <a class="nav-link" href="/admin"><i data-lucide="sliders-horizontal"></i> Admin Triggers</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/admin/audit"><i class="bi bi-journal-check"></i> Audit</a>
+                            <a class="nav-link" href="/admin/audit"><i data-lucide="clipboard-check"></i> Audit</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="/admin/users"><i class="bi bi-people-fill"></i> Manage Users</a>
+                            <a class="nav-link" href="/admin/users"><i data-lucide="users"></i> Manage Users</a>
                         </li>
                         {% endif %}
                     </ul>
@@ -147,15 +149,18 @@
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                     <h1 class="h2">{% block page_title %}Dashboard{% endblock %}</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0 d-none d-md-flex">
+                    <div class="btn-toolbar mb-2 mb-md-0 d-none d-md-flex align-items-center gap-2">
+                        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch theme" title="Switch Light / Cream theme">
+                            <i data-lucide="sun"></i><span id="theme-toggle-label">Light</span>
+                        </button>
                         <div class="dropdown">
                             <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-person-circle"></i> {{ current_user.username }}
+                                <i data-lucide="circle-user"></i> {{ current_user.username }}
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item" href="/settings"><i class="bi bi-gear me-2"></i>Settings</a></li>
+                                <li><a class="dropdown-item" href="/settings"><i data-lucide="settings-2" class="me-2"></i>Settings</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('logout') }}"><i data-lucide="log-out" class="me-2"></i>Logout</a></li>
                             </ul>
                         </div>
                     </div>
@@ -542,6 +547,46 @@
                 if (best) best.classList.add('active');
             });
         });
+    </script>
+    <!-- Lucide icons — single icon system. Renders every <i data-lucide="…"> to
+         an inline SVG (stroke=currentColor, so color inherits from text). -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+      // Global icon renderer — call after any dynamic markup that injects
+      // new <i data-lucide> nodes (cards, tables, menus rendered by page JS).
+      window.renderIcons = function () {
+        try { if (window.lucide) lucide.createIcons(); } catch (e) {}
+      };
+      document.addEventListener('DOMContentLoaded', window.renderIcons);
+      // Re-render after page scripts have run (covers most initial dynamic content).
+      window.addEventListener('load', window.renderIcons);
+
+      // ---- Theme toggle: Light (default) ⇄ Cream, persisted to localStorage ----
+      (function themeToggle() {
+        const KEY = 'se-theme';
+        const root = document.documentElement;
+        function apply(t) {
+          if (t === 'cream') root.setAttribute('data-theme', 'cream');
+          else root.removeAttribute('data-theme');
+          const lbl = document.getElementById('theme-toggle-label');
+          const btn = document.getElementById('theme-toggle');
+          if (lbl) lbl.textContent = t === 'cream' ? 'Cream' : 'Light';
+          if (btn) { btn.querySelector('i')?.setAttribute('data-lucide', t === 'cream' ? 'moon-star' : 'sun'); window.renderIcons(); }
+          const meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', t === 'cream' ? '#F3ECDD' : '#F4F6FB');
+        }
+        let cur = 'light';
+        try { cur = localStorage.getItem(KEY) || 'light'; } catch (e) {}
+        document.addEventListener('DOMContentLoaded', () => {
+          apply(cur);
+          const b = document.getElementById('theme-toggle');
+          if (b) b.addEventListener('click', () => {
+            cur = (cur === 'cream') ? 'light' : 'cream';
+            try { localStorage.setItem(KEY, cur); } catch (e) {}
+            apply(cur);
+          });
+        });
+      })();
     </script>
     {% block scripts %}{% endblock %}
 </body>
