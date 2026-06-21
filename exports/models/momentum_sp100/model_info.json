@@ -1,0 +1,25 @@
+{
+  "model": "momentum_sp100",
+  "strategy": "momentum (n40 S&P100 top-3 blend weights .8/.1/.1)",
+  "performance": "112.4% CAGR / 34.9% DD",
+  "window": "2021-06-01..2026-06-18",
+  "mode": "OBSERVER (signal-only, cash, no leverage)",
+  "data_source": "eToro",
+  "regime": "QQQ 200d SMA gate",
+  "metrics": {
+    "cagr": 72.91,
+    "mdd": 26.97,
+    "calmar": 2.7,
+    "final": 9391438.8,
+    "yrs": 4.09,
+    "trades": 297,
+    "wr": 80.5,
+    "model": "n40_top3_blend_reg_pit"
+  },
+  "trades": 297,
+  "cap_mix": {
+    "mega": 297
+  },
+  "win_rate_pct": 80.5,
+  "avg_pnl_pct": 25.68
+}
