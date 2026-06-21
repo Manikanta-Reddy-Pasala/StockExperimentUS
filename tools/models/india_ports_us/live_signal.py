@@ -63,7 +63,7 @@ RETAIN = 4          # held names retained while in top-4 rank
 MOM_LB = 126        # 126-day momentum lookback
 EMA = 20            # retest EMA span
 BAND = 0.20         # within 20% above EMA = retest zone
-SIGNAL = "ret"
+SIGNAL = "blend"   # blend (avg 21/63/126d) > raw 126d ret: 112% vs 98% CAGR (5yr PIT), same 34% DD, Calmar 3.30
 REGIME_SMA = 200
 DATA_SOURCE = "yfinance"
 

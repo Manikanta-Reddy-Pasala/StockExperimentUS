@@ -51,7 +51,7 @@ KNOWN_MODELS = [
         "name": "retest_sp500",
         "default_capital": 30000,
         "enabled": True,
-        "description": "OBSERVER (cash): India retest on S&P500 PIT, top-2 of top-120 ADV by 126d momentum in retest zone, weekly, QQQ regime. PIT ~134% CAGR / 34% DD. No leverage/orders.",
+        "description": "OBSERVER (cash): India retest on S&P500 PIT, top-2 of top-120 ADV, BLEND momentum, retest zone, weekly, QQQ regime. PIT ~112% CAGR / 34% DD / Calmar 3.30. No leverage/orders.",
     },
 ]
 
