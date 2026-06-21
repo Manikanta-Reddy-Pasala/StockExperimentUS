@@ -304,7 +304,7 @@ const MODEL_META = {
     universe: 'S&P 100', kind: 'equity',
     title: 'Momentum S&P 100 (n40 blend)',
     rules: { top_n: 3, max_concurrent: 3, lookback: 'blend 21/63/126d',
-             rebalance: 'Weekly (1st trading day/ISO week)',
+             rebalance: 'Weekly · 1st trading day/ISO week · signal 13:50 ET',
              stop: 'None', target: 'None',
              exit: 'Weekly re-pick (QQQ 200d cash gate)' },
     strategy: [
@@ -321,7 +321,7 @@ const MODEL_META = {
     universe: 'S&P 500 (PIT)', kind: 'equity',
     title: 'Retest S&P 500 (India port)',
     rules: { top_n: 2, max_concurrent: 2, lookback: '126d',
-             rebalance: 'Weekly (1st trading day/ISO week)',
+             rebalance: 'Weekly · 1st trading day/ISO week · signal 13:50 ET',
              stop: 'None', target: 'None',
              exit: 'Rank drop-out of top-4 (QQQ 200d cash gate)' },
     strategy: [
@@ -375,7 +375,7 @@ async function loadAllocations() {
           <strong>${m.model_name}</strong>${enabledBadge}${warnBadge}
           <span class="universe-tag">${meta.universe} · ${meta.kind}</span>
           <label class="form-check form-switch mt-1 mb-0" style="padding-left:2.4em" title="Enable/disable this model. ON = emits signals at next cron. OFF = paused, no signals. (Whole app is observer-only — no live orders either way.)">
-            <input class="form-check-input" type="checkbox" role="switch" ${m.enabled ? 'checked' : ''} onchange="toggleEnabled('${m.model_name}', this.checked)">
+            <input class="form-check-input" type="checkbox" role="switch" ${m.enabled ? 'checked' : ''} onchange="toggleEnabled('${m.model_name}', this.checked, this)">
             <span class="small ${m.enabled ? 'text-success' : 'text-muted'}">${m.enabled ? '● Enabled' : 'Disabled'}</span>
           </label>
         </td>
@@ -526,15 +526,10 @@ async function bootstrap(model) {
   }
 }
 
-async function toggleEnabled(model, enabled) {
-  if (!enabled) {
-    const ok = await appModal.confirm(`Disable ${model}`,
-      `Stops scheduled signal + execute jobs for <strong>${model}</strong>.<br>` +
-      'Open positions are <strong>NOT</strong> closed. Capital stays allocated.<br>' +
-      'You can re-enable any time.',
-      {okLabel: 'Disable', okClass: 'btn-warning'});
-    if (!ok) return;
-  }
+// Observer-only: enable/disable just pauses/resumes weekly signal emission —
+// harmless and reversible, so toggle instantly (no confirm modal). Optimistic:
+// the switch already moved; on failure we revert it so it never desyncs from DB.
+async function toggleEnabled(model, enabled, el) {
   try {
     const r = await fetch(`/admin/models/${model}/enabled`, {
       method: 'POST',
@@ -545,16 +540,12 @@ async function toggleEnabled(model, enabled) {
     if (d.success) {
       await loadAllocations();
       flashRow(model);
-      await appModal.alert(
-        enabled ? 'Model enabled' : 'Model disabled',
-        `<strong>${model}</strong> is now <strong>${enabled ? 'ENABLED' : 'DISABLED'}</strong>.<br>` +
-        (enabled ? 'Scheduled signal + execute jobs will fire at next cron.'
-                 : 'Cron jobs paused. Open positions untouched.'),
-        enabled ? 'success' : 'warning');
     } else {
+      if (el) el.checked = !enabled;   // revert switch to truth
       await appModal.alert('Toggle Failed', d.error || 'toggle failed', 'danger');
     }
   } catch (e) {
+    if (el) el.checked = !enabled;     // revert switch to truth
     await appModal.alert('Network Error', e.message, 'danger');
   }
 }
