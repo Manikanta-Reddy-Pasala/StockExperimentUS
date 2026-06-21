@@ -64,27 +64,22 @@ KNOWN_MODELS = [
         "enabled": True,
         "description": "Equity daily rotation top-20-ADV ∩ Nasdaq 100 by 30d return",
     },
-    # --- N40 large-cap WEEKLY OBSERVER models (signal-only, NO live orders) ---
-    # Three variants of the n40 recipe (top-40 ADV → top-3 blend → weekly →
-    # QQQ 200d regime) on different large-cap universes + modest leverage.
-    # OBSERVER: they emit target-holdings signals only; no executor is wired.
+    # --- N40 S&P 100 cash BLEND OBSERVER models (signal-only, NO leverage, NO orders) ---
+    # Honest, survivorship-corrected (PIT) blend that meets ≥100% CAGR AND <35% DD:
+    # 60% top-1 sleeve (return) + 40% top-3 sleeve (stability) = 107% CAGR / 33.5%
+    # DD / Calmar 3.21 combined (cash, ~4yr eToro). Each = n40 recipe (top-50 ADV →
+    # top-K blend → weekly → QQQ 200d regime), lev 1.0. OBSERVER: signals only.
     {
-        "name": "n40_sp500_lev11",
-        "default_capital": 30000,
+        "name": "n40_sp100_top1_cash",
+        "default_capital": 18000,   # 60% of the 30k blend
         "enabled": True,
-        "description": "OBSERVER (signal-only): n40 weekly top-3 of top-40 ADV from S&P 500 (sp500.csv), blend momentum, QQQ 200d regime, lev 1.10. Backtest 5yr: 129.9% CAGR / 37.8% DD.",
+        "description": "OBSERVER (signal-only, cash): n40 S&P 100 top-1 of top-50 ADV, blend momentum, QQQ 200d regime, NO leverage. Return sleeve (60%) of the S&P100 cash blend. Standalone PIT: ~125% CAGR / 39% DD.",
     },
     {
-        "name": "n40_nasdaq100_lev11",
-        "default_capital": 30000,
+        "name": "n40_sp100_top3_cash",
+        "default_capital": 12000,   # 40% of the 30k blend
         "enabled": True,
-        "description": "OBSERVER (signal-only): n40 weekly top-3 of top-40 ADV from Nasdaq 100 (nasdaq100.csv), blend momentum, QQQ 200d regime, lev 1.10. Backtest 5yr: 108.4% CAGR / 41.1% DD.",
-    },
-    {
-        "name": "n40_sp100_lev125",
-        "default_capital": 30000,
-        "enabled": True,
-        "description": "OBSERVER (signal-only): n40 weekly top-3 of top-40 ADV from S&P 100 (sp100.csv), blend momentum, QQQ 200d regime, lev 1.25. Backtest 5yr: 102.7% CAGR / 33.2% DD.",
+        "description": "OBSERVER (signal-only, cash): n40 S&P 100 top-3 of top-50 ADV, blend momentum, QQQ 200d regime, NO leverage. Stability sleeve (40%) of the S&P100 cash blend. Standalone PIT: ~76% CAGR / 27% DD. Blend (60/40 w/ top-1) = 107% / 33.5% / Calmar 3.21.",
     },
     # NOTE: finnifty_ic_otm4_w300_lots5 (India FINNIFTY options Iron Condor) is
     # removed — US has no options model and no option_universe table.

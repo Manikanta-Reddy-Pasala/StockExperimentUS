@@ -123,7 +123,9 @@ def load_regime_on(regime_sym: str, days_back: int = 420) -> bool:
 def build_signal_payload(model_name: str, universe_csv: str, lev: float,
                          regime_sym: str, risk_on: bool,
                          holdings: Dict[str, float], prices: Dict[str, float],
-                         universe_size: int, asof: str) -> Dict:
+                         universe_size: int, asof: str,
+                         top: int = TOP, topadv: int = TOPADV,
+                         signal: str = SIGNAL) -> Dict:
     """Observer signal: target top-3 holdings + leverage-scaled weights.
 
     Always observer/dry_run=True — there is NO executor path for these models.
@@ -148,14 +150,14 @@ def build_signal_payload(model_name: str, universe_csv: str, lev: float,
         "universe_csv": universe_csv,
         "universe_size": universe_size,
         "params": {
-            "top": TOP, "topadv": TOPADV, "signal": SIGNAL,
+            "top": top, "topadv": topadv, "signal": signal,
             "mom_lb": MOM_LB, "lev": lev,
             "regime_sym": regime_sym, "regime_sma": REGIME_SMA,
         },
         "regime_on": risk_on,
         "targets": targets,
         "note": (
-            f"OBSERVER n40 weekly: top-{TOP} of top-{TOPADV} ADV by {SIGNAL} "
+            f"OBSERVER n40 weekly: top-{top} of top-{topadv} ADV by {signal} "
             f"momentum, lev {lev:g}, {regime_sym} 200d regime "
             f"{'ON' if risk_on else 'OFF (100% cash)'}."
         ),
@@ -242,6 +244,7 @@ def main() -> int:
     payload = build_signal_payload(
         args.model_name, args.universe_csv, args.lev, args.regime_sym,
         risk_on, holdings, prices, len(universe), asof,
+        top=args.top, topadv=args.topadv, signal=args.signal,
     )
     out_path.write_text(json.dumps(payload, indent=2, default=str))
     log.info(f"Wrote OBSERVER signal -> {out_path}")

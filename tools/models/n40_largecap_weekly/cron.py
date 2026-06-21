@@ -32,16 +32,19 @@ log = logging.getLogger(__name__)
 
 SIGNALS_DIR = Path("/app/logs/n40_observer/signals")
 
-# (model_name, universe_csv, leverage)
+# HONEST cash blend (no leverage, PIT survivorship-corrected). Two S&P 100
+# sleeves: top-1 (return) 60% + top-3 (stability) 40% = 107% CAGR / 33.5% DD /
+# Calmar 3.21 combined. Each sleeve = n40 recipe (topadv-40-by-ADV -> top-K blend
+# -> weekly -> QQQ 200d regime), cash (lev 1.0).
+# (model_name, universe_csv, leverage, top, topadv)
 VARIANTS = [
-    ("n40_sp500_lev11", "src/data/symbols/sp500.csv", 1.10),
-    ("n40_nasdaq100_lev11", "src/data/symbols/nasdaq100.csv", 1.10),
-    ("n40_sp100_lev125", "src/data/symbols/sp100.csv", 1.25),
+    ("n40_sp100_top1_cash", "src/data/symbols/sp100.csv", 1.0, 1, 50),  # 60% sleeve
+    ("n40_sp100_top3_cash", "src/data/symbols/sp100.csv", 1.0, 3, 50),  # 40% sleeve
 ]
 
 
 def emit_observer_signal(model_name: str, universe_csv: str, lev: float,
-                         force: bool = False):
+                         top: int = 3, topadv: int = 40, force: bool = False):
     """Emit one variant's OBSERVER signal. Weekly-gated unless force=True.
 
     Signal-only — never calls an executor. The live_signal self-skips on
@@ -59,6 +62,8 @@ def emit_observer_signal(model_name: str, universe_csv: str, lev: float,
         "python3", "tools/models/n40_largecap_weekly/live_signal.py",
         "--universe-csv", universe_csv,
         "--lev", str(lev),
+        "--top", str(top),
+        "--topadv", str(topadv),
         "--model-name", model_name,
         "--signals-out", str(signals_out),
     ]
@@ -95,9 +100,10 @@ def register_trading_jobs(schedule):
     place orders. live_signal self-skips on non-Monday days, so daily firing is
     safe; 13:50 sits just after the 13:45 US-book DRY-RUN signal slot.
     """
-    for model_name, universe_csv, lev in VARIANTS:
+    for model_name, universe_csv, lev, top, topadv in VARIANTS:
         # Bind loop vars via defaults so the closure captures the right values.
         schedule.every().day.at("13:50").do(
-            lambda m=model_name, u=universe_csv, l=lev: emit_observer_signal(m, u, l)
+            lambda m=model_name, u=universe_csv, l=lev, t=top, a=topadv:
+                emit_observer_signal(m, u, l, top=t, topadv=a)
         )
         log.debug(f"registered n40 observer trading job: {model_name}")

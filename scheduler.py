@@ -283,7 +283,7 @@ def run_scheduler():
     logger.info("  - momentum_pseudo_n100_adv:   signal 09:25 + execute 09:30 (monthly rebal)")
     logger.info("  - midcap_narrow_60d_breakout: signal 09:25 + execute 09:32 + EOD signal 15:25")
     logger.info("  - n20_daily_large_only:       signal 09:25 + execute 09:30 (daily rotation)")
-    logger.info("  - n40_observer (x3):          signal 13:50 weekly (OBSERVER — signal-only, no orders)")
+    logger.info("  - n40 S&P100 cash blend (x2): signal 13:50 weekly (OBSERVER — top1+top3, no leverage, no orders)")
     logger.info("")
     logger.info("Maintenance:")
     logger.info("  - Cleanup Old Snapshots: Weekly (Sunday) at 03:00 AM")
