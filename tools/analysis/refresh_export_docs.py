@@ -189,23 +189,37 @@ def write_summary(model, info, eq, glitch, unver):
     (EXPORTS / model / "SUMMARY.md").write_text("\n".join(L) + "\n")
 
 
+def _qty(s):
+    """India-style qty: whole number if integral, else 2dp (US uses fractional $-alloc shares)."""
+    q = float(s)
+    return f"{q:,.0f}" if abs(q - round(q)) < 1e-6 else f"{q:,.2f}"
+
+
 def write_ledger(model, info, rows, glitch, unver):
     g_ids = {id(r) for r in glitch}
     u_ids = {id(r) for r in unver}
+    # proper chronological order: by entry date, then exit date, then symbol
+    srows = sorted(rows, key=lambda r: (r["entry_date"], r["exit_date"], r["symbol"]))
+    wins = sum(1 for r in srows if float(r["pnl"]) > 0)
     L = []
     L.append(f"# {model} — trade ledger ({info['window'].replace('..',' → ')})")
     L.append("")
-    L.append("Flag: 🛑 = CONFIRMED data error (price impossible, verifiable date); "
-             "❓ = UNVERIFIABLE 2025-26 edge price (needs NUC raw-candle check).")
+    L.append(f"{len(srows)} trades, chronological by entry date. **Amount $** = capital deployed "
+             "(entry price × qty); **Return %** and **PnL $** are net of $1/txn. Qty is fractional "
+             "(dollar-allocated). Flag: 🛑 = constant-scale price unit (CAGR-neutral); "
+             "❓ = 2025-26 memory-edge price (verified jump-free, leans real). No exit-reason field in source.")
     L.append("")
-    L.append("| # | Symbol | Cap | Entry date | Exit date | Entry $ | Exit $ | Shares | PnL $ | Return % | Bars | Flag |")
-    L.append("|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|")
-    for i, r in enumerate(rows, 1):
+    L.append(f"Wins {wins} / Losses {len(srows)-wins} ({100*wins/len(srows):.1f}% win).")
+    L.append("")
+    L.append("| # | Symbol | Cap | Entry date | Exit date | Entry $ | Exit $ | Qty | Amount $ | PnL $ | Return % | Bars | Flag |")
+    L.append("|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|")
+    for i, r in enumerate(srows, 1):
         flag = "🛑" if id(r) in g_ids else ("❓" if id(r) in u_ids else "")
+        ep, q = float(r["entry_px"]), float(r["shares"])
         L.append(
             f"| {i} | {r['symbol']} | {r['cap_tag']} | {r['entry_date']} | {r['exit_date']} "
-            f"| {float(r['entry_px']):,.2f} | {float(r['exit_px']):,.2f} | {float(r['shares']):,.2f} "
-            f"| {float(r['pnl']):,.0f} | {float(r['ret_pct']):.2f} | {r['bars_held']} | {flag} |"
+            f"| {ep:,.2f} | {float(r['exit_px']):,.2f} | {_qty(q)} | {ep*q:,.0f} "
+            f"| {float(r['pnl']):,.0f} | {float(r['ret_pct']):+.2f} | {r['bars_held']} | {flag} |"
         )
     L.append("")
     (EXPORTS / model / "TRADE_LEDGER.md").write_text("\n".join(L) + "\n")
