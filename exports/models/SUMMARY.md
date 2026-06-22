@@ -1,17 +1,14 @@
 # Model Exports — US Observer System (2 models)
 
 Cash / no-leverage / OBSERVER (signal-only) / PIT survivorship-corrected / eToro data.
-Window 2021-06-01 → 2026-06-18 (~5yr). QQQ 200d SMA regime gate.
+Window 2021-06-01 → 2026-06-18 (~5yr). QQQ 200d SMA regime gate. Net of $1/txn.
 
-| Model | Strategy | CAGR | MaxDD | Calmar | Trades | WR | Avg PnL% |
-|-------|----------|------|-------|--------|--------|----|----------|
-| momentum_sp100 | n40 S&P100 top-3, blend momentum, weights .8/.1/.1 (70/30) | 112.4% | 34.9% | 3.22 | 297 | — | — |
-| retest_sp500 | India retest engine, S&P500 PIT, top-2, blend | 112.4% | 34.1% | 3.30 | 66 | 75.8% | +78.0% |
+> ⚠️ **DATA-INTEGRITY WARNING:** the eToro candle feed has corrupted price levels at the 2025-2026 edge that inflate headline CAGR/NAV. Per-model `DATA_AUDIT.md` lists the flagged trades. Headline numbers below are an UPPER bound until the eToro candles are re-pulled and validated on the NUC. Especially `retest_sp500`, where one corrupted WDC trade alone is ~67% of PnL.
 
-Each model folder contains:
-- `trade_ledger.csv` — per-trade: symbol, entry_date, entry_px, shares, exit_date, exit_px, pnl, ret_pct, bars_held, **cap_tag** (mega=S&P100 / large=S&P500), pnl_pct
-- `equity_curve.csv` — daily equity
-- `model_info.json` — strategy, performance, metrics, cap-mix, win-rate, mode
+| Model | CAGR | MaxDD | Calmar | Final NAV | Trades | WR | 🛑 corrupt PnL share |
+|-------|------|-------|--------|-----------|--------|----|----|
+| momentum_sp100 | +72.9% | 27.0% | 2.70 | $9,388,792 | 297 | 80.5% | 34% |
+| retest_sp500 | +112.4% | 34.1% | 3.30 | $44,776,308 | 66 | 75.8% | 83% |
 
-NOTE: momentum trade count (297) is high because the blend-weight live model rebalances the
-top-3 weekly; many are small re-weights of the same names. retest holds longer (66 trades, 75.8% WR).
+Each model folder contains: `SUMMARY.md`, `TRADE_LEDGER.md`, `DATA_AUDIT.md`, `trade_ledger.csv`, `equity_curve.csv`, `model_info.json`.
+
