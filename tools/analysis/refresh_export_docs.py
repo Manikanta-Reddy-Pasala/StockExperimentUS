@@ -14,11 +14,14 @@ from __future__ import annotations
 
 import csv
 import json
+import sys
 from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPORTS = ROOT / "exports" / "models"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import recheck_trades as RC  # per-trade calibrated verdicts (single source of truth)
 
 # Per-model descriptors (title, universe, one-line strategy, status).
 DESC = {
@@ -35,38 +38,23 @@ DESC = {
 }
 
 # ---------------------------------------------------------------------------
-# DATA-INTEGRITY AUDIT
+# DATA-INTEGRITY AUDIT  (delegates per-trade verdicts to recheck_trades.py)
 # ---------------------------------------------------------------------------
-# The eToro candle feed produces impossible price LEVELS for some names at the
-# 2025-2026 data edge (bad split adjustment / stale-quote glitches). Those trades
-# show absurd exit prices and dominate PnL. We hard-flag them with a manual
-# per-ticker sanity ceiling (the highest plausible traded price in-window) and
-# also surface every single-position move >= REVIEW_RET for manual eyeballing.
-#
-# CEILINGS are deliberately generous — anything ABOVE is physically impossible for
-# that ticker in this window, so it is a confirmed data glitch, not a judgement call.
-PRICE_CEILING = {
-    "WDC": 200.0,    # Western Digital traded ~$40-90; $546 exit = glitch
-    "SNDK": 120.0,   # SanDisk (2025 WDC spin) ~$40-90; $573-$1761 exits = glitch
-    "MU": 300.0,     # Micron ~$60-160; $793-$1080 exits = glitch
-    "INTC": 110.0,   # Intel ~$18-50; $119-$125 exits = glitch
-}
-REVIEW_RET = 80.0    # single-position ret% >= this -> list for manual review
-
-
+# Two buckets, honestly separated by confidence:
+#   glitch (CONFIRMED)   — price impossible AND on a date inside the solid market-
+#                          knowledge window (e.g. NFLX Dec-2022 $29, BKNG $107).
+#   unver  (UNVERIFIABLE) — out-of-band price on a 2025-07+ date (eToro data edge,
+#                          past the Jan-2026 cutoff). Could be a real 2025-26 mania
+#                          move OR a corrupted candle — needs a NUC raw-candle check.
 def audit_trades(rows):
-    """Return (confirmed_glitch, review_only) lists. Confirmed = exit/entry price
-    above the ticker's physical ceiling. Review = big winner, ceiling OK (likely real)."""
-    glitch, review = [], []
+    glitch, unver = [], []
     for r in rows:
-        sym = r["symbol"]
-        ep, xp = float(r["entry_px"]), float(r["exit_px"])
-        ceil = PRICE_CEILING.get(sym)
-        if ceil and (xp > ceil or ep > ceil):
+        v = RC.check(r)[0]
+        if v in ("GLITCH", "MATH_ERR"):
             glitch.append(r)
-        elif abs(float(r["ret_pct"])) >= REVIEW_RET:
-            review.append(r)
-    return glitch, review
+        elif v == "UNVERIFIABLE":
+            unver.append(r)
+    return glitch, unver
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +96,11 @@ def fmt_usd(x):
 # ---------------------------------------------------------------------------
 # DOC WRITERS
 # ---------------------------------------------------------------------------
-def write_summary(model, info, eq, glitch, review):
+def _pnl(rows):
+    return sum(float(r["pnl"]) for r in rows)
+
+
+def write_summary(model, info, eq, glitch, unver):
     d = DESC[model]
     m = info["metrics"]
     final = eq[-1][1]
@@ -117,9 +109,10 @@ def write_summary(model, info, eq, glitch, review):
     mdd = max_drawdown(eq)
     yb = year_breakdown(eq)
 
-    glitch_pnl = sum(float(r["pnl"]) for r in glitch)
-    tot_pnl = sum(float(r["pnl"]) for r in _all_rows[model])
-    glitch_share = (glitch_pnl / tot_pnl * 100) if tot_pnl else 0.0
+    tot_pnl = _pnl(_all_rows[model])
+    g_pnl, u_pnl = _pnl(glitch), _pnl(unver)
+    g_share = (g_pnl / tot_pnl * 100) if tot_pnl else 0.0
+    u_share = (u_pnl / tot_pnl * 100) if tot_pnl else 0.0
 
     L = []
     L.append(f"# {d['title']} (`{model}`)")
@@ -137,20 +130,28 @@ def write_summary(model, info, eq, glitch, review):
     )
     L.append("")
 
-    if glitch:
-        L.append("## ⚠️ DATA-INTEGRITY WARNING — headline metrics are NOT trustworthy")
+    if unver or glitch:
+        L.append("## ⚠️ DATA-INTEGRITY NOTE — verify before trusting headline")
         L.append("")
-        L.append(
-            f"**{len(glitch)} trade(s) use corrupted eToro price levels** "
-            "(impossible exit prices, e.g. "
-            + ", ".join(sorted({"{} ${:,.0f}".format(r["symbol"], float(r["exit_px"])) for r in glitch}))
-            + "). They contribute "
-            f"**{fmt_usd(glitch_pnl)} = {glitch_share:.0f}% of all PnL**. "
-            "Until the underlying eToro candles are re-pulled and validated on the NUC, "
-            "treat CAGR / Final NAV below as an UPPER bound, not a real result. "
-            "See `DATA_AUDIT.md`."
-        )
-        L.append("")
+        if unver:
+            names = ", ".join(sorted({r["symbol"] for r in unver}))
+            L.append(
+                f"**{len(unver)} trade(s) ({fmt_usd(u_pnl)} = {u_share:.0f}% of PnL) sit on UNVERIFIABLE "
+                f"2025-26 edge prices** ({names}) — out-of-band vs pre-2026 norms, on dates past the "
+                "Jan-2026 knowledge cutoff. Could be real 2025-26 AI/memory mania OR corrupted eToro "
+                "candles; the price paths are smooth & self-consistent (lean real) but magnitudes are "
+                "extreme. **Re-pull the raw eToro daily series for these names on the NUC to confirm.** "
+                "Until then treat CAGR / Final NAV as UNVERIFIED. See `DATA_AUDIT.md` / `TRADE_RECHECK.md`."
+            )
+            L.append("")
+        if glitch:
+            L.append(
+                f"**{len(glitch)} CONFIRMED data error(s)** ({fmt_usd(g_pnl)} = {g_share:.0f}% of PnL): "
+                + ", ".join("{} {} ${:,.0f}".format(r["symbol"], r["exit_date"], float(r["exit_px"]))
+                            for r in glitch)
+                + " — price impossible on a date inside the verifiable window."
+            )
+            L.append("")
 
     L.append("## Results (as-is, net of $1/txn) — see audit before trusting")
     L.append("")
@@ -162,8 +163,8 @@ def write_summary(model, info, eq, glitch, review):
     L.append(f"| Max drawdown | {mdd:.1f}% |")
     L.append(f"| Calmar | {m['calmar']:.2f} |")
     L.append(f"| Trades | {m['trades']} · {m.get('wr','—')}% win |")
-    if glitch:
-        L.append(f"| **PnL from corrupted trades** | **{fmt_usd(glitch_pnl)} ({glitch_share:.0f}% of total)** |")
+    L.append(f"| PnL on UNVERIFIABLE edge prices | {fmt_usd(u_pnl)} ({u_share:.0f}% of total) |")
+    L.append(f"| PnL on CONFIRMED data errors | {fmt_usd(g_pnl)} ({g_share:.0f}% of total) |")
     L.append("")
 
     L.append("## Year-by-year breakdown")
@@ -186,19 +187,19 @@ def write_summary(model, info, eq, glitch, review):
     (EXPORTS / model / "SUMMARY.md").write_text("\n".join(L) + "\n")
 
 
-def write_ledger(model, info, rows, glitch, review):
-    glitch_ids = {id(r) for r in glitch}
-    review_ids = {id(r) for r in review}
+def write_ledger(model, info, rows, glitch, unver):
+    g_ids = {id(r) for r in glitch}
+    u_ids = {id(r) for r in unver}
     L = []
     L.append(f"# {model} — trade ledger ({info['window'].replace('..',' → ')})")
     L.append("")
-    L.append("Flag column: 🛑 = confirmed corrupted price (excluded from trustworthy stats); "
-             "👀 = big winner, price plausible (review).")
+    L.append("Flag: 🛑 = CONFIRMED data error (price impossible, verifiable date); "
+             "❓ = UNVERIFIABLE 2025-26 edge price (needs NUC raw-candle check).")
     L.append("")
     L.append("| # | Symbol | Cap | Entry date | Exit date | Entry $ | Exit $ | Shares | PnL $ | Return % | Bars | Flag |")
     L.append("|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|")
     for i, r in enumerate(rows, 1):
-        flag = "🛑" if id(r) in glitch_ids else ("👀" if id(r) in review_ids else "")
+        flag = "🛑" if id(r) in g_ids else ("❓" if id(r) in u_ids else "")
         L.append(
             f"| {i} | {r['symbol']} | {r['cap_tag']} | {r['entry_date']} | {r['exit_date']} "
             f"| {float(r['entry_px']):,.2f} | {float(r['exit_px']):,.2f} | {float(r['shares']):,.2f} "
@@ -208,42 +209,43 @@ def write_ledger(model, info, rows, glitch, review):
     (EXPORTS / model / "TRADE_LEDGER.md").write_text("\n".join(L) + "\n")
 
 
-def write_audit(model, info, rows, glitch, review):
-    tot_pnl = sum(float(r["pnl"]) for r in rows)
-    glitch_pnl = sum(float(r["pnl"]) for r in glitch)
-    review_pnl = sum(float(r["pnl"]) for r in review)
+def write_audit(model, info, rows, glitch, unver):
+    tot_pnl = _pnl(rows)
     L = []
     L.append(f"# {model} — DATA AUDIT")
     L.append("")
-    L.append(f"Total trades: **{len(rows)}** · total PnL: **{fmt_usd(tot_pnl)}**")
+    L.append(f"Total trades: **{len(rows)}** · total PnL: **{fmt_usd(tot_pnl)}**. "
+             "Per-trade verdicts in `TRADE_RECHECK.md`.")
     L.append("")
-    L.append("## 🛑 Confirmed corrupted prices (eToro glitch — exit price physically impossible)")
+    L.append("## 🛑 CONFIRMED data errors (price impossible, date inside verifiable window)")
     L.append("")
     if glitch:
-        L.append(f"{len(glitch)} trade(s), **{fmt_usd(glitch_pnl)} = {glitch_pnl/tot_pnl*100:.0f}% of total PnL**. "
-                 "Exit price exceeds the ticker's highest plausible in-window level "
-                 "(ceiling in `PRICE_CEILING`). These are split-adjust / stale-quote glitches at the "
-                 "2025-2026 data edge and must be re-pulled on the NUC before the model is trusted.")
-        L.append("")
-        L.append("| Symbol | Entry date | Exit date | Entry $ | Exit $ | Ceiling $ | Return % | PnL $ |")
-        L.append("|---|---|---|---:|---:|---:|---:|---:|")
-        for r in sorted(glitch, key=lambda r: -float(r["pnl"])):
-            L.append(f"| {r['symbol']} | {r['entry_date']} | {r['exit_date']} "
-                     f"| {float(r['entry_px']):,.2f} | {float(r['exit_px']):,.2f} "
-                     f"| {PRICE_CEILING[r['symbol']]:,.0f} | {float(r['ret_pct']):.1f} | {float(r['pnl']):,.0f} |")
-    else:
-        L.append("None.")
-    L.append("")
-    L.append(f"## 👀 Big winners with plausible prices (likely REAL — listed for review)")
-    L.append("")
-    if review:
-        L.append(f"{len(review)} trade(s) with |ret| ≥ {REVIEW_RET:.0f}%, exit price within sanity ceiling "
-                 f"(e.g. NVDA 2024 split-adjusted run, PLTR 2024-25). Contributes {fmt_usd(review_pnl)}. "
-                 "Plausible but verify against the eToro series.")
+        L.append(f"{len(glitch)} trade(s), {fmt_usd(_pnl(glitch))} ({_pnl(glitch)/tot_pnl*100:.0f}% of PnL). "
+                 "High confidence — the price is impossible for that ticker and the date predates the "
+                 "knowledge cutoff (e.g. NFLX Dec-2022 ~$30 when real Netflix was ~$300; BKNG ~$107 when "
+                 "Booking trades $2,000-5,000).")
         L.append("")
         L.append("| Symbol | Entry date | Exit date | Entry $ | Exit $ | Return % | PnL $ |")
         L.append("|---|---|---|---:|---:|---:|---:|")
-        for r in sorted(review, key=lambda r: -float(r["pnl"])):
+        for r in sorted(glitch, key=lambda r: -float(r["pnl"])):
+            L.append(f"| {r['symbol']} | {r['entry_date']} | {r['exit_date']} "
+                     f"| {float(r['entry_px']):,.2f} | {float(r['exit_px']):,.2f} "
+                     f"| {float(r['ret_pct']):.1f} | {float(r['pnl']):,.0f} |")
+    else:
+        L.append("None.")
+    L.append("")
+    L.append("## ❓ UNVERIFIABLE 2025-26 edge prices (real mania OR glitch — needs NUC check)")
+    L.append("")
+    if unver:
+        L.append(f"{len(unver)} trade(s), **{fmt_usd(_pnl(unver))} = {_pnl(unver)/tot_pnl*100:.0f}% of PnL**. "
+                 "Out-of-band vs pre-2026 norms, on 2025-07-or-later dates past the Jan-2026 cutoff. "
+                 "Self-consistent smooth price paths (entries chain from prior exits) lean REAL; "
+                 ">10x-from-baseline magnitudes (e.g. SanDisk to $1,761) lean GLITCH. "
+                 "**Resolve by re-pulling the raw eToro daily candles for these names on the NUC.**")
+        L.append("")
+        L.append("| Symbol | Entry date | Exit date | Entry $ | Exit $ | Return % | PnL $ |")
+        L.append("|---|---|---|---:|---:|---:|---:|")
+        for r in sorted(unver, key=lambda r: -float(r["pnl"])):
             L.append(f"| {r['symbol']} | {r['entry_date']} | {r['exit_date']} "
                      f"| {float(r['entry_px']):,.2f} | {float(r['exit_px']):,.2f} "
                      f"| {float(r['ret_pct']):.1f} | {float(r['pnl']):,.0f} |")
@@ -266,25 +268,29 @@ def write_top_summary(infos, equities, audits):
     L.append("Cash / no-leverage / OBSERVER (signal-only) / PIT survivorship-corrected / eToro data.")
     L.append("Window 2021-06-01 → 2026-06-18 (~5yr). QQQ 200d SMA regime gate. Net of $1/txn.")
     L.append("")
-    L.append("> ⚠️ **DATA-INTEGRITY WARNING:** the eToro candle feed has corrupted price levels at the "
-             "2025-2026 edge that inflate headline CAGR/NAV. Per-model `DATA_AUDIT.md` lists the flagged "
-             "trades. Headline numbers below are an UPPER bound until the eToro candles are re-pulled and "
-             "validated on the NUC. Especially `retest_sp500`, where one corrupted WDC trade alone is ~67% of PnL.")
+    L.append("> ⚠️ **DATA-INTEGRITY NOTE:** a large share of PnL rides on 2025-26 price moves that are "
+             "UNVERIFIABLE past the Jan-2026 knowledge cutoff (out-of-band vs pre-2026 norms). They may be "
+             "real AI/memory-mania moves or corrupted eToro candles — the paths are smooth & self-consistent "
+             "but the magnitudes are extreme. Per-model `TRADE_RECHECK.md` has every trade's verdict; resolve "
+             "the ❓ names by re-pulling raw eToro candles on the NUC. `retest_sp500` is **85% UNVERIFIABLE** "
+             "(WDC + SNDK), so its +112% CAGR is unconfirmed. Only 2 CONFIRMED data errors exist (NFLX 2022, "
+             "BKNG 2023) and neither inflates returns.")
     L.append("")
-    L.append("| Model | CAGR | MaxDD | Calmar | Final NAV | Trades | WR | 🛑 corrupt PnL share |")
-    L.append("|-------|------|-------|--------|-----------|--------|----|----|")
+    L.append("| Model | CAGR | MaxDD | Calmar | Final NAV | Trades | WR | ❓ unverif. PnL | 🛑 confirmed-err PnL |")
+    L.append("|-------|------|-------|--------|-----------|--------|----|----|----|")
     for model in DESC:
         m = infos[model]["metrics"]
         eq = equities[model]
         mdd = max_drawdown(eq)
-        glitch, _ = audits[model]
-        tot_pnl = sum(float(r["pnl"]) for r in _all_rows[model])
-        gshare = sum(float(r["pnl"]) for r in glitch) / tot_pnl * 100 if tot_pnl else 0
+        glitch, unver = audits[model]
+        tot_pnl = _pnl(_all_rows[model])
+        ushare = _pnl(unver) / tot_pnl * 100 if tot_pnl else 0
+        gshare = _pnl(glitch) / tot_pnl * 100 if tot_pnl else 0
         L.append(f"| {model} | {m['cagr']:+.1f}% | {mdd:.1f}% | {m['calmar']:.2f} "
-                 f"| {fmt_usd(eq[-1][1])} | {m['trades']} | {m.get('wr','—')}% | {gshare:.0f}% |")
+                 f"| {fmt_usd(eq[-1][1])} | {m['trades']} | {m.get('wr','—')}% | {ushare:.0f}% | {gshare:.0f}% |")
     L.append("")
     L.append("Each model folder contains: `SUMMARY.md`, `TRADE_LEDGER.md`, `DATA_AUDIT.md`, "
-             "`trade_ledger.csv`, `equity_curve.csv`, `model_info.json`.")
+             "`TRADE_RECHECK.md`, `trade_ledger.csv`, `equity_curve.csv`, `model_info.json`.")
     L.append("")
     (EXPORTS / "SUMMARY.md").write_text("\n".join(L) + "\n")
 
@@ -298,14 +304,14 @@ def main():
             rows = list(csv.DictReader(f))
         _all_rows[model] = rows
         eq = load_equity(mdir / "equity_curve.csv")
-        glitch, review = audit_trades(rows)
-        infos[model], equities[model], audits[model] = info, eq, (glitch, review)
+        glitch, unver = audit_trades(rows)
+        infos[model], equities[model], audits[model] = info, eq, (glitch, unver)
 
-        write_summary(model, info, eq, glitch, review)
-        write_ledger(model, info, rows, glitch, review)
-        write_audit(model, info, rows, glitch, review)
-        print(f"{model}: {len(rows)} trades | 🛑 glitch={len(glitch)} 👀 review={len(review)} "
-              f"| glitch PnL ${sum(float(r['pnl']) for r in glitch):,.0f}")
+        write_summary(model, info, eq, glitch, unver)
+        write_ledger(model, info, rows, glitch, unver)
+        write_audit(model, info, rows, glitch, unver)
+        print(f"{model}: {len(rows)} trades | 🛑 confirmed={len(glitch)} ❓ unverifiable={len(unver)} "
+              f"| unverif PnL ${_pnl(unver):,.0f}")
 
     write_top_summary(infos, equities, audits)
     print("wrote per-model SUMMARY.md / TRADE_LEDGER.md / DATA_AUDIT.md + top SUMMARY.md")

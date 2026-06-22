@@ -7,9 +7,11 @@ Weekly rotation, top-3 by 30d return, blend weights .8/.1/.1 (70/30 conviction),
 
 Backtest window: **2021-06-01 → 2026-06-18** (~4.09 years; $1,000,000 start). OBSERVER (cash, no leverage), net of $1/txn, next-close fills, PIT survivorship-corrected, **eToro** daily data. QQQ 200d regime gate.
 
-## ⚠️ DATA-INTEGRITY WARNING — headline metrics are NOT trustworthy
+## ⚠️ DATA-INTEGRITY NOTE — verify before trusting headline
 
-**19 trade(s) use corrupted eToro price levels** (impossible exit prices, e.g. INTC $110, INTC $120, INTC $126, INTC $129, MU $1,038, MU $1,081, MU $345, MU $366, MU $388, MU $389, MU $397, MU $404, MU $411, MU $420, MU $439, MU $445, MU $447, MU $579, MU $793). They contribute **$1,585,696 = 34% of all PnL**. Until the underlying eToro candles are re-pulled and validated on the NUC, treat CAGR / Final NAV below as an UPPER bound, not a real result. See `DATA_AUDIT.md`.
+**41 trade(s) ($2,050,261 = 44% of PnL) sit on UNVERIFIABLE 2025-26 edge prices** (AMAT, AMD, GEV, INTC, MU) — out-of-band vs pre-2026 norms, on dates past the Jan-2026 knowledge cutoff. Could be real 2025-26 AI/memory mania OR corrupted eToro candles; the price paths are smooth & self-consistent (lean real) but magnitudes are extreme. **Re-pull the raw eToro daily series for these names on the NUC to confirm.** Until then treat CAGR / Final NAV as UNVERIFIED. See `DATA_AUDIT.md` / `TRADE_RECHECK.md`.
+
+**1 CONFIRMED data error(s)** ($583 = 0% of PnL): BKNG 2023-04-24 $107 — price impossible on a date inside the verifiable window.
 
 ## Results (as-is, net of $1/txn) — see audit before trusting
 
@@ -21,7 +23,8 @@ Backtest window: **2021-06-01 → 2026-06-18** (~4.09 years; $1,000,000 start). 
 | Max drawdown | 27.0% |
 | Calmar | 2.70 |
 | Trades | 297 · 80.5% win |
-| **PnL from corrupted trades** | **$1,585,696 (34% of total)** |
+| PnL on UNVERIFIABLE edge prices | $2,050,261 (44% of total) |
+| PnL on CONFIRMED data errors | $583 (0% of total) |
 
 ## Year-by-year breakdown
 
