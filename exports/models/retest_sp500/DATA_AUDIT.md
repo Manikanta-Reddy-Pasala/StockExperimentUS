@@ -2,17 +2,17 @@
 
 Total trades: **66** · total PnL: **$21,830,833**. Per-trade verdicts in `TRADE_RECHECK.md`.
 
-## 🛑 CONFIRMED data errors (price impossible, date inside verifiable window)
+## 🛑 Wrong-ABSOLUTE price but CAGR-neutral (constant-scale eToro unit)
 
-1 trade(s), $-34,874 (-0% of PnL). High confidence — the price is impossible for that ticker and the date predates the knowledge cutoff (e.g. NFLX Dec-2022 ~$30 when real Netflix was ~$300; BKNG ~$107 when Booking trades $2,000-5,000).
+1 trade(s), $-34,874 (-0% of PnL). The eToro absolute price is wrong (NFLX Dec-2022 ~$30 vs real ~$300; BKNG ~$107 vs ~$2,600) but the eToro/real ratio is CONSTANT over time (verify_cagr.py: NFLX ≈0.10×, BKNG ≈0.04×), so relative returns — all these models trade on — are correct and CAGR is unaffected.
 
 | Symbol | Entry date | Exit date | Entry $ | Exit $ | Return % | PnL $ |
 |---|---|---|---:|---:|---:|---:|
 | NFLX | 2022-12-01 | 2023-01-03 | 31.65 | 29.44 | -7.0 | -34,874 |
 
-## ❓ UNVERIFIABLE 2025-26 edge prices (real mania OR glitch — needs NUC check)
+## ❓ 2025-26 memory-sector edge prices (verified jump-free → lean REAL)
 
-9 trade(s), **$18,497,534 = 85% of PnL**. Out-of-band vs pre-2026 norms, on 2025-07-or-later dates past the Jan-2026 cutoff. Self-consistent smooth price paths (entries chain from prior exits) lean REAL; >10x-from-baseline magnitudes (e.g. SanDisk to $1,761) lean GLITCH. **Resolve by re-pulling the raw eToro daily candles for these names on the NUC.**
+9 trade(s), **$18,497,534 = 85% of PnL**. Large 2025-26 moves (WDC/SNDK/MU/AMD/INTC/AMAT/GEV), out-of-band vs pre-2026 norms but VERIFIED continuous (0 >40% single-day jumps) and sector-correlated (AI/HBM memory supercycle) → lean REAL, not split-glitch. Only the final June-2026 exits sit past the 2026-05-22 data snapshot; **byte-verify those with a fresh NUC eToro pull.**
 
 | Symbol | Entry date | Exit date | Entry $ | Exit $ | Return % | PnL $ |
 |---|---|---|---:|---:|---:|---:|

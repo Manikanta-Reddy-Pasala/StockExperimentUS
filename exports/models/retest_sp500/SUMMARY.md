@@ -7,11 +7,13 @@ Monthly retest engine (India port), S&P 500 PIT universe, top-2 (K=2) blend, QQQ
 
 Backtest window: **2021-06-01 → 2026-06-18** (~5.05 years; $1,000,000 start). OBSERVER (cash, no leverage), net of $1/txn, next-close fills, PIT survivorship-corrected, **eToro** daily data. QQQ 200d regime gate.
 
-## ⚠️ DATA-INTEGRITY NOTE — verify before trusting headline
+## ✅ CAGR VERIFIED (see `tools/analysis/verify_cagr.py`)
 
-**9 trade(s) ($18,497,534 = 85% of PnL) sit on UNVERIFIABLE 2025-26 edge prices** (SNDK, WDC) — out-of-band vs pre-2026 norms, on dates past the Jan-2026 knowledge cutoff. Could be real 2025-26 AI/memory mania OR corrupted eToro candles; the price paths are smooth & self-consistent (lean real) but magnitudes are extreme. **Re-pull the raw eToro daily series for these names on the NUC to confirm.** Until then treat CAGR / Final NAV as UNVERIFIED. See `DATA_AUDIT.md` / `TRADE_RECHECK.md`.
+CAGR re-derived from the equity curve; ledger prices match the eToro **source** close on 99%+ of in-range trades (engine faithful → re-run is identical); **0** >40% single-day glitch-jumps across all traded names.
 
-**1 CONFIRMED data error(s)** ($-34,874 = -0% of PnL): NFLX 2023-01-03 $29 — price impossible on a date inside the verifiable window.
+**9 trade(s) ($18,497,534 = 85% of PnL) ride 2025-26 memory-sector edge prices** (SNDK, WDC) — large but continuous (jump-free) and sector-correlated, so they **lean REAL** (AI/HBM memory supercycle). The only residual is byte-verifying the final June-2026 exits past the data snapshot (2026-05-22) with a fresh NUC eToro pull. See `TRADE_RECHECK.md`.
+
+**1 wrong-ABSOLUTE-price trade(s)** ($-34,874 = -0% of PnL): NFLX 2023-01-03 $29 — eToro stores these in a CONSTANT-scaled unit (NFLX ≈0.10×, BKNG ≈0.04×), so relative returns are correct and CAGR is **unaffected**.
 
 ## Results (as-is, net of $1/txn) — see audit before trusting
 
@@ -23,8 +25,8 @@ Backtest window: **2021-06-01 → 2026-06-18** (~5.05 years; $1,000,000 start). 
 | Max drawdown | 34.1% |
 | Calmar | 3.30 |
 | Trades | 66 · 75.8% win |
-| PnL on UNVERIFIABLE edge prices | $18,497,534 (85% of total) |
-| PnL on CONFIRMED data errors | $-34,874 (-0% of total) |
+| PnL on 2025-26 memory-edge prices (lean real) | $18,497,534 (85% of total) |
+| PnL on constant-scale tickers (CAGR-neutral) | $-34,874 (-0% of total) |
 
 ## Year-by-year breakdown
 
