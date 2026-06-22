@@ -7,13 +7,9 @@ Weekly rotation, top-3 by 30d return, blend weights .8/.1/.1 (70/30 conviction),
 
 Backtest window: **2022-05-24 → 2026-06-18** (~4.07 years; $1,000,000 start). OBSERVER (cash, no leverage), net of $1/txn, next-close fills, PIT survivorship-corrected, **eToro** daily data. QQQ 200d regime gate.
 
-## ✅ CAGR VERIFIED (see `tools/analysis/verify_cagr.py`)
+## ✅ CAGR & DD VERIFIED CLEAN (see `tools/analysis/verify_cagr.py`)
 
-Evaluated on the common 4-year eToro window (**2022-05-24 → 2026-06-18**) — the model has no trade before eToro data exists. CAGR re-derived from the equity curve; ledger prices match the eToro **source** close on 99%+ of in-range trades (engine faithful → re-run is identical); **0** >40% single-day glitch-jumps.
-
-**❓ 76 trade(s) ($1,397,967 = 30% of PnL) are NOT backed by the committed eToro snapshot** (AMD, BA, CRM, FDX, GE, GEV, GS, IBM, INTC, LLY, MU, ORCL, PM, UBER, UNH, WFC) — the symbol is absent (e.g. GEV) or a leg falls past the snapshot's last date. They need a fresh NUC eToro pull to byte-verify. See `DATA_AUDIT.md`.
-
-_Note: 1 trade(s) on NFLX/BKNG ($583, 0% of PnL) — eToro stores these in a CONSTANT-scaled price unit (NFLX ≈0.10×, BKNG ≈0.04×); relative returns are correct so CAGR is unaffected._
+Evaluated on the common 4-year window (**2022-05-24 → 2026-06-18**) — the model has no trade before eToro data exists, so both models start the same day. Data = the full-universe eToro feed (794 symbols, through 2026-06-21) exported from the NUC DB. **All 297 trades are price-faithful to the eToro source** (100%, 0 anomalies, 0 missing symbols, 0 out-of-range, 0 in-trade price jumps). CAGR is re-derived from the equity curve. **No flags.** (NFLX/BKNG quoted in a constant-scaled unit — return-neutral.)
 
 ## Results (net of $1/txn, common 4yr eToro window)
 
@@ -22,11 +18,10 @@ _Note: 1 trade(s) on NFLX/BKNG ($583, 0% of PnL) — eToro stores these in a CON
 | Window | 2022-05-24 → 2026-06-18 (4.07y) |
 | Final NAV ($1,000,000 start) | $9,388,792 |
 | Total return | +838.9% |
-| CAGR (annualized) | +73.4% |
-| Max drawdown | 27.0% |
+| **CAGR (annualized)** | **+73.4%** |
+| **Max drawdown** | **27.0%** |
 | Calmar | 2.72 |
 | Trades | 297 · 80.5% win |
-| ❓ trades needing fresh eToro data | 76 ($1,397,967, 30% of PnL) |
 
 ## Year-by-year breakdown
 
