@@ -45,28 +45,27 @@ SP100_BLEND_WEIGHTS = "0.8,0.1,0.1"   # 70/30 blend (fine-tuned): 112% CAGR / 34
 
 
 def emit_momentum_sp100(force: bool = False):
-    """Emit momentum_sp100 OBSERVER signal (n40 S&P100 top-2, EQUAL weight).
+    """Emit momentum_sp100 OBSERVER signal (n40 S&P100 top-1 single-stock).
 
     Signal-only — never calls an executor. The live_signal self-skips on
     non-rebalance days (writes an empty file), so this is safe to fire daily.
     """
     model_name = "momentum_sp100"
     log.info("\n" + "=" * 80)
-    log.info(f"RUNNING OBSERVER signal: {model_name} (S&P100 top-2 equal-weight)"
+    log.info(f"RUNNING OBSERVER signal: {model_name} (S&P100 top-1 single-stock)"
              + (" [FORCE]" if force else " [weekly-gated]"))
     log.info("=" * 80)
     SIGNALS_DIR.mkdir(parents=True, exist_ok=True)
     today = datetime.now().strftime("%Y-%m-%d")
     signals_out = SIGNALS_DIR / f"{today}_{model_name}.json"
-    # top-2 EQUAL-WEIGHT (no --weights) so the live signal is byte-identical to the
-    # backtest: both call the shared pick_n40_holdings(top=2) and equal-weight it —
-    # zero drift. Tuned 2026-06: top-3 .8/.1/.1 → top-2 equal-weight lifted CAGR
-    # 81→102% and cut trades 300→196 (DD flat ~28%) on the shared n40 engine.
+    # top-1 SINGLE-STOCK (no --weights) so the live signal is byte-identical to the
+    # backtest: both call the shared pick_n40_holdings(top=1) — zero drift. User chose
+    # top-1 for max CAGR: +121.4% / 39.0% DD / Calmar 3.11 (vs top-2 102%/28%/3.65).
     cmd = [
         "python3", "tools/models/n40_largecap_weekly/live_signal.py",
         "--universe-csv", "src/data/symbols/sp100.csv",
         "--lev", "1.0",
-        "--top", "2",
+        "--top", "1",
         "--topadv", "50",
         "--signal", "blend",
         "--model-name", model_name,

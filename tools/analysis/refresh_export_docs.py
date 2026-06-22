@@ -36,9 +36,9 @@ SCALE_TICKERS = {"NFLX", "BKNG"}
 # Per-model descriptors (title, universe, one-line strategy, status).
 DESC = {
     "momentum_sp100": {
-        "title": "S&P 100 Momentum (n40 top-2)", "status": "LIVE (observer)",
+        "title": "S&P 100 Momentum (n40 top-1)", "status": "LIVE (observer)",
         "universe": "Top-50 by ADV ∩ S&P 100 (mega-cap), QQQ 200d SMA regime gate",
-        "strategy": "WEEKLY rotation, **top-2 equal-weight** by BLEND multi-timeframe momentum (21/63/126d) from the top-50-ADV S&P100 pool, QQQ-200d regime gate (risk-off → cash). Shared `pick_n40_holdings` — **live signal byte-identical to this backtest**. Tuned 2026-06: top-3 .8/.1/.1 → top-2 equal-weight lifted CAGR 81→102% and cut trades 300→196 (DD flat ~28%).",
+        "strategy": "WEEKLY rotation, **top-1 single-stock** by BLEND multi-timeframe momentum (21/63/126d) from the top-50-ADV S&P100 pool, QQQ-200d regime gate (risk-off → cash). Shared `pick_n40_holdings` — **live signal byte-identical to this backtest**. top-1 chosen for max CAGR (+121.4% / 39.0% DD / Calmar 3.11; vs top-2 102%/28%/3.65). Single-stock = whole book on one name → higher DD, but rotates (83.8% WR, not one-name-dependent).",
     },
     "retest_sp500": {
         "title": "S&P 500 Retest Momentum (top-2 blend)", "status": "LIVE (observer)",
