@@ -37,9 +37,9 @@ SCALE_TICKERS = {"NFLX", "BKNG"}
 # Per-model descriptors (title, universe, one-line strategy, status).
 DESC = {
     "momentum_sp100": {
-        "title": "S&P 100 Momentum (n40 top-3 blend)", "status": "LIVE (observer)",
-        "universe": "Top-40 by ADV ∩ S&P 100 (mega-cap), QQQ 200d SMA regime gate",
-        "strategy": "Weekly rotation, top-3 by 30d return, blend weights .8/.1/.1 (70/30 conviction), single sleeve. QQQ-200d regime gate (risk-off → cash).",
+        "title": "S&P 100 Momentum (top-2 blend)", "status": "LIVE (observer)",
+        "universe": "S&P 100 (mega-cap), QQQ 200d SMA regime gate",
+        "strategy": "Monthly + mid-month rotation, **top-2** equal-weight by BLEND multi-timeframe momentum (21/63/126d), QQQ-200d regime gate (risk-off → cash). Tuned 2026-06: top-3→top-2 concentration + blend signal lifted CAGR 73→118% and cut trades 297→94 (DD flat ~27%); robust pre-mania (92% CAGR / 19% DD on 2022-24).",
     },
     "retest_sp500": {
         "title": "S&P 500 Retest Momentum (top-2 blend)", "status": "LIVE (observer)",

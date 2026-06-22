@@ -1,21 +1,19 @@
 ======================================================================
 1) CAGR re-derived from equity curve (independent of model_info.json)
-   momentum_sp100   2022-05-24→2026-06-18 4.07y  $1,000,000→$9,388,792  CAGR +73.4%
+   momentum_sp100   2022-05-24→2026-06-18 4.07y  $1,000,000→$24,020,701  CAGR +118.4%
    retest_sp500     2022-05-24→2026-06-18 4.07y  $1,000,000→$44,776,308  CAGR +154.6%
 
 2) Per-trade fidelity — every trade in an EXPLAINED bucket (snapshot ends 2026-06-21)
    PRICE_FAITHFUL=both legs are real eToro bars · RETURN_FAITHFUL=booked return
    matches eToro close-to-close (fill-shift) · OUT_OF_RANGE=past snapshot · ANOMALY=must be 0
-   momentum_sp100   in-range explained 297/297 (100.0%)  [price 297 · return 0 · blend 0] | OUT_OF_RANGE 0 | NOT_IN_SNAPSHOT 0 | ANOMALY 0
+   momentum_sp100   in-range explained 94/94 (100.0%)  [price 94 · return 0 · blend 0] | OUT_OF_RANGE 0 | NOT_IN_SNAPSHOT 0 | ANOMALY 0
    retest_sp500     in-range explained 66/66 (100.0%)  [price 66 · return 0 · blend 0] | OUT_OF_RANGE 0 | NOT_IN_SNAPSHOT 0 | ANOMALY 0
 
 3) Glitch-jump scan — >40% single-day moves, split by whether a TRADE spans them
-   IN-TRADE jumps (corrupt PnL): 0  |  OUT-OF-TRADE (harmless): 5
+   IN-TRADE jumps (corrupt PnL): 1  |  OUT-OF-TRADE (harmless): 2
+      ⚠️ IN-TRADE GEV 2024-04-01 +614%
       ok (no position) TSLA 2022-05-27 -64%
       ok (no position) TSLA 2022-05-31 +199%
-      ok (no position) GEV 2024-04-01 +614%
-      ok (no position) GOOG 2022-05-27 -95%
-      ok (no position) GOOG 2022-05-31 +1920%
 
 4) Scale fidelity — wrong-ABSOLUTE tickers have CONSTANT scale? (=> returns OK)
       NFLX: eToro/real ≈ 0.101, spread 12%  ->  CONSTANT scale (returns UNAFFECTED)

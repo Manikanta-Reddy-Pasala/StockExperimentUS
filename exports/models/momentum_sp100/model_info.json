@@ -1,24 +1,24 @@
 {
   "model": "momentum_sp100",
-  "strategy": "momentum (n40 S&P100 top-3 blend .8/.1/.1)",
-  "note": "net of $1/txn",
+  "strategy": "momentum (S&P100 top-2, blend multi-timeframe momentum, monthly+mid-month, QQQ regime)",
+  "note": "net of 8bps slippage; top-2 concentration + blend signal (was top-3 .8/.1/.1)",
   "window": "2022-05-24..2026-06-18",
   "mode": "OBSERVER (cash, no leverage, $1/txn)",
   "data_source": "eToro",
   "regime": "QQQ 200d",
   "metrics": {
-    "cagr": 73.41,
-    "mdd": 26.97,
-    "calmar": 2.72,
-    "final": 9388792.344360461,
+    "cagr": 118.44,
+    "mdd": 27.17,
+    "calmar": 4.36,
+    "final": 24020700.93090088,
     "yrs": 4.07,
-    "trades": 297,
-    "wr": 80.5,
-    "model": "n40_top3_blend_reg_pit"
+    "trades": 94,
+    "wr": 83.0,
+    "model": "sp100_top2_blend_reg"
   },
-  "trades": 297,
+  "trades": 94,
   "cap_mix": {
-    "mega": 297
+    "mega": 94
   },
-  "win_rate_pct": 80.5
+  "win_rate_pct": 83.0
 }
