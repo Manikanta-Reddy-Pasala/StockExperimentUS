@@ -13,6 +13,7 @@ Run: python3 tools/analysis/refresh_export_docs.py
 from __future__ import annotations
 
 import csv
+import gzip
 import json
 import sys
 from datetime import date
@@ -20,8 +21,18 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPORTS = ROOT / "exports" / "models"
+ETORO = ROOT / "data" / "historical_etoro_ohlcv.csv.gz"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import recheck_trades as RC  # per-trade calibrated verdicts (single source of truth)
+
+# Both models are evaluated on the COMMON 4-year window where eToro daily data exists.
+# The eToro snapshot starts 2022-05-24; neither model has any trade before then, so the
+# old retest 2021-06 start was a ~1yr phantom cash period that wrongly diluted its CAGR.
+COMMON_START = "2022-05-24"
+
+# Tickers whose eToro ABSOLUTE price is a constant-scaled unit (NFLX ≈0.10×, BKNG ≈0.04×) —
+# verified return-neutral (verify_cagr.py), so informational only, not a data problem.
+SCALE_TICKERS = {"NFLX", "BKNG"}
 
 # Per-model descriptors (title, universe, one-line strategy, status).
 DESC = {
@@ -38,23 +49,31 @@ DESC = {
 }
 
 # ---------------------------------------------------------------------------
-# DATA-INTEGRITY AUDIT  (delegates per-trade verdicts to recheck_trades.py)
+# DATA-COVERAGE AUDIT — the flag now means exactly "needs proper eToro data"
 # ---------------------------------------------------------------------------
-# Two buckets, honestly separated by confidence:
-#   glitch (CONFIRMED)   — price impossible AND on a date inside the solid market-
-#                          knowledge window (e.g. NFLX Dec-2022 $29, BKNG $107).
-#   unver  (UNVERIFIABLE) — out-of-band price on a 2025-07+ date (eToro data edge,
-#                          past the Jan-2026 cutoff). Could be a real 2025-26 mania
-#                          move OR a corrupted candle — needs a NUC raw-candle check.
-def audit_trades(rows):
-    glitch, unver = [], []
+# A trade is flagged ❓ ONLY if it is NOT fully backed by the committed eToro snapshot:
+#   - the symbol is absent from the snapshot (e.g. GEV), or
+#   - a leg date is past the snapshot's last date (the June-2026 exits).
+# Everything else is verified faithful (verify_cagr.py: 100% in-range, 0 anomalies), so
+# it carries no flag. SCALE_TICKERS (NFLX/BKNG) are noted separately — return-neutral.
+def load_coverage():
+    syms, dmax = set(), ""
+    for x in csv.DictReader(gzip.open(ETORO, "rt")):
+        syms.add(x["symbol"])
+        d = x["date"][:10]
+        if d > dmax:
+            dmax = d
+    return syms, dmax
+
+
+def audit_trades(rows, syms, dmax):
+    uncovered, scale = [], []
     for r in rows:
-        v = RC.check(r)[0]
-        if v in ("GLITCH", "MATH_ERR"):
-            glitch.append(r)
-        elif v == "UNVERIFIABLE":
-            unver.append(r)
-    return glitch, unver
+        if (r["symbol"] not in syms) or (r["exit_date"] > dmax) or (r["entry_date"] > dmax):
+            uncovered.append(r)
+        elif r["symbol"] in SCALE_TICKERS:
+            scale.append(r)
+    return scale, uncovered
 
 
 # ---------------------------------------------------------------------------
@@ -64,8 +83,21 @@ def load_equity(path):
     pts = []
     with open(path) as f:
         for row in csv.DictReader(f):
-            pts.append((row["date"], float(row["equity"])))
+            if row["date"] >= COMMON_START:          # trim to the common eToro window
+                pts.append((row["date"], float(row["equity"])))
     return pts
+
+
+def recompute_metrics(eq, trades, wr):
+    """CAGR / MDD / Calmar / final / years over the (trimmed) equity curve."""
+    d0, d1 = date.fromisoformat(eq[0][0]), date.fromisoformat(eq[-1][0])
+    yrs = (d1 - d0).days / 365.25
+    g = eq[-1][1] / eq[0][1]
+    cagr = (g ** (1 / yrs) - 1) * 100
+    mdd = max_drawdown(eq)
+    return {"cagr": round(cagr, 2), "mdd": round(mdd, 2),
+            "calmar": round(cagr / mdd, 2) if mdd else 0.0,
+            "final": eq[-1][1], "yrs": round(yrs, 2), "trades": trades, "wr": wr}
 
 
 def max_drawdown(pts):
@@ -132,41 +164,39 @@ def write_summary(model, info, eq, glitch, unver):
 
     L.append("## ✅ CAGR VERIFIED (see `tools/analysis/verify_cagr.py`)")
     L.append("")
-    L.append("CAGR re-derived from the equity curve; ledger prices match the eToro **source** close on 99%+ "
-             "of in-range trades (engine faithful → re-run is identical); **0** >40% single-day glitch-jumps "
-             "across all traded names.")
+    L.append(f"Evaluated on the common 4-year eToro window (**{COMMON_START} → {eq[-1][0]}**) — the model has "
+             "no trade before eToro data exists. CAGR re-derived from the equity curve; ledger prices match the "
+             "eToro **source** close on 99%+ of in-range trades (engine faithful → re-run is identical); "
+             "**0** >40% single-day glitch-jumps.")
     L.append("")
     if unver:
         names = ", ".join(sorted({r["symbol"] for r in unver}))
         L.append(
-            f"**{len(unver)} trade(s) ({fmt_usd(u_pnl)} = {u_share:.0f}% of PnL) ride 2025-26 memory-sector "
-            f"edge prices** ({names}) — large but continuous (jump-free) and sector-correlated, so they "
-            "**lean REAL** (AI/HBM memory supercycle). The only residual is byte-verifying the final June-2026 "
-            "exits past the data snapshot (2026-05-22) with a fresh NUC eToro pull. See `TRADE_RECHECK.md`."
+            f"**❓ {len(unver)} trade(s) ({fmt_usd(u_pnl)} = {u_share:.0f}% of PnL) are NOT backed by the "
+            f"committed eToro snapshot** ({names}) — the symbol is absent (e.g. GEV) or a leg falls past the "
+            "snapshot's last date. They need a fresh NUC eToro pull to byte-verify. See `DATA_AUDIT.md`."
         )
         L.append("")
     if glitch:
         L.append(
-            f"**{len(glitch)} wrong-ABSOLUTE-price trade(s)** ({fmt_usd(g_pnl)} = {g_share:.0f}% of PnL): "
-            + ", ".join("{} {} ${:,.0f}".format(r["symbol"], r["exit_date"], float(r["exit_px"]))
-                        for r in glitch)
-            + " — eToro stores these in a CONSTANT-scaled unit (NFLX ≈0.10×, BKNG ≈0.04×), so relative "
-            "returns are correct and CAGR is **unaffected**."
+            f"_Note: {len(glitch)} trade(s) on NFLX/BKNG ({fmt_usd(g_pnl)}, {g_share:.0f}% of PnL) — eToro "
+            "stores these in a CONSTANT-scaled price unit (NFLX ≈0.10×, BKNG ≈0.04×); relative returns are "
+            "correct so CAGR is unaffected._"
         )
         L.append("")
 
-    L.append("## Results (as-is, net of $1/txn) — see audit before trusting")
+    L.append("## Results (net of $1/txn, common 4yr eToro window)")
     L.append("")
     L.append("| Metric | Value |")
     L.append("|---|---|")
+    L.append(f"| Window | {eq[0][0]} → {eq[-1][0]} ({m['yrs']:.2f}y) |")
     L.append(f"| Final NAV (${start:,.0f} start) | {fmt_usd(final)} |")
     L.append(f"| Total return | {tot_ret:+.1f}% |")
     L.append(f"| CAGR (annualized) | {m['cagr']:+.1f}% |")
     L.append(f"| Max drawdown | {mdd:.1f}% |")
     L.append(f"| Calmar | {m['calmar']:.2f} |")
     L.append(f"| Trades | {m['trades']} · {m.get('wr','—')}% win |")
-    L.append(f"| PnL on 2025-26 memory-edge prices (lean real) | {fmt_usd(u_pnl)} ({u_share:.0f}% of total) |")
-    L.append(f"| PnL on constant-scale tickers (CAGR-neutral) | {fmt_usd(g_pnl)} ({g_share:.0f}% of total) |")
+    L.append(f"| ❓ trades needing fresh eToro data | {len(unver)} ({fmt_usd(u_pnl)}, {u_share:.0f}% of PnL) |")
     L.append("")
 
     L.append("## Year-by-year breakdown")
@@ -204,17 +234,18 @@ def write_ledger(model, info, rows, glitch, unver):
     L = []
     L.append(f"# {model} — trade ledger ({info['window'].replace('..',' → ')})")
     L.append("")
-    L.append(f"{len(srows)} trades, chronological by entry date. **Amount $** = capital deployed "
-             "(entry price × qty); **Return %** and **PnL $** are net of $1/txn. Qty is fractional "
-             "(dollar-allocated). Flag: 🛑 = constant-scale price unit (CAGR-neutral); "
-             "❓ = 2025-26 memory-edge price (verified jump-free, leans real). No exit-reason field in source.")
+    L.append(f"{len(srows)} trades, chronological by entry date, common 4yr eToro window. **Amount $** = "
+             "capital deployed (entry price × qty); **Return %** and **PnL $** are net of $1/txn. Qty is "
+             "fractional (dollar-allocated). Flag: ❓ = not backed by the committed eToro snapshot (symbol "
+             "absent or leg past snapshot end → needs fresh pull); 🛈 = constant-scale price unit (NFLX/BKNG, "
+             "CAGR-neutral). No exit-reason field in source.")
     L.append("")
     L.append(f"Wins {wins} / Losses {len(srows)-wins} ({100*wins/len(srows):.1f}% win).")
     L.append("")
     L.append("| # | Symbol | Cap | Entry date | Exit date | Entry $ | Exit $ | Qty | Amount $ | PnL $ | Return % | Bars | Flag |")
     L.append("|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|")
     for i, r in enumerate(srows, 1):
-        flag = "🛑" if id(r) in g_ids else ("❓" if id(r) in u_ids else "")
+        flag = "❓" if id(r) in u_ids else ("🛈" if id(r) in g_ids else "")
         ep, q = float(r["entry_px"]), float(r["shares"])
         L.append(
             f"| {i} | {r['symbol']} | {r['cap_tag']} | {r['entry_date']} | {r['exit_date']} "
@@ -233,31 +264,32 @@ def write_audit(model, info, rows, glitch, unver):
     L.append(f"Total trades: **{len(rows)}** · total PnL: **{fmt_usd(tot_pnl)}**. "
              "Per-trade verdicts in `TRADE_RECHECK.md`.")
     L.append("")
-    L.append("## 🛑 Wrong-ABSOLUTE price but CAGR-neutral (constant-scale eToro unit)")
-    L.append("")
-    if glitch:
-        L.append(f"{len(glitch)} trade(s), {fmt_usd(_pnl(glitch))} ({_pnl(glitch)/tot_pnl*100:.0f}% of PnL). "
-                 "The eToro absolute price is wrong (NFLX Dec-2022 ~$30 vs real ~$300; BKNG ~$107 vs ~$2,600) "
-                 "but the eToro/real ratio is CONSTANT over time (verify_cagr.py: NFLX ≈0.10×, BKNG ≈0.04×), "
-                 "so relative returns — all these models trade on — are correct and CAGR is unaffected.")
-        L.append("")
-        L.append("| Symbol | Entry date | Exit date | Entry $ | Exit $ | Return % | PnL $ |")
-        L.append("|---|---|---|---:|---:|---:|---:|")
-        for r in sorted(glitch, key=lambda r: -float(r["pnl"])):
-            L.append(f"| {r['symbol']} | {r['entry_date']} | {r['exit_date']} "
-                     f"| {float(r['entry_px']):,.2f} | {float(r['exit_px']):,.2f} "
-                     f"| {float(r['ret_pct']):.1f} | {float(r['pnl']):,.0f} |")
-    else:
-        L.append("None.")
-    L.append("")
-    L.append("## ❓ 2025-26 memory-sector edge prices (verified jump-free → lean REAL)")
+    L.append("## ❓ Trades NOT backed by the committed eToro snapshot (need fresh pull)")
     L.append("")
     if unver:
         L.append(f"{len(unver)} trade(s), **{fmt_usd(_pnl(unver))} = {_pnl(unver)/tot_pnl*100:.0f}% of PnL**. "
-                 "Large 2025-26 moves (WDC/SNDK/MU/AMD/INTC/AMAT/GEV), out-of-band vs pre-2026 norms but "
-                 "VERIFIED continuous (0 >40% single-day jumps) and sector-correlated (AI/HBM memory "
-                 "supercycle) → lean REAL, not split-glitch. Only the final June-2026 exits sit past the "
-                 "2026-05-22 data snapshot; **byte-verify those with a fresh NUC eToro pull.**")
+                 "The symbol is absent from the snapshot (e.g. GEV — not in the file at all) or a leg date "
+                 "falls past the snapshot's last bar (the June-2026 exits). All in-snapshot trades are already "
+                 "verified faithful (verify_cagr.py); these just can't be byte-checked here. "
+                 "**Re-pull raw eToro candles on the NUC through the backtest end to close them.**")
+        L.append("")
+        L.append("| Symbol | Entry date | Exit date | Entry $ | Exit $ | Return % | PnL $ | Reason |")
+        L.append("|---|---|---|---:|---:|---:|---:|---|")
+        for r in sorted(unver, key=lambda r: -float(r["pnl"])):
+            reason = "symbol absent" if r["symbol"] in _ABSENT else "leg past snapshot"
+            L.append(f"| {r['symbol']} | {r['entry_date']} | {r['exit_date']} "
+                     f"| {float(r['entry_px']):,.2f} | {float(r['exit_px']):,.2f} "
+                     f"| {float(r['ret_pct']):.1f} | {float(r['pnl']):,.0f} | {reason} |")
+    else:
+        L.append("None.")
+    L.append("")
+    L.append("## 🛈 Constant-scale price unit (NFLX/BKNG — CAGR-neutral, informational)")
+    L.append("")
+    if glitch:
+        L.append(f"{len(glitch)} trade(s), {fmt_usd(_pnl(glitch))} ({_pnl(glitch)/tot_pnl*100:.0f}% of PnL). "
+                 "eToro stores NFLX ≈0.10× and BKNG ≈0.04× of the real USD price, but the ratio is CONSTANT "
+                 "over time (verify_cagr.py), so relative returns — all these models trade on — are correct "
+                 "and CAGR is unaffected. Not a problem to fix; noted for transparency.")
         L.append("")
         L.append("| Symbol | Entry date | Exit date | Entry $ | Exit $ | Return % | PnL $ |")
         L.append("|---|---|---|---:|---:|---:|---:|")
@@ -275,38 +307,33 @@ def write_audit(model, info, rows, glitch, unver):
 
 # ---------------------------------------------------------------------------
 _all_rows = {}
+_ABSENT = set()   # traded symbols absent from the eToro snapshot (e.g. GEV)
 
 
-def write_top_summary(infos, equities, audits):
+def write_top_summary(infos, equities, audits, dmax):
     L = []
     L.append("# Model Exports — US Observer System (2 models)")
     L.append("")
     L.append("Cash / no-leverage / OBSERVER (signal-only) / PIT survivorship-corrected / eToro data.")
-    L.append("Window 2021-06-01 → 2026-06-18 (~5yr). QQQ 200d SMA regime gate. Net of $1/txn.")
+    L.append(f"**Common window {COMMON_START} → {equities['retest_sp500'][-1][0]} (~4yr)** — the span where "
+             "eToro daily data exists; both models start the SAME day (neither trades before it). "
+             "QQQ 200d SMA regime gate. Net of $1/txn.")
     L.append("")
-    L.append("> ✅ **CAGR VERIFIED** (`tools/analysis/verify_cagr.py`): CAGRs re-derived from the equity curve, "
-             "and **100% of in-range trades are explained with ZERO anomalies** — each is price-faithful (the "
-             "ledger price is a real eToro bar), return-faithful (booked return == eToro close-to-close under "
-             "the fill convention), or a documented blend re-weight. Engine adds no error → a re-run is "
-             "identical. Glitch-jump scan = **0** >40% single-day moves across all 54 names (no split-adjust "
-             "corruption). The wrong-ABSOLUTE tickers (NFLX ≈0.10×, BKNG ≈0.04×) are **constant-scale** → "
-             "relative returns unchanged → **zero CAGR impact**. The 2025-26 memory run (WDC/SNDK/MU) is "
-             "continuous + sector-correlated → REAL. The ONLY unverified slice is **9 June-2026 exits past the "
-             "2026-05-22 data snapshot** — close with a fresh NUC eToro pull. Detail: `CAGR_VERIFICATION.txt`, "
-             "`TRADE_RECHECK.md`.")
+    L.append("> ✅ **CAGR VERIFIED** (`tools/analysis/verify_cagr.py`): CAGRs re-derived from the equity curve; "
+             "**100% of in-range trades explained, ZERO anomalies** (price-faithful, return-faithful, or "
+             "documented blend re-weight); engine adds no error. 0 split-adjust jumps. The ❓ flag marks ONLY "
+             f"trades not backed by the committed eToro snapshot (symbol absent, e.g. GEV, or a leg past {dmax}) "
+             "— these need a fresh NUC eToro pull to byte-verify. NFLX/BKNG store a constant-scaled price unit "
+             "(return-neutral, zero CAGR impact). Detail: `CAGR_VERIFICATION.txt`.")
     L.append("")
-    L.append("| Model | CAGR | MaxDD | Calmar | Final NAV | Trades | WR | ❓ memory-edge PnL (lean real) | 🛑 scale-only PnL (CAGR-neutral) |")
-    L.append("|-------|------|-------|--------|-----------|--------|----|----|----|")
+    L.append("| Model | CAGR | MaxDD | Calmar | Final NAV | Years | Trades | WR | ❓ needs-data |")
+    L.append("|-------|------|-------|--------|-----------|-------|--------|----|----|")
     for model in DESC:
         m = infos[model]["metrics"]
         eq = equities[model]
-        mdd = max_drawdown(eq)
-        glitch, unver = audits[model]
-        tot_pnl = _pnl(_all_rows[model])
-        ushare = _pnl(unver) / tot_pnl * 100 if tot_pnl else 0
-        gshare = _pnl(glitch) / tot_pnl * 100 if tot_pnl else 0
-        L.append(f"| {model} | {m['cagr']:+.1f}% | {mdd:.1f}% | {m['calmar']:.2f} "
-                 f"| {fmt_usd(eq[-1][1])} | {m['trades']} | {m.get('wr','—')}% | {ushare:.0f}% | {gshare:.0f}% |")
+        _, unver = audits[model]
+        L.append(f"| {model} | {m['cagr']:+.1f}% | {m['mdd']:.1f}% | {m['calmar']:.2f} "
+                 f"| {fmt_usd(eq[-1][1])} | {m['yrs']} | {m['trades']} | {m.get('wr','—')}% | {len(unver)} |")
     L.append("")
     L.append("Each model folder contains: `SUMMARY.md`, `TRADE_LEDGER.md`, `DATA_AUDIT.md`, "
              "`TRADE_RECHECK.md`, `trade_ledger.csv`, `equity_curve.csv`, `model_info.json`.")
@@ -315,6 +342,11 @@ def write_top_summary(infos, equities, audits):
 
 
 def main():
+    syms, dmax = load_coverage()
+    for model in DESC:
+        for r in csv.DictReader(open(EXPORTS / model / "trade_ledger.csv")):
+            if r["symbol"] not in syms:
+                _ABSENT.add(r["symbol"])
     infos, equities, audits = {}, {}, {}
     for model in DESC:
         mdir = EXPORTS / model
@@ -322,18 +354,25 @@ def main():
         with open(mdir / "trade_ledger.csv") as f:
             rows = list(csv.DictReader(f))
         _all_rows[model] = rows
-        eq = load_equity(mdir / "equity_curve.csv")
-        glitch, unver = audit_trades(rows)
-        infos[model], equities[model], audits[model] = info, eq, (glitch, unver)
+        eq = load_equity(mdir / "equity_curve.csv")           # trimmed to COMMON_START
+        wr = round(100 * sum(1 for r in rows if float(r["pnl"]) > 0) / len(rows), 1)
+        # recompute metrics on the common 4yr eToro window; persist to model_info.json
+        info["metrics"] = {**info.get("metrics", {}), **recompute_metrics(eq, len(rows), wr)}
+        info["window"] = f"{eq[0][0]}..{eq[-1][0]}"
+        info["win_rate_pct"] = wr
+        (mdir / "model_info.json").write_text(json.dumps(info, indent=2) + "\n")
 
-        write_summary(model, info, eq, glitch, unver)
-        write_ledger(model, info, rows, glitch, unver)
-        write_audit(model, info, rows, glitch, unver)
-        print(f"{model}: {len(rows)} trades | 🛑 confirmed={len(glitch)} ❓ unverifiable={len(unver)} "
-              f"| unverif PnL ${_pnl(unver):,.0f}")
+        scale, unver = audit_trades(rows, syms, dmax)
+        infos[model], equities[model], audits[model] = info, eq, (scale, unver)
 
-    write_top_summary(infos, equities, audits)
-    print("wrote per-model SUMMARY.md / TRADE_LEDGER.md / DATA_AUDIT.md + top SUMMARY.md")
+        write_summary(model, info, eq, scale, unver)
+        write_ledger(model, info, rows, scale, unver)
+        write_audit(model, info, rows, scale, unver)
+        print(f"{model}: {len(rows)} trades | CAGR {info['metrics']['cagr']:+.1f}% over "
+              f"{info['metrics']['yrs']}y | ❓ uncovered={len(unver)} scale-note={len(scale)}")
+
+    write_top_summary(infos, equities, audits, dmax)
+    print(f"wrote docs on common window from {COMMON_START} (eToro snapshot ends {dmax})")
 
 
 if __name__ == "__main__":

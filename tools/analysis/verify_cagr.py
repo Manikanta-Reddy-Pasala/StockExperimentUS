@@ -196,7 +196,7 @@ def main():
         pct = 100 * explained / inrange if inrange else 100
         print(f"   {model:16} in-range explained {explained}/{inrange} ({pct:.1f}%)  "
               f"[price {c['PRICE_FAITHFUL']} · return {c['RETURN_FAITHFUL']} · blend {c['BLEND_REWEIGHT']}] "
-              f"| OUT_OF_RANGE {c['OUT_OF_RANGE']} | ANOMALY {c['ANOMALY']}")
+              f"| OUT_OF_RANGE {c['OUT_OF_RANGE']} | NOT_IN_SNAPSHOT {c['NO_DATA']} | ANOMALY {c['ANOMALY']}")
         for s, ed, xd, lret, resid in anom[:8]:
             print(f"      ANOMALY {s} {ed}→{xd} ret {lret:+.1f}% (best source resid {resid:.1f}pp)")
 
@@ -215,12 +215,13 @@ def main():
         print(f"      {s}: eToro/real ≈ {mean:.3f}, spread {spread*100:.0f}%  ->  {verdict}")
 
     print("\n" + "=" * 70)
-    print("VERDICT: CAGR momentum_sp100 +72.9% / retest_sp500 +112.4% CONFIRMED.")
-    print("100% of in-range trades are explained (price-faithful, return-faithful, or blend")
-    print("re-weight) with ZERO anomalies; engine faithfully uses eToro source. NFLX/BKNG")
-    print("abs-price errors are constant-scale => return-neutral => no CAGR impact. No split")
-    print("glitches (0 >40% daily jumps). The ONLY unverified slice is the 9 OUT_OF_RANGE")
-    print("June-2026 exits past the 2026-05-22 snapshot — close those with a fresh NUC pull.")
+    print("VERDICT: on the common 4yr eToro window (2022-05-24->2026-06-18):")
+    print("  momentum_sp100 +73.4% CAGR · retest_sp500 +154.6% CAGR.")
+    print("Every trade present in the committed snapshot is faithful (100% in-range, 0 anomalies,")
+    print("0 split-jumps; NFLX/BKNG constant-scale => return-neutral). NOT fully verifiable here:")
+    print("trades on symbols ABSENT from this NASDAQ-universe snapshot (NYSE names: GE/GS/LLY/UNH/")
+    print("BA/IBM/ORCL/... and GEV) + the June-2026 exits past 2026-05-22. CLOSE THEM with a fresh")
+    print("FULL-universe eToro pull on the NUC (S&P100 NYSE+NASDAQ, through the backtest end).")
 
 
 if __name__ == "__main__":

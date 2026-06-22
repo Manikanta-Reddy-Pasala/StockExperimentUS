@@ -5,28 +5,28 @@ Weekly rotation, top-3 by 30d return, blend weights .8/.1/.1 (70/30 conviction),
 
 **Universe:** Top-40 by ADV ∩ S&P 100 (mega-cap), QQQ 200d SMA regime gate
 
-Backtest window: **2021-06-01 → 2026-06-18** (~4.09 years; $1,000,000 start). OBSERVER (cash, no leverage), net of $1/txn, next-close fills, PIT survivorship-corrected, **eToro** daily data. QQQ 200d regime gate.
+Backtest window: **2022-05-24 → 2026-06-18** (~4.07 years; $1,000,000 start). OBSERVER (cash, no leverage), net of $1/txn, next-close fills, PIT survivorship-corrected, **eToro** daily data. QQQ 200d regime gate.
 
 ## ✅ CAGR VERIFIED (see `tools/analysis/verify_cagr.py`)
 
-CAGR re-derived from the equity curve; ledger prices match the eToro **source** close on 99%+ of in-range trades (engine faithful → re-run is identical); **0** >40% single-day glitch-jumps across all traded names.
+Evaluated on the common 4-year eToro window (**2022-05-24 → 2026-06-18**) — the model has no trade before eToro data exists. CAGR re-derived from the equity curve; ledger prices match the eToro **source** close on 99%+ of in-range trades (engine faithful → re-run is identical); **0** >40% single-day glitch-jumps.
 
-**41 trade(s) ($2,050,261 = 44% of PnL) ride 2025-26 memory-sector edge prices** (AMAT, AMD, GEV, INTC, MU) — large but continuous (jump-free) and sector-correlated, so they **lean REAL** (AI/HBM memory supercycle). The only residual is byte-verifying the final June-2026 exits past the data snapshot (2026-05-22) with a fresh NUC eToro pull. See `TRADE_RECHECK.md`.
+**❓ 76 trade(s) ($1,397,967 = 30% of PnL) are NOT backed by the committed eToro snapshot** (AMD, BA, CRM, FDX, GE, GEV, GS, IBM, INTC, LLY, MU, ORCL, PM, UBER, UNH, WFC) — the symbol is absent (e.g. GEV) or a leg falls past the snapshot's last date. They need a fresh NUC eToro pull to byte-verify. See `DATA_AUDIT.md`.
 
-**1 wrong-ABSOLUTE-price trade(s)** ($583 = 0% of PnL): BKNG 2023-04-24 $107 — eToro stores these in a CONSTANT-scaled unit (NFLX ≈0.10×, BKNG ≈0.04×), so relative returns are correct and CAGR is **unaffected**.
+_Note: 1 trade(s) on NFLX/BKNG ($583, 0% of PnL) — eToro stores these in a CONSTANT-scaled price unit (NFLX ≈0.10×, BKNG ≈0.04×); relative returns are correct so CAGR is unaffected._
 
-## Results (as-is, net of $1/txn) — see audit before trusting
+## Results (net of $1/txn, common 4yr eToro window)
 
 | Metric | Value |
 |---|---|
+| Window | 2022-05-24 → 2026-06-18 (4.07y) |
 | Final NAV ($1,000,000 start) | $9,388,792 |
 | Total return | +838.9% |
-| CAGR (annualized) | +72.9% |
+| CAGR (annualized) | +73.4% |
 | Max drawdown | 27.0% |
-| Calmar | 2.70 |
+| Calmar | 2.72 |
 | Trades | 297 · 80.5% win |
-| PnL on 2025-26 memory-edge prices (lean real) | $2,050,261 (44% of total) |
-| PnL on constant-scale tickers (CAGR-neutral) | $583 (0% of total) |
+| ❓ trades needing fresh eToro data | 76 ($1,397,967, 30% of PnL) |
 
 ## Year-by-year breakdown
 
