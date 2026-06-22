@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
 from tools.models.india_ports_us.backtest import (  # noqa: E402  shared core engine
-    load_csv, load_panels, load_regime, run_n40, N100_CSV,
+    load_csv, load_panels, load_open, load_regime, run_n40, N100_CSV,
 )
 
 DEFAULT_START = date(2023, 5, 24)
@@ -67,12 +67,15 @@ def main():
                     help="flat $ per-transaction fee deducted on EVERY fill, both "
                          "buys and sells (eToro charges $1/txn each side). 0 = off.")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--legacy-fills", action="store_true",
+                    help="old same-close fills (no next-open / no T+1 settlement)")
     ap.set_defaults(regime=True)
     a = ap.parse_args()
     s, e = date.fromisoformat(a.start), date.fromisoformat(a.end)
 
     syms = sorted(set(load_csv(a.universe_csv)))
     cl, dv = load_panels(syms, s, e)
+    op = load_open(syms, s, e, cl)
     dates = cl.index
     reg = load_regime(a.regime_sym, dates, s, e) if a.regime else None
 
@@ -81,6 +84,7 @@ def main():
             regime_on=reg, regime=a.regime, lev=a.lev,
             margin_apr=(a.margin_apr if a.lev > 1 else 0.0),
             membership_csv=a.membership_csv, txn_charge=a.txn_charge,
+            op=(None if a.legacy_fills else op),
             tag="_top%d_%s%s%s%s" % (a.top, a.signal, "_reg" if a.regime else "",
                                      ("_lev%g" % a.lev) if a.lev != 1 else "",
                                      "_pit" if a.membership_csv else ""))

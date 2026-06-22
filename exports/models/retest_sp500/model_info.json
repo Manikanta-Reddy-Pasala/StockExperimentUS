@@ -1,25 +1,25 @@
 {
   "model": "retest_sp500",
-  "strategy": "retest (S&P500 PIT top-2 blend)",
-  "note": "net of charges; SHARED pick_retest_holdings (live==backtest); top-2 K=2, was stale 154.6% (older params)",
+  "strategy": "retest (S&P500 PIT top-2, blend, WEEKLY, QQQ regime, REALISTIC next-open+T+1 fills)",
+  "note": "REALISTIC US fills: decide on close, fill next-open, T+1 settlement; shared pick_retest_holdings, live==backtest selection",
   "window": "2022-05-24..2026-06-18",
   "mode": "OBSERVER (cash, no leverage, $1/txn)",
   "data_source": "eToro",
   "regime": "QQQ 200d",
   "metrics": {
-    "cagr": 104.53,
-    "mdd": 31.41,
-    "calmar": 3.33,
-    "final": 18376751.997107204,
+    "cagr": 110.21,
+    "mdd": 34.54,
+    "calmar": 3.19,
+    "final": 20546084.753778603,
     "yrs": 4.07,
-    "trades": 55,
-    "wr": 74.5,
-    "model": "retest_k2_blend_reg"
+    "trades": 31,
+    "wr": 58.1,
+    "model": "retest_k2_blend_reg_realfill"
   },
-  "trades": 55,
+  "trades": 31,
   "cap_mix": {
-    "mega": 27,
-    "large": 28
+    "mega": 12,
+    "large": 19
   },
-  "win_rate_pct": 74.5
+  "win_rate_pct": 58.1
 }

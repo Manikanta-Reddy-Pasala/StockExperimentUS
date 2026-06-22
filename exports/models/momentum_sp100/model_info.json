@@ -1,24 +1,24 @@
 {
   "model": "momentum_sp100",
-  "strategy": "momentum (S&P100 n40 top-1 single-stock, blend multi-timeframe momentum, WEEKLY, QQQ regime)",
-  "note": "net of $1/txn; n40 engine (shared pick_n40_holdings, live==backtest); top-1 single-stock (max CAGR, higher DD)",
+  "strategy": "momentum (S&P100 n40 top-1 single-stock, blend, WEEKLY, QQQ regime, REALISTIC next-open+T+1 fills)",
+  "note": "REALISTIC US fills: decide on close, fill next-open, T+1 settlement (buy waits 1 bar after sell); shared engine, live==backtest selection",
   "window": "2022-05-24..2026-06-18",
   "mode": "OBSERVER (cash, no leverage, $1/txn)",
   "data_source": "eToro",
   "regime": "QQQ 200d",
   "metrics": {
-    "cagr": 121.38,
-    "mdd": 38.97,
-    "calmar": 3.11,
-    "final": 25362069.485161543,
+    "cagr": 118.84,
+    "mdd": 43.67,
+    "calmar": 2.72,
+    "final": 24197428.072270866,
     "yrs": 4.07,
-    "trades": 154,
-    "wr": 83.8,
-    "model": "n40_top1_blend_reg"
+    "trades": 28,
+    "wr": 67.9,
+    "model": "n40_top1_blend_reg_realfill"
   },
-  "trades": 154,
+  "trades": 28,
   "cap_mix": {
-    "mega": 154
+    "mega": 28
   },
-  "win_rate_pct": 83.8
+  "win_rate_pct": 67.9
 }

@@ -36,14 +36,14 @@ SCALE_TICKERS = {"NFLX", "BKNG"}
 # Per-model descriptors (title, universe, one-line strategy, status).
 DESC = {
     "momentum_sp100": {
-        "title": "S&P 100 Momentum (n40 top-1)", "status": "LIVE (observer)",
+        "title": "S&P 100 Momentum (n40 top-1, realistic fills)", "status": "LIVE (observer)",
         "universe": "Top-50 by ADV ∩ S&P 100 (mega-cap), QQQ 200d SMA regime gate",
-        "strategy": "WEEKLY rotation, **top-1 single-stock** by BLEND multi-timeframe momentum (21/63/126d) from the top-50-ADV S&P100 pool, QQQ-200d regime gate (risk-off → cash). Shared `pick_n40_holdings` — **live signal byte-identical to this backtest**. top-1 chosen for max CAGR (+121.4% / 39.0% DD / Calmar 3.11; vs top-2 102%/28%/3.65). Single-stock = whole book on one name → higher DD, but rotates (83.8% WR, not one-name-dependent).",
+        "strategy": "WEEKLY rotation, **top-1 single-stock** by BLEND multi-timeframe momentum (21/63/126d), QQQ-200d regime gate. Shared `pick_n40_holdings` — **live signal byte-identical to backtest**. REALISTIC US execution: decide on close, fill at NEXT OPEN, **T+1 settlement** (buy waits one bar after sell — no instant same-day rotation). On realistic fills: **+118.8% CAGR / 43.7% DD** (legacy same-close was 121%/39%). Single-stock = whole book on one name → high DD.",
     },
     "retest_sp500": {
-        "title": "S&P 500 Retest Momentum (top-2 blend)", "status": "LIVE (observer)",
+        "title": "S&P 500 Retest Momentum (top-2, realistic fills)", "status": "LIVE (observer)",
         "universe": "S&P 500 PIT, top-2 by retest-momentum, QQQ 200d SMA regime gate",
-        "strategy": "Monthly retest engine (India port), S&P 500 PIT universe, top-2 (K=2) blend, QQQ-200d regime gate.",
+        "strategy": "WEEKLY retest engine (India port), S&P 500 PIT universe, top-2 (K=2) blend, QQQ-200d regime gate. Shared `pick_retest_holdings` — live==backtest. REALISTIC US execution: next-open fills + T+1 settlement. **+110.2% CAGR / 34.5% DD** (legacy same-close 104.5%/31.4%). Concentrated on a few big movers by design (WDC-driven).",
     },
 }
 
@@ -156,8 +156,9 @@ def write_summary(model, info, eq, glitch, unver):
     L.append(
         f"Backtest window: **{info['window'].replace('..',' → ')}** "
         f"(~{m['yrs']:.2f} years; ${start:,.0f} start). "
-        f"OBSERVER (cash, no leverage), net of $1/txn, next-close fills, "
-        f"PIT survivorship-corrected, **eToro** daily data. {info['regime']} regime gate."
+        f"OBSERVER (cash, no leverage), net of $1/txn + 8bps slippage, **next-open fills + "
+        f"T+1 settlement** (realistic US execution), PIT survivorship-corrected, **eToro** daily "
+        f"data. {info['regime']} regime gate."
     )
     L.append("")
 

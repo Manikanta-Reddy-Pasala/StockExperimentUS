@@ -7,8 +7,8 @@ Cash / no-leverage / OBSERVER (signal-only) / PIT survivorship-corrected / eToro
 
 | Model | CAGR | MaxDD | Calmar | Final NAV | Years | Trades | WR |
 |-------|------|-------|--------|-----------|-------|--------|----|
-| momentum_sp100 | +121.4% | 39.0% | 3.11 | $25,362,069 | 4.07 | 154 | 83.8% |
-| retest_sp500 | +104.5% | 31.4% | 3.33 | $18,376,752 | 4.07 | 55 | 74.5% |
+| momentum_sp100 | +118.8% | 43.7% | 2.72 | $24,197,428 | 4.07 | 28 | 67.9% |
+| retest_sp500 | +110.2% | 34.5% | 3.19 | $20,546,085 | 4.07 | 31 | 58.1% |
 
 Each model folder contains: `SUMMARY.md`, `TRADE_LEDGER.md`, `DATA_AUDIT.md`, `trade_ledger.csv`, `equity_curve.csv`, `model_info.json`.
 

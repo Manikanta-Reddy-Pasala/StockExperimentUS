@@ -1,6 +1,6 @@
 # retest_sp500 — DATA AUDIT
 
-Total trades: **55** · total PnL: **$14,905,765**. 
+Total trades: **31** · total PnL: **$15,509,595**. 
 
 ## ❓ Trades NOT backed by the committed eToro snapshot (need fresh pull)
 

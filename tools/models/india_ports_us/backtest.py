@@ -87,6 +87,22 @@ def load_panels(syms, start, end):
     return cl, dv
 
 
+def load_open(syms, start, end, cl):
+    """OPEN-price pivot aligned to `cl` (close panel), for realistic next-open fills.
+    Gaps (open missing where close exists) fall back to close so a fill is never NaN."""
+    eng = get_engine()
+    with eng.connect() as c:
+        df = pd.read_sql(text(
+            "SELECT symbol,date,open FROM historical_data "
+            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='yfinance' "
+            "ORDER BY symbol,date"
+        ), c, params={"s": syms, "a": start - timedelta(days=400), "b": end})
+    df["date"] = pd.to_datetime(df["date"])
+    op = df.pivot(index="date", columns="symbol", values="open").reindex(
+        index=cl.index, columns=cl.columns).ffill()
+    return op.where(op.notna(), cl)
+
+
 def load_regime(sym, index, start, end):
     """QQQ (or other) > 200d SMA gate, reindexed to `index`."""
     eng = get_engine()
@@ -148,14 +164,151 @@ def momscore(cl, di, mode="ret", lb=15):
     return cl.iloc[di] / cl.iloc[di - lb] - 1
 
 
+def _simulate_realistic(cl, op, run_dates, dates, capital, target_fn, rebal_days,
+                        mid_days, regime_on, regime, trail, lev, margin_apr,
+                        txn_charge, settle_lag):
+    """Realistic US-equity execution (see simulate docstring):
+      - decide on bar d's CLOSE, fill at the NEXT bar's OPEN
+      - T+settle_lag settlement: sale proceeds go to an unsettled pool and only become
+        spendable `settle_lag` bars later, so a rotation's BUY happens one bar AFTER its
+        SELL (you're in cash for the gap). Roster-based full swaps (no fractional trims).
+    """
+    slip = SLIPPAGE_BPS / 1e4
+    trail_f = trail / 100.0
+    daily_borrow = margin_apr / 252.0
+    cash = capital                       # settled, spendable
+    pending_settle = []                  # [[mature_di, amount], ...] unsettled sale cash
+    pos, entry_px, entry_date, entry_di, peak_px = {}, {}, {}, {}, {}
+    equity, trades, txns = [], [], []
+    decided = None                       # target dict awaiting SELL leg (next open)
+    to_buy = None                        # target dict awaiting BUY leg (after funding)
+
+    def close_trade(s, d, px, sh, di):
+        ep = entry_px.get(s)
+        if ep is None:
+            return
+        trades.append({"symbol": s, "entry_date": entry_date.get(s),
+                       "entry_px": round(ep, 4), "shares": round(sh, 4),
+                       "exit_date": d.date().isoformat(), "exit_px": round(px, 4),
+                       "pnl": round(sh * (px - ep), 2),
+                       "ret_pct": round((px / ep - 1) * 100, 2),
+                       "bars_held": int(di - entry_di.get(s, di))})
+
+    def opx(s, di):
+        v = op[s].iloc[di]
+        return float(v) if pd.notna(v) and float(v) > 0 else None
+
+    n = len(dates)
+    for d in run_dates:
+        di = dates.get_loc(d)
+        # 1) settle matured sale proceeds
+        keep = []
+        for mdi, amt in pending_settle:
+            if mdi <= di:
+                cash += amt
+            else:
+                keep.append([mdi, amt])
+        pending_settle = keep
+        # 2) trailing stop (decide on this bar's close, fill NEXT open, T+settle_lag)
+        if trail_f > 0 and pos and di + 1 < n:
+            for s in list(pos):
+                px = cl[s].iloc[di]
+                if pd.isna(px):
+                    continue
+                peak_px[s] = max(peak_px.get(s, float(px)), float(px))
+                if float(px) <= peak_px[s] * (1 - trail_f):
+                    fp = opx(s, di + 1)
+                    if fp is None:
+                        continue
+                    proceeds = pos[s] * fp * (1 - slip) - txn_charge
+                    pending_settle.append([di + 1 + settle_lag, proceeds])
+                    txns.append({"date": dates[di + 1].date().isoformat(), "action": "SELL_TRAIL",
+                                 "symbol": s, "price": round(fp, 4), "shares": round(pos[s], 4)})
+                    close_trade(s, dates[di + 1], fp, pos[s], di + 1)
+                    pos.pop(s, None); entry_px.pop(s, None); peak_px.pop(s, None)
+                    entry_date.pop(s, None); entry_di.pop(s, None)
+        # 3) execute a funded BUY leg at TODAY's open (was queued after a prior SELL)
+        if to_buy is not None:
+            names = [s for s in to_buy if opx(s, di) is not None]
+            wsum = sum(to_buy[s] for s in names)
+            if names and wsum > 0:
+                budget = cash * lev
+                for s in names:
+                    fp = opx(s, di)
+                    # allocation for this name; reserve the flat txn fee so the total
+                    # fill cost never exceeds spendable cash (else the buy is rejected).
+                    alloc = budget * (to_buy[s] / wsum)
+                    sh = max(0.0, alloc - txn_charge) / (fp * (1 + slip))
+                    cost = sh * fp * (1 + slip) + txn_charge
+                    if sh > 0 and (cost <= cash + 1e-6 or lev > 1):
+                        cash -= cost
+                        pos[s] = pos.get(s, 0.0) + sh
+                        entry_px[s] = fp; peak_px[s] = fp
+                        entry_date[s] = d.date().isoformat(); entry_di[s] = di
+                        txns.append({"date": d.date().isoformat(), "action": "BUY",
+                                     "symbol": s, "price": round(fp, 4), "shares": round(sh, 4)})
+            to_buy = None
+        # 4) execute the SELL leg of a decision made on the PRIOR bar, at TODAY's open
+        if decided is not None:
+            target = decided
+            for s in list(pos):
+                if s not in target:           # roster change => full exit
+                    fp = opx(s, di)
+                    if fp is None:
+                        continue
+                    proceeds = pos[s] * fp * (1 - slip) - txn_charge
+                    pending_settle.append([di + settle_lag, proceeds])
+                    txns.append({"date": d.date().isoformat(), "action": "SELL",
+                                 "symbol": s, "price": round(fp, 4), "shares": round(pos[s], 4)})
+                    close_trade(s, dates[di], fp, pos[s], di)
+                    pos.pop(s, None); entry_px.pop(s, None); peak_px.pop(s, None)
+                    entry_date.pop(s, None); entry_di.pop(s, None)
+            # queue the BUY of names not already held (funded once sale cash settles)
+            fresh = {s: w for s, w in target.items() if s not in pos}
+            to_buy = fresh or None
+            decided = None
+        # 5) rebalance decision on TODAY's close -> sell leg fills next bar
+        is_rebal = d in rebal_days or (mid_days is not None and d in mid_days)
+        if is_rebal and di + 1 < n:
+            risk_on = (not regime) or (regime_on is not None and bool(regime_on.iloc[di]))
+            decided = target_fn(di, d, pos, risk_on) if risk_on else {}
+        # 6) margin interest + daily MTM at close (unsettled cash still counts as NAV)
+        if daily_borrow > 0 and cash < 0:
+            cash += cash * daily_borrow
+        val = cash + sum(a for _, a in pending_settle) + sum(
+            sh * float(cl[s].iloc[di]) for s, sh in pos.items() if pd.notna(cl[s].iloc[di]))
+        equity.append(val)
+
+    eq = pd.Series(equity, index=run_dates)
+    yrs = (run_dates[-1] - run_dates[0]).days / 365.25
+    final = float(eq.iloc[-1])
+    cagr = ((final / capital) ** (1 / yrs) - 1) * 100
+    mdd = max_drawdown(eq)
+    wins = sum(1 for t in trades if t["ret_pct"] > 0)
+    tot = len(trades)
+    return {"eq": eq, "cagr": cagr, "mdd": mdd, "calmar": cagr / max(0.01, mdd),
+            "final": final, "yrs": yrs, "trades": tot,
+            "wr": round(wins / max(1, tot) * 100, 1)}, trades, txns
+
+
 def simulate(cl, run_dates, dates, capital, target_fn, rebal_days, mid_days=None,
              regime_on=None, regime=False, trail=0.0, lev=1.0, margin_apr=0.0,
-             txn_charge=0.0):
+             txn_charge=0.0, op=None, settle_lag=1):
     """lev>1 = apply margin to the target weights (cash goes negative = borrowing).
     margin_apr = annual borrow cost charged daily on negative cash (e.g. 0.06 = IBKR-ish).
     txn_charge = flat per-transaction fee in $ deducted from cash on EVERY fill
                  (both buys and sells, including trailing-stop exits) — eToro charges
-                 a flat $1 per transaction each side. 0 = off (legacy numbers)."""
+                 a flat $1 per transaction each side. 0 = off (legacy numbers).
+
+    op (open-price panel) given => REALISTIC US execution: decisions on bar d's CLOSE,
+    fills at the NEXT bar's OPEN, and T+`settle_lag` cash settlement (sell proceeds are
+    not spendable until they settle, so a rotation's BUY waits one bar after its SELL —
+    you cannot buy with unsettled same-day sale cash, unlike a margin/India assumption).
+    op=None keeps the legacy same-close-fill behavior byte-for-byte."""
+    if op is not None:
+        return _simulate_realistic(cl, op, run_dates, dates, capital, target_fn, rebal_days,
+                                   mid_days, regime_on, regime, trail, lev, margin_apr,
+                                   txn_charge, settle_lag)
     slip = SLIPPAGE_BPS / 1e4
     trail_f = trail / 100.0
     daily_borrow = margin_apr / 252.0
@@ -445,7 +598,7 @@ def pick_retest_holdings(cl, dv, ema20, di, universe, pos=None, pool=120, k=2,
 def run_retest(cl, dv, dates, start, end, capital, pool=120, k=2, retain=4,
                mom_lb=126, ema=20, band=0.20, signal="ret", trail=0.0,
                out_dir=None, regime_on=None, regime=False, tag="",
-               membership_csv=None, ker_min=0.0, cfresh=False, txn_charge=0.0):
+               membership_csv=None, ker_min=0.0, cfresh=False, txn_charge=0.0, op=None):
     """`membership_csv` (optional): PIT index membership CSV. When provided, the
     broad candidate pool (full panel) is restricted at EACH rebalance to symbols
     that were index members on that date (survivorship-correct). When None,
@@ -472,7 +625,7 @@ def run_retest(cl, dv, dates, start, end, capital, pool=120, k=2, retain=4,
 
     res, trades, txns = simulate(cl, run_dates, dates, capital, target_fn, rebal,
                                  regime_on=regime_on, regime=regime, trail=trail,
-                                 txn_charge=txn_charge)
+                                 txn_charge=txn_charge, op=op)
     _report(f"retest{tag}", res, trades, txns, out_dir)
     return res
 
@@ -504,7 +657,7 @@ def pick_n40_holdings(cl, dv, di, universe, topadv=40, top=3, mom_lb=63,
 
 def run_n40(cl, dv, dates, start, end, capital, topadv=40, top=1, mom_lb=63,
             signal="ret", trail=0.0, out_dir=None, regime_on=None, regime=False, tag="",
-            lev=1.0, margin_apr=0.0, membership_csv=None, txn_charge=0.0):
+            lev=1.0, margin_apr=0.0, membership_csv=None, txn_charge=0.0, op=None):
     """`membership_csv` (optional): path to a point-in-time index membership CSV
     (schema symbol,start_date,end_date). When provided, the selection universe is
     the FULL panel (cl.columns) restricted at EACH rebalance to the symbols that
@@ -537,7 +690,7 @@ def run_n40(cl, dv, dates, start, end, capital, topadv=40, top=1, mom_lb=63,
 
     res, trades, txns = simulate(cl, run_dates, dates, capital, target_fn, rebal,
                                  regime_on=regime_on, regime=regime, trail=trail,
-                                 lev=lev, margin_apr=margin_apr, txn_charge=txn_charge)
+                                 lev=lev, margin_apr=margin_apr, txn_charge=txn_charge, op=op)
     _report(f"n40{tag}", res, trades, txns, out_dir)
     return res
 
@@ -581,6 +734,8 @@ def main():
     ap.add_argument("--cfresh", action="store_true",
                     help="retest only: India conditional-freshness gate "
                          "(drop stale names in flat tape unless breaking out)")
+    ap.add_argument("--legacy-fills", action="store_true",
+                    help="use the old same-close fills (no next-open / no T+1 settlement)")
     ap.add_argument("--txn-charge", type=float, default=1.0,
                     help="flat $ per-transaction fee deducted on EVERY fill, both "
                          "buys and sells (eToro charges $1/txn each side). 0 = off "
@@ -596,6 +751,7 @@ def main():
     cl, dv = load_panels(syms, s, e)
     dates = cl.index
     reg = load_regime(a.regime_sym, dates, s, e) if a.regime else None
+    op_arg = None if a.legacy_fills else load_open(syms, s, e, cl)  # realistic next-open + T+1
 
     if a.sweep:
         return sweep(cl, dv, dates, s, e, a.capital, reg)
@@ -609,14 +765,14 @@ def main():
         run_retest(cl, dv, dates, s, e, a.capital, k=max(2, a.top), signal=a.signal, trail=a.trail,
                    out_dir=a.out, regime_on=reg, regime=a.regime,
                    membership_csv=a.membership_csv, txn_charge=a.txn_charge,
-                   ker_min=a.ker_min, cfresh=a.cfresh,
+                   ker_min=a.ker_min, cfresh=a.cfresh, op=op_arg,
                    tag=f"_k{max(2,a.top)}_{a.signal}" + ("_reg" if a.regime else "")
                        + (f"_ker{a.ker_min}" if a.ker_min > 0 else "")
                        + ("_cfresh" if a.cfresh else ""))
     if a.model in ("n40", "all"):
         run_n40(cl, dv, dates, s, e, a.capital, top=a.top, signal=a.signal, trail=a.trail,
                 out_dir=a.out, regime_on=reg, regime=a.regime,
-                membership_csv=a.membership_csv, txn_charge=a.txn_charge,
+                membership_csv=a.membership_csv, txn_charge=a.txn_charge, op=op_arg,
                 tag=f"_top{a.top}_{a.signal}" + ("_reg" if a.regime else ""))
 
 
