@@ -1,6 +1,6 @@
 # momentum_sp100 — DATA AUDIT
 
-Total trades: **94** · total PnL: **$18,928,988**. Per-trade verdicts in `TRADE_RECHECK.md`.
+Total trades: **94** · total PnL: **$18,928,988**. 
 
 ## ❓ Trades NOT backed by the committed eToro snapshot (need fresh pull)
 

@@ -23,7 +23,6 @@ ROOT = Path(__file__).resolve().parents[2]
 EXPORTS = ROOT / "exports" / "models"
 ETORO = ROOT / "data" / "historical_etoro_ohlcv.csv.gz"
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import recheck_trades as RC  # per-trade calibrated verdicts (single source of truth)
 
 # Both models are evaluated on the COMMON 4-year window where eToro daily data exists.
 # The eToro snapshot starts 2022-05-24; neither model has any trade before then, so the
@@ -247,7 +246,7 @@ def write_audit(model, info, rows, glitch, unver):
     L.append(f"# {model} — DATA AUDIT")
     L.append("")
     L.append(f"Total trades: **{len(rows)}** · total PnL: **{fmt_usd(tot_pnl)}**. "
-             "Per-trade verdicts in `TRADE_RECHECK.md`.")
+             )
     L.append("")
     L.append("## ❓ Trades NOT backed by the committed eToro snapshot (need fresh pull)")
     L.append("")
@@ -319,7 +318,7 @@ def write_top_summary(infos, equities, audits, dmax):
                  f"| {fmt_usd(eq[-1][1])} | {m['yrs']} | {m['trades']} | {m.get('wr','—')}% |")
     L.append("")
     L.append("Each model folder contains: `SUMMARY.md`, `TRADE_LEDGER.md`, `DATA_AUDIT.md`, "
-             "`TRADE_RECHECK.md`, `trade_ledger.csv`, `equity_curve.csv`, `model_info.json`.")
+             "`trade_ledger.csv`, `equity_curve.csv`, `model_info.json`.")
     L.append("")
     (EXPORTS / "SUMMARY.md").write_text("\n".join(L) + "\n")
 
