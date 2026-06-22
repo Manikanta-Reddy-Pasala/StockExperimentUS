@@ -1,13 +1,13 @@
 ======================================================================
 1) CAGR re-derived from equity curve (independent of model_info.json)
    momentum_sp100   2022-05-24→2026-06-18 4.07y  $1,000,000→$25,362,069  CAGR +121.4%
-   retest_sp500     2022-05-24→2026-06-18 4.07y  $1,000,000→$44,776,308  CAGR +154.6%
+   retest_sp500     2022-05-24→2026-06-18 4.07y  $1,000,000→$18,376,752  CAGR +104.5%
 
 2) Per-trade fidelity — every trade in an EXPLAINED bucket (snapshot ends 2026-06-21)
    PRICE_FAITHFUL=both legs are real eToro bars · RETURN_FAITHFUL=booked return
    matches eToro close-to-close (fill-shift) · OUT_OF_RANGE=past snapshot · ANOMALY=must be 0
    momentum_sp100   in-range explained 154/154 (100.0%)  [price 154 · return 0 · blend 0] | OUT_OF_RANGE 0 | NOT_IN_SNAPSHOT 0 | ANOMALY 0
-   retest_sp500     in-range explained 66/66 (100.0%)  [price 66 · return 0 · blend 0] | OUT_OF_RANGE 0 | NOT_IN_SNAPSHOT 0 | ANOMALY 0
+   retest_sp500     in-range explained 55/55 (100.0%)  [price 55 · return 0 · blend 0] | OUT_OF_RANGE 0 | NOT_IN_SNAPSHOT 0 | ANOMALY 0
 
 3) Glitch-jump scan — >40% single-day moves, split by whether a TRADE spans them
    IN-TRADE jumps (corrupt PnL): 0  |  OUT-OF-TRADE (harmless): 2

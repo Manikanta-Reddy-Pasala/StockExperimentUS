@@ -9,33 +9,33 @@ Backtest window: **2022-05-24 → 2026-06-18** (~4.07 years; $1,000,000 start). 
 
 ## ✅ CAGR & DD VERIFIED CLEAN (see `tools/analysis/verify_cagr.py`)
 
-Evaluated on the common 4-year window (**2022-05-24 → 2026-06-18**) — the model has no trade before eToro data exists, so both models start the same day. Data = the full-universe eToro feed (794 symbols, through 2026-06-21) exported from the NUC DB. **All 66 trades are price-faithful to the eToro source** (100%, 0 anomalies, 0 missing symbols, 0 out-of-range, 0 in-trade price jumps). CAGR is re-derived from the equity curve. **No flags.** (NFLX/BKNG quoted in a constant-scaled unit — return-neutral.)
+Evaluated on the common 4-year window (**2022-05-24 → 2026-06-18**) — the model has no trade before eToro data exists, so both models start the same day. Data = the full-universe eToro feed (794 symbols, through 2026-06-21) exported from the NUC DB. **All 55 trades are price-faithful to the eToro source** (100%, 0 anomalies, 0 missing symbols, 0 out-of-range, 0 in-trade price jumps). CAGR is re-derived from the equity curve. **No flags.** (NFLX/BKNG quoted in a constant-scaled unit — return-neutral.)
 
 ## Results (net of $1/txn, common 4yr eToro window)
 
 | Metric | Value |
 |---|---|
 | Window | 2022-05-24 → 2026-06-18 (4.07y) |
-| Final NAV ($1,000,000 start) | $44,776,308 |
-| Total return | +4377.6% |
-| **CAGR (annualized)** | **+154.6%** |
-| **Max drawdown** | **34.1%** |
-| Calmar | 4.54 |
-| Trades | 66 · 75.8% win |
+| Final NAV ($1,000,000 start) | $18,376,752 |
+| Total return | +1737.7% |
+| **CAGR (annualized)** | **+104.5%** |
+| **Max drawdown** | **31.4%** |
+| Calmar | 3.33 |
+| Trades | 55 · 74.5% win |
 
 ## Year-by-year breakdown
 
 | Year | Return % | Intra-yr DD % |
 |---|---:|---:|
-| 2022 | -7.7% | 11.0% |
-| 2023 | +81.7% | 17.5% |
+| 2022 | +0.0% | 0.0% |
+| 2023 | +44.4% | 17.5% |
 | 2024 | +71.5% | 30.2% |
-| 2025 | +151.8% | 34.1% |
-| 2026 | +524.5% | 23.4% |
+| 2025 | +93.4% | 31.4% |
+| 2026 | +284.0% | 23.4% |
 
 ## Cap mix
 
-large=36, mega=30
+mega=27, large=28
 
 ---
 *Auto-generated from model_info.json + trade_ledger.csv by tools/analysis/refresh_export_docs.py — do not hand-edit.*
