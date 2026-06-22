@@ -69,6 +69,8 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("--legacy-fills", action="store_true",
                     help="old same-close fills (no next-open / no T+1 settlement)")
+    ap.add_argument("--decide-prior", action="store_true",
+                    help="scheme B: decide on the bar before the rebal day (sell ON rebal day)")
     ap.set_defaults(regime=True)
     a = ap.parse_args()
     s, e = date.fromisoformat(a.start), date.fromisoformat(a.end)
@@ -84,7 +86,7 @@ def main():
             regime_on=reg, regime=a.regime, lev=a.lev,
             margin_apr=(a.margin_apr if a.lev > 1 else 0.0),
             membership_csv=a.membership_csv, txn_charge=a.txn_charge,
-            op=(None if a.legacy_fills else op),
+            op=(None if a.legacy_fills else op), decide_prior=a.decide_prior,
             tag="_top%d_%s%s%s%s" % (a.top, a.signal, "_reg" if a.regime else "",
                                      ("_lev%g" % a.lev) if a.lev != 1 else "",
                                      "_pit" if a.membership_csv else ""))

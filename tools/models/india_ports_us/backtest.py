@@ -166,7 +166,7 @@ def momscore(cl, di, mode="ret", lb=15):
 
 def _simulate_realistic(cl, op, run_dates, dates, capital, target_fn, rebal_days,
                         mid_days, regime_on, regime, trail, lev, margin_apr,
-                        txn_charge, settle_lag):
+                        txn_charge, settle_lag, decide_prior=False):
     """Realistic US-equity execution (see simulate docstring):
       - decide on bar d's CLOSE, fill at the NEXT bar's OPEN
       - T+settle_lag settlement: sale proceeds go to an unsettled pool and only become
@@ -267,8 +267,16 @@ def _simulate_realistic(cl, op, run_dates, dates, capital, target_fn, rebal_days
             fresh = {s: w for s, w in target.items() if s not in pos}
             to_buy = fresh or None
             decided = None
-        # 5) rebalance decision on TODAY's close -> sell leg fills next bar
-        is_rebal = d in rebal_days or (mid_days is not None and d in mid_days)
+        # 5) rebalance decision on TODAY's close -> sell leg fills next bar.
+        # scheme A (default): decide on the rebal day itself (sell rebal+1, buy rebal+2).
+        # scheme B (decide_prior): decide on the bar BEFORE the rebal day, so the SELL
+        # lands ON the rebal day's open (buy rebal+1).
+        if decide_prior:
+            nxt = dates[di + 1] if di + 1 < n else None
+            is_rebal = nxt is not None and (
+                nxt in rebal_days or (mid_days is not None and nxt in mid_days))
+        else:
+            is_rebal = d in rebal_days or (mid_days is not None and d in mid_days)
         if is_rebal and di + 1 < n:
             risk_on = (not regime) or (regime_on is not None and bool(regime_on.iloc[di]))
             decided = target_fn(di, d, pos, risk_on) if risk_on else {}
@@ -293,7 +301,7 @@ def _simulate_realistic(cl, op, run_dates, dates, capital, target_fn, rebal_days
 
 def simulate(cl, run_dates, dates, capital, target_fn, rebal_days, mid_days=None,
              regime_on=None, regime=False, trail=0.0, lev=1.0, margin_apr=0.0,
-             txn_charge=0.0, op=None, settle_lag=1):
+             txn_charge=0.0, op=None, settle_lag=1, decide_prior=False):
     """lev>1 = apply margin to the target weights (cash goes negative = borrowing).
     margin_apr = annual borrow cost charged daily on negative cash (e.g. 0.06 = IBKR-ish).
     txn_charge = flat per-transaction fee in $ deducted from cash on EVERY fill
@@ -308,7 +316,7 @@ def simulate(cl, run_dates, dates, capital, target_fn, rebal_days, mid_days=None
     if op is not None:
         return _simulate_realistic(cl, op, run_dates, dates, capital, target_fn, rebal_days,
                                    mid_days, regime_on, regime, trail, lev, margin_apr,
-                                   txn_charge, settle_lag)
+                                   txn_charge, settle_lag, decide_prior)
     slip = SLIPPAGE_BPS / 1e4
     trail_f = trail / 100.0
     daily_borrow = margin_apr / 252.0
@@ -598,7 +606,7 @@ def pick_retest_holdings(cl, dv, ema20, di, universe, pos=None, pool=120, k=2,
 def run_retest(cl, dv, dates, start, end, capital, pool=120, k=2, retain=4,
                mom_lb=126, ema=20, band=0.20, signal="ret", trail=0.0,
                out_dir=None, regime_on=None, regime=False, tag="",
-               membership_csv=None, ker_min=0.0, cfresh=False, txn_charge=0.0, op=None):
+               membership_csv=None, ker_min=0.0, cfresh=False, txn_charge=0.0, op=None, decide_prior=False):
     """`membership_csv` (optional): PIT index membership CSV. When provided, the
     broad candidate pool (full panel) is restricted at EACH rebalance to symbols
     that were index members on that date (survivorship-correct). When None,
@@ -625,7 +633,7 @@ def run_retest(cl, dv, dates, start, end, capital, pool=120, k=2, retain=4,
 
     res, trades, txns = simulate(cl, run_dates, dates, capital, target_fn, rebal,
                                  regime_on=regime_on, regime=regime, trail=trail,
-                                 txn_charge=txn_charge, op=op)
+                                 txn_charge=txn_charge, op=op, decide_prior=decide_prior)
     _report(f"retest{tag}", res, trades, txns, out_dir)
     return res
 
@@ -657,7 +665,7 @@ def pick_n40_holdings(cl, dv, di, universe, topadv=40, top=3, mom_lb=63,
 
 def run_n40(cl, dv, dates, start, end, capital, topadv=40, top=1, mom_lb=63,
             signal="ret", trail=0.0, out_dir=None, regime_on=None, regime=False, tag="",
-            lev=1.0, margin_apr=0.0, membership_csv=None, txn_charge=0.0, op=None):
+            lev=1.0, margin_apr=0.0, membership_csv=None, txn_charge=0.0, op=None, decide_prior=False):
     """`membership_csv` (optional): path to a point-in-time index membership CSV
     (schema symbol,start_date,end_date). When provided, the selection universe is
     the FULL panel (cl.columns) restricted at EACH rebalance to the symbols that
@@ -690,7 +698,7 @@ def run_n40(cl, dv, dates, start, end, capital, topadv=40, top=1, mom_lb=63,
 
     res, trades, txns = simulate(cl, run_dates, dates, capital, target_fn, rebal,
                                  regime_on=regime_on, regime=regime, trail=trail,
-                                 lev=lev, margin_apr=margin_apr, txn_charge=txn_charge, op=op)
+                                 lev=lev, margin_apr=margin_apr, txn_charge=txn_charge, op=op, decide_prior=decide_prior)
     _report(f"n40{tag}", res, trades, txns, out_dir)
     return res
 
@@ -734,6 +742,8 @@ def main():
     ap.add_argument("--cfresh", action="store_true",
                     help="retest only: India conditional-freshness gate "
                          "(drop stale names in flat tape unless breaking out)")
+    ap.add_argument("--decide-prior", action="store_true",
+                    help="scheme B: decide on the bar BEFORE the rebal day (sell ON rebal day)")
     ap.add_argument("--legacy-fills", action="store_true",
                     help="use the old same-close fills (no next-open / no T+1 settlement)")
     ap.add_argument("--txn-charge", type=float, default=1.0,
@@ -765,14 +775,14 @@ def main():
         run_retest(cl, dv, dates, s, e, a.capital, k=max(2, a.top), signal=a.signal, trail=a.trail,
                    out_dir=a.out, regime_on=reg, regime=a.regime,
                    membership_csv=a.membership_csv, txn_charge=a.txn_charge,
-                   ker_min=a.ker_min, cfresh=a.cfresh, op=op_arg,
+                   ker_min=a.ker_min, cfresh=a.cfresh, op=op_arg, decide_prior=a.decide_prior,
                    tag=f"_k{max(2,a.top)}_{a.signal}" + ("_reg" if a.regime else "")
                        + (f"_ker{a.ker_min}" if a.ker_min > 0 else "")
                        + ("_cfresh" if a.cfresh else ""))
     if a.model in ("n40", "all"):
         run_n40(cl, dv, dates, s, e, a.capital, top=a.top, signal=a.signal, trail=a.trail,
                 out_dir=a.out, regime_on=reg, regime=a.regime,
-                membership_csv=a.membership_csv, txn_charge=a.txn_charge, op=op_arg,
+                membership_csv=a.membership_csv, txn_charge=a.txn_charge, op=op_arg, decide_prior=a.decide_prior,
                 tag=f"_top{a.top}_{a.signal}" + ("_reg" if a.regime else ""))
 
 
