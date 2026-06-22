@@ -1,6 +1,6 @@
 # momentum_sp100 — DATA AUDIT
 
-Total trades: **94** · total PnL: **$18,928,988**. 
+Total trades: **196** · total PnL: **$13,306,101**. 
 
 ## ❓ Trades NOT backed by the committed eToro snapshot (need fresh pull)
 
@@ -8,7 +8,7 @@ None.
 
 ## 🛈 Constant-scale price unit (NFLX/BKNG — CAGR-neutral, informational)
 
-1 trade(s), $98,341 (1% of PnL). eToro stores NFLX ≈0.10× and BKNG ≈0.04× of the real USD price, but the ratio is CONSTANT over time (verify_cagr.py), so relative returns — all these models trade on — are correct and CAGR is unaffected. Not a problem to fix; noted for transparency.
+6 trade(s), $-11,648 (-0% of PnL). eToro stores NFLX ≈0.10× and BKNG ≈0.04× of the real USD price, but the ratio is CONSTANT over time (verify_cagr.py), so relative returns — all these models trade on — are correct and CAGR is unaffected. Not a problem to fix; noted for transparency.
 
 | Symbol | Entry date | Exit date | Entry $ | Exit $ | Return % | PnL $ |
 |---|---|---|---:|---:|---:|---:|
