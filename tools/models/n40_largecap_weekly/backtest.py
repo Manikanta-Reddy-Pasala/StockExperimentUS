@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
 
 from tools.models.india_ports_us.backtest import (  # noqa: E402  shared core engine
-    load_csv, load_panels, load_open, load_regime, run_n40, N100_CSV,
+    load_csv, load_panels, load_panels_spliced, load_open, load_regime, run_n40, N100_CSV,
 )
 
 DEFAULT_START = date(2023, 5, 24)
@@ -71,15 +71,23 @@ def main():
                     help="old same-close fills (no next-open / no T+1 settlement)")
     ap.add_argument("--decide-prior", action="store_true",
                     help="scheme B: decide on the bar before the rebal day (sell ON rebal day)")
+    ap.add_argument("--extended", action="store_true",
+                    help="10yr history: splice real-yfinance backfill (pre-join) to "
+                         "eToro (post-join) per symbol")
+    ap.add_argument("--join", default="2021-06-01",
+                    help="splice date: eToro authoritative on/after this day")
     ap.set_defaults(regime=True)
     a = ap.parse_args()
     s, e = date.fromisoformat(a.start), date.fromisoformat(a.end)
 
     syms = sorted(set(load_csv(a.universe_csv)))
-    cl, dv = load_panels(syms, s, e)
+    cl, dv = (load_panels_spliced(syms, s, e, join=a.join) if a.extended
+              else load_panels(syms, s, e))
     op = load_open(syms, s, e, cl)
     dates = cl.index
-    reg = load_regime(a.regime_sym, dates, s, e) if a.regime else None
+    reg = load_regime(a.regime_sym, dates, s, e,
+                      buckets=("yfinance", "yfinance_real") if a.extended else ("yfinance",),
+                      join=a.join) if a.regime else None
 
     run_n40(cl, dv, dates, s, e, a.capital, topadv=a.topadv, top=a.top,
             signal=a.signal, trail=a.trail, out_dir=a.out,
