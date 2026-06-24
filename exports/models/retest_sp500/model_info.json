@@ -7,19 +7,19 @@
   "data_source": "eToro",
   "regime": "QQQ 200d",
   "metrics": {
-    "cagr": 110.21,
-    "mdd": 34.54,
-    "calmar": 3.19,
-    "final": 20546084.753778603,
+    "cagr": 82.62,
+    "mdd": 40.5,
+    "calmar": 2.04,
+    "final": 11589816.824158331,
     "yrs": 4.07,
-    "trades": 31,
-    "wr": 58.1,
-    "model": "retest_k2_blend_reg_realfill"
+    "trades": 19,
+    "wr": 68.4,
+    "model": "retest_k2_blend_reg"
   },
-  "trades": 31,
+  "trades": 19,
   "cap_mix": {
-    "mega": 12,
-    "large": 19
+    "mega": 9,
+    "large": 10
   },
-  "win_rate_pct": 58.1
+  "win_rate_pct": 68.4
 }

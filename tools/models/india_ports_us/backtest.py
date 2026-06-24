@@ -71,8 +71,35 @@ def max_drawdown(equity: pd.Series) -> float:
     return float(-((equity - peak) / peak).min() * 100)
 
 
+# Clean reference tickers used to derive the true US trading-day calendar.
+# eToro emits carried-forward phantom candles on weekends/holidays for SOME
+# symbols (e.g. DASH/AMP/A) but NOT for these high-liquidity majors — verified
+# zero weekend rows. The union of their bar dates is therefore exactly the set
+# of days the US market was open (weekends AND holidays already excluded).
+CALENDAR_REFS = ("AAPL", "MSFT", "QQQ", "SPY")
+
+
+def load_calendar(start, end, buckets=("yfinance",)):
+    """DatetimeIndex of real US trading days from clean reference symbols. `buckets`
+    selects which data_source buckets contribute dates: default ('yfinance',) =
+    eToro only (default backtest path, calendar provably unchanged); pass
+    ('yfinance','yfinance_real') for extended 10yr runs. Phantom weekend/holiday
+    rows can't leak in (clean refs + weekday filter)."""
+    from tools.shared.splice import trading_days
+    eng = get_engine()
+    with eng.connect() as c:
+        df = pd.read_sql(text(
+            "SELECT DISTINCT date FROM historical_data "
+            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b "
+            "AND data_source = ANY(:bkt)"
+        ), c, params={"s": list(CALENDAR_REFS),
+                      "a": start - timedelta(days=400), "b": end,
+                      "bkt": list(buckets)})
+    return trading_days(df["date"])
+
+
 def load_panels(syms, start, end):
-    """Return (close, dollar_vol) pivots, ffilled, indexed by date."""
+    """Return (close, dollar_vol) pivots, ffilled, indexed by real trading days."""
     eng = get_engine()
     with eng.connect() as c:
         df = pd.read_sql(text(
@@ -81,9 +108,56 @@ def load_panels(syms, start, end):
             "ORDER BY symbol,date"
         ), c, params={"s": syms, "a": start - timedelta(days=400), "b": end})
     df["date"] = pd.to_datetime(df["date"])
-    cl = df.pivot(index="date", columns="symbol", values="close").ffill()
+    cal = load_calendar(start, end)
+    cl = df.pivot(index="date", columns="symbol", values="close").reindex(cal).ffill()
     dv = df.assign(dv=df["close"] * df["volume"]).pivot(
-        index="date", columns="symbol", values="dv").ffill()
+        index="date", columns="symbol", values="dv").reindex(cal).ffill()
+    return cl, dv
+
+
+def _read_bucket(syms, start, end, bucket):
+    eng = get_engine()
+    with eng.connect() as c:
+        return pd.read_sql(text(
+            "SELECT symbol,date,open,high,low,close,volume FROM historical_data "
+            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source=:bkt "
+            "ORDER BY symbol,date"
+        ), c, params={"s": syms, "a": start - timedelta(days=400), "b": end, "bkt": bucket})
+
+
+def load_panels_spliced(syms, start, end, join="2021-06-01"):
+    """Like load_panels, but joins the real-yfinance backfill (bucket
+    'yfinance_real', date < join) to the eToro feed (bucket 'yfinance', date >=
+    join) per symbol via a ratio splice, for extended (10yr) backtests.
+
+    Returns (close, dollar_vol) pivots reindexed to the extended trading calendar
+    and ffilled — same shape/contract as load_panels."""
+    from tools.shared.splice import splice_symbol
+    j = pd.Timestamp(join)
+    old = _read_bucket(syms, start, end, "yfinance_real")
+    new = _read_bucket(syms, start, end, "yfinance")
+    old["date"] = pd.to_datetime(old["date"]); new["date"] = pd.to_datetime(new["date"])
+    cols = ["date", "open", "high", "low", "close", "volume"]
+    parts, stats = [], {}
+    for s in syms:
+        o = old.loc[old["symbol"] == s, cols]
+        n = new.loc[new["symbol"] == s, cols]
+        if o.empty and n.empty:
+            continue
+        spliced, _ratio, status = splice_symbol(o, n, j)
+        spliced["symbol"] = s
+        parts.append(spliced)
+        stats[status] = stats.get(status, 0) + 1
+        if status in ("bad_ratio", "no_anchor", "only_old"):
+            print(f"  splice[{status}] {s} ratio={_ratio:.4g}", flush=True)
+    if not parts:
+        raise SystemExit("load_panels_spliced: no data in either bucket for requested symbols")
+    print(f"splice summary: {stats}", flush=True)
+    df = pd.concat(parts, ignore_index=True)
+    cal = load_calendar(start, end, buckets=("yfinance", "yfinance_real"))
+    cl = df.pivot(index="date", columns="symbol", values="close").reindex(cal).ffill()
+    dv = df.assign(dv=df["close"] * df["volume"]).pivot(
+        index="date", columns="symbol", values="dv").reindex(cal).ffill()
     return cl, dv
 
 
@@ -103,16 +177,34 @@ def load_open(syms, start, end, cl):
     return op.where(op.notna(), cl)
 
 
-def load_regime(sym, index, start, end):
-    """QQQ (or other) > 200d SMA gate, reindexed to `index`."""
+def load_regime(sym, index, start, end, buckets=("yfinance",), join="2021-06-01"):
+    """`sym` (e.g. QQQ) > 200d SMA gate, reindexed to `index`.
+
+    Default reads the eToro bucket only (byte-for-byte the original behavior). When
+    `buckets` also includes 'yfinance_real' (extended 10yr runs), the pre-join real
+    series is ratio-spliced onto the eToro series so the 200d SMA has continuous
+    pre-2021 history — otherwise the regime gate is risk-OFF for the whole backfill
+    period (no pre-2021 eToro data) and the strategy never trades before 2021."""
     eng = get_engine()
     with eng.connect() as c:
-        q = pd.read_sql(text(
-            "SELECT date,close FROM historical_data WHERE symbol=:s AND data_source='yfinance' "
-            "AND date BETWEEN :a AND :b ORDER BY date"
-        ), c, params={"s": sym, "a": start - timedelta(days=400), "b": end})
-    q["date"] = pd.to_datetime(q["date"])
-    q = q.set_index("date")["close"]
+        df = pd.read_sql(text(
+            "SELECT date,close,data_source FROM historical_data WHERE symbol=:s "
+            "AND data_source = ANY(:bkt) AND date BETWEEN :a AND :b ORDER BY date"
+        ), c, params={"s": sym, "bkt": list(buckets),
+                      "a": start - timedelta(days=400), "b": end})
+    df["date"] = pd.to_datetime(df["date"])
+    if len(buckets) > 1 and not df.empty:
+        from tools.shared.splice import splice_ratio
+        j = pd.Timestamp(join)
+        old = df[df["data_source"] == "yfinance_real"].set_index("date")["close"].sort_index()
+        new = df[df["data_source"] == "yfinance"].set_index("date")["close"].sort_index()
+        r, status = splice_ratio(old, new, j)
+        if status == "ok":
+            old = old * r
+        q = pd.concat([old[old.index < j], new[new.index >= j]]).sort_index()
+        q = q[~q.index.duplicated(keep="last")]
+    else:
+        q = df.set_index("date")["close"]
     on = q > q.rolling(200).mean()
     return on.reindex(index).ffill().fillna(False)
 
@@ -750,6 +842,11 @@ def main():
                     help="flat $ per-transaction fee deducted on EVERY fill, both "
                          "buys and sells (eToro charges $1/txn each side). 0 = off "
                          "(legacy no-charge numbers).")
+    ap.add_argument("--extended", action="store_true",
+                    help="10yr history: splice real-yfinance backfill (pre-join) to "
+                         "eToro (post-join) per symbol")
+    ap.add_argument("--join", default="2021-06-01",
+                    help="splice date: eToro authoritative on/after this day")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     s, e = date.fromisoformat(a.start), date.fromisoformat(a.end)
@@ -758,9 +855,12 @@ def main():
     n500 = load_csv(N500_CSV)
     n100 = load_csv(N100_CSV)
     syms = sorted(set(n500) | set(n100))
-    cl, dv = load_panels(syms, s, e)
+    cl, dv = (load_panels_spliced(syms, s, e, join=a.join) if a.extended
+              else load_panels(syms, s, e))
     dates = cl.index
-    reg = load_regime(a.regime_sym, dates, s, e) if a.regime else None
+    reg = load_regime(a.regime_sym, dates, s, e,
+                      buckets=("yfinance", "yfinance_real") if a.extended else ("yfinance",),
+                      join=a.join) if a.regime else None
     op_arg = None if a.legacy_fills else load_open(syms, s, e, cl)  # realistic next-open + T+1
 
     if a.sweep:

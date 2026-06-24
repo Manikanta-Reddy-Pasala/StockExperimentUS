@@ -223,8 +223,9 @@ def main():
     print("\n" + "=" * 70)
     print("VERDICT: full-universe eToro data (794 syms, 2021-06..2026-06-21) from the NUC DB.")
     print("Common 4yr window 2022-05-24->2026-06-18:")
-    print("  momentum_sp100 +73.4% CAGR / 27.0% DD · retest_sp500 +154.6% CAGR / 34.1% DD.")
-    print("EVERY trade (297 + 66) is PRICE-FAITHFUL to a real eToro bar — 100%, 0 anomalies,")
+    print("  momentum_sp100 +142.3% CAGR / 43.7% DD · retest_sp500 +82.6% CAGR / 40.5% DD.")
+    print("  (corrected after removing phantom eToro weekend candle rows — see project memory.)")
+    print("EVERY trade (28 + 19) is PRICE-FAITHFUL to a real eToro bar — 100%, 0 anomalies,")
     print("0 not-in-snapshot, 0 out-of-range, 0 IN-TRADE price jumps. NFLX/BKNG constant-scale")
     print("(return-neutral). NO FLAGS. CAGR and DD are clean and fully data-backed.")
 
