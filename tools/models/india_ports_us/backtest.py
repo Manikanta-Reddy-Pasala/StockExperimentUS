@@ -71,8 +71,35 @@ def max_drawdown(equity: pd.Series) -> float:
     return float(-((equity - peak) / peak).min() * 100)
 
 
+# Clean reference tickers used to derive the true US trading-day calendar.
+# eToro emits carried-forward phantom candles on weekends/holidays for SOME
+# symbols (e.g. DASH/AMP/A) but NOT for these high-liquidity majors — verified
+# zero weekend rows. The union of their bar dates is therefore exactly the set
+# of days the US market was open (weekends AND holidays already excluded).
+CALENDAR_REFS = ("AAPL", "MSFT", "QQQ", "SPY")
+
+
+def load_calendar(start, end):
+    """DatetimeIndex of real US trading days from clean reference symbols.
+
+    Every price panel is reindexed to this so phantom weekend/holiday rows in
+    `historical_data` can never leak into the date index (which drives rebalance
+    timing and daily MTM). The trailing weekday filter is belt-and-suspenders in
+    case a future reference symbol picks up a phantom weekend bar."""
+    eng = get_engine()
+    with eng.connect() as c:
+        df = pd.read_sql(text(
+            "SELECT DISTINCT date FROM historical_data "
+            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='yfinance'"
+        ), c, params={"s": list(CALENDAR_REFS),
+                      "a": start - timedelta(days=400), "b": end})
+    idx = pd.to_datetime(df["date"])
+    idx = idx[idx.dt.weekday < 5]
+    return pd.DatetimeIndex(sorted(idx.unique()))
+
+
 def load_panels(syms, start, end):
-    """Return (close, dollar_vol) pivots, ffilled, indexed by date."""
+    """Return (close, dollar_vol) pivots, ffilled, indexed by real trading days."""
     eng = get_engine()
     with eng.connect() as c:
         df = pd.read_sql(text(
@@ -81,9 +108,10 @@ def load_panels(syms, start, end):
             "ORDER BY symbol,date"
         ), c, params={"s": syms, "a": start - timedelta(days=400), "b": end})
     df["date"] = pd.to_datetime(df["date"])
-    cl = df.pivot(index="date", columns="symbol", values="close").ffill()
+    cal = load_calendar(start, end)
+    cl = df.pivot(index="date", columns="symbol", values="close").reindex(cal).ffill()
     dv = df.assign(dv=df["close"] * df["volume"]).pivot(
-        index="date", columns="symbol", values="dv").ffill()
+        index="date", columns="symbol", values="dv").reindex(cal).ffill()
     return cl, dv
 
 
