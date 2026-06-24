@@ -80,22 +80,20 @@ CALENDAR_REFS = ("AAPL", "MSFT", "QQQ", "SPY")
 
 
 def load_calendar(start, end):
-    """DatetimeIndex of real US trading days from clean reference symbols.
-
-    Every price panel is reindexed to this so phantom weekend/holiday rows in
-    `historical_data` can never leak into the date index (which drives rebalance
-    timing and daily MTM). The trailing weekday filter is belt-and-suspenders in
-    case a future reference symbol picks up a phantom weekend bar."""
+    """DatetimeIndex of real US trading days from clean reference symbols, unioned
+    across BOTH the eToro bucket ('yfinance') and the real-yfinance backfill bucket
+    ('yfinance_real') so an extended 10yr span has a complete calendar. Phantom
+    weekend/holiday rows can never leak in (clean refs + weekday filter)."""
+    from tools.shared.splice import trading_days
     eng = get_engine()
     with eng.connect() as c:
         df = pd.read_sql(text(
             "SELECT DISTINCT date FROM historical_data "
-            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source='yfinance'"
+            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b "
+            "AND data_source IN ('yfinance','yfinance_real')"
         ), c, params={"s": list(CALENDAR_REFS),
                       "a": start - timedelta(days=400), "b": end})
-    idx = pd.to_datetime(df["date"])
-    idx = idx[idx.dt.weekday < 5]
-    return pd.DatetimeIndex(sorted(idx.unique()))
+    return trading_days(df["date"])
 
 
 def load_panels(syms, start, end):
