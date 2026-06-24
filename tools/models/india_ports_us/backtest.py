@@ -177,8 +177,14 @@ def load_open(syms, start, end, cl):
     return op.where(op.notna(), cl)
 
 
-def load_regime(sym, index, start, end, buckets=("yfinance",), join="2022-05-18"):
+def load_regime(sym, index, start, end, buckets=("yfinance",), join="2022-05-18",
+                fast_sma=0):
     """`sym` (e.g. QQQ) > 200d SMA gate, reindexed to `index`.
+
+    When `fast_sma` > 0, the gate ALSO requires `sym` > its `fast_sma`-day SMA
+    (multi-timeframe regime confirm) — risk-OFF the moment the faster trend breaks,
+    which exits earlier and cuts drawdown vs the 200d gate alone. `fast_sma=0`
+    (default) = original single 200d gate, byte-for-byte unchanged.
 
     Default reads the eToro bucket only (byte-for-byte the original behavior). When
     `buckets` also includes 'yfinance_real' (extended 10yr runs), the pre-join real
@@ -206,6 +212,8 @@ def load_regime(sym, index, start, end, buckets=("yfinance",), join="2022-05-18"
     else:
         q = df.set_index("date")["close"]
     on = q > q.rolling(200).mean()
+    if fast_sma and fast_sma > 0:
+        on = on & (q > q.rolling(fast_sma).mean())
     return on.reindex(index).ffill().fillna(False)
 
 

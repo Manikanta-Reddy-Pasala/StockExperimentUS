@@ -53,6 +53,9 @@ def main():
                          "actual members at each rebalance (survivorship-correct). When unset, "
                          "behavior is unchanged (universe = panel ∩ Nasdaq-100).")
     ap.add_argument("--regime-sym", default="QQQ")
+    ap.add_argument("--fast-sma", dest="fast_sma", type=int, default=0,
+                    help="multi-timeframe regime confirm: also require regime-sym > "
+                         "this faster SMA (e.g. 50/100). 0 = 200d gate only. Cuts DD.")
     # locked knobs (overridable for research)
     ap.add_argument("--top", type=int, default=3)
     ap.add_argument("--topadv", type=int, default=40)
@@ -87,7 +90,7 @@ def main():
     dates = cl.index
     reg = load_regime(a.regime_sym, dates, s, e,
                       buckets=("yfinance", "yfinance_real") if a.extended else ("yfinance",),
-                      join=a.join) if a.regime else None
+                      join=a.join, fast_sma=a.fast_sma) if a.regime else None
 
     run_n40(cl, dv, dates, s, e, a.capital, topadv=a.topadv, top=a.top,
             signal=a.signal, trail=a.trail, out_dir=a.out,
