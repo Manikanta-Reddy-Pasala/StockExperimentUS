@@ -20,30 +20,31 @@ def trading_days(dates) -> pd.DatetimeIndex:
 def splice_ratio(old_close: pd.Series, new_close: pd.Series, join: pd.Timestamp,
                  lo: float = 1e-3, hi: float = 1e3):
     """Return (ratio, status) to scale the OLD (yfinance_real) segment so its level
-    matches the NEW (eToro) segment at the join.
-
-    ratio = new@anchor / old@anchor, anchor = latest trading day <= join present in
-    BOTH series. status: ok | only_new | only_old | no_anchor | bad_ratio."""
+    matches the NEW (eToro) segment at the join, using ADJACENT-BOUNDARY anchoring
+    (the two buckets do not overlap — eToro owns date >= join, yfinance_real owns
+    date < join):
+      anchor_old = last old bar with date <  join
+      anchor_new = first new bar with date >= join
+      ratio      = anchor_new / anchor_old
+    status:
+      ok        -> finite ratio in [lo, hi]; scale old by ratio
+      only_new  -> no old bars before join (nothing to scale) -> 1.0
+      only_old  -> no new bars at/after join (no eToro anchor) -> 1.0
+      bad_ratio -> anchor_old == 0 or ratio non-finite / <=0 / outside [lo,hi]; do NOT scale
+    """
     o = old_close.dropna()
     n = new_close.dropna()
-    if o.empty and n.empty:
+    o_pre = o[o.index < join]
+    n_post = n[n.index >= join]
+    if o_pre.empty:
         return 1.0, "only_new"
-    if o.empty:
-        return 1.0, "only_new"
-    if n.empty:
+    if n_post.empty:
         return 1.0, "only_old"
-    o = o[o.index <= join]
-    n = n[n.index <= join]
-    if o.empty or n.empty:
-        return 1.0, "no_anchor"
-    common = o.index.intersection(n.index)
-    if len(common) == 0:
-        return 1.0, "no_anchor"
-    anchor = common.max()
-    denom = float(o.loc[anchor])
-    if denom == 0:
+    anchor_old = float(o_pre.iloc[-1])
+    anchor_new = float(n_post.iloc[0])
+    if anchor_old == 0:
         return float("inf"), "bad_ratio"
-    r = float(n.loc[anchor]) / denom
+    r = anchor_new / anchor_old
     if not np.isfinite(r) or r <= 0 or not (lo <= r <= hi):
         return r, "bad_ratio"
     return r, "ok"
@@ -60,8 +61,9 @@ def splice_symbol(old_df: pd.DataFrame, new_df: pd.DataFrame, join: pd.Timestamp
     On non-'ok' status old rows pass through unscaled — callers must check `status`."""
     o = old_df.copy()
     n = new_df.copy()
-    oc = o.set_index("date")["close"] if not o.empty else pd.Series(dtype=float)
-    nc = n.set_index("date")["close"] if not n.empty else pd.Series(dtype=float)
+    _empty = pd.Series(dtype=float, index=pd.DatetimeIndex([]))
+    oc = o.set_index("date")["close"] if not o.empty else _empty
+    nc = n.set_index("date")["close"] if not n.empty else _empty
     ratio, status = splice_ratio(oc, nc, join)
     older = o[o["date"] < join].copy()
     recent = n[n["date"] >= join].copy()
