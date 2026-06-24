@@ -822,6 +822,11 @@ def main():
                     help="flat $ per-transaction fee deducted on EVERY fill, both "
                          "buys and sells (eToro charges $1/txn each side). 0 = off "
                          "(legacy no-charge numbers).")
+    ap.add_argument("--extended", action="store_true",
+                    help="10yr history: splice real-yfinance backfill (pre-join) to "
+                         "eToro (post-join) per symbol")
+    ap.add_argument("--join", default="2022-05-24",
+                    help="splice date: eToro authoritative on/after this day")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
     s, e = date.fromisoformat(a.start), date.fromisoformat(a.end)
@@ -830,7 +835,8 @@ def main():
     n500 = load_csv(N500_CSV)
     n100 = load_csv(N100_CSV)
     syms = sorted(set(n500) | set(n100))
-    cl, dv = load_panels(syms, s, e)
+    cl, dv = (load_panels_spliced(syms, s, e, join=a.join) if a.extended
+              else load_panels(syms, s, e))
     dates = cl.index
     reg = load_regime(a.regime_sym, dates, s, e) if a.regime else None
     op_arg = None if a.legacy_fills else load_open(syms, s, e, cl)  # realistic next-open + T+1
