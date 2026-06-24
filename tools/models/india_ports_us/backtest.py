@@ -113,6 +113,52 @@ def load_panels(syms, start, end):
     return cl, dv
 
 
+def _read_bucket(syms, start, end, bucket):
+    eng = get_engine()
+    with eng.connect() as c:
+        return pd.read_sql(text(
+            "SELECT symbol,date,open,high,low,close,volume FROM historical_data "
+            "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b AND data_source=:bkt "
+            "ORDER BY symbol,date"
+        ), c, params={"s": syms, "a": start - timedelta(days=400), "b": end, "bkt": bucket})
+
+
+def load_panels_spliced(syms, start, end, join="2022-05-24"):
+    """Like load_panels, but joins the real-yfinance backfill (bucket
+    'yfinance_real', date < join) to the eToro feed (bucket 'yfinance', date >=
+    join) per symbol via a ratio splice, for extended (10yr) backtests.
+
+    Returns (close, dollar_vol) pivots reindexed to the extended trading calendar
+    and ffilled — same shape/contract as load_panels."""
+    from tools.shared.splice import splice_symbol
+    j = pd.Timestamp(join)
+    old = _read_bucket(syms, start, end, "yfinance_real")
+    new = _read_bucket(syms, start, end, "yfinance")
+    old["date"] = pd.to_datetime(old["date"]); new["date"] = pd.to_datetime(new["date"])
+    cols = ["date", "open", "high", "low", "close", "volume"]
+    parts, stats = [], {}
+    for s in syms:
+        o = old.loc[old["symbol"] == s, cols]
+        n = new.loc[new["symbol"] == s, cols]
+        if o.empty and n.empty:
+            continue
+        spliced, _ratio, status = splice_symbol(o, n, j)
+        spliced["symbol"] = s
+        parts.append(spliced)
+        stats[status] = stats.get(status, 0) + 1
+        if status in ("bad_ratio", "no_anchor", "only_old"):
+            print(f"  splice[{status}] {s} ratio={_ratio:.4g}", flush=True)
+    if not parts:
+        raise SystemExit("load_panels_spliced: no data in either bucket for requested symbols")
+    print(f"splice summary: {stats}", flush=True)
+    df = pd.concat(parts, ignore_index=True)
+    cal = load_calendar(start, end)
+    cl = df.pivot(index="date", columns="symbol", values="close").reindex(cal).ffill()
+    dv = df.assign(dv=df["close"] * df["volume"]).pivot(
+        index="date", columns="symbol", values="dv").reindex(cal).ffill()
+    return cl, dv
+
+
 def load_open(syms, start, end, cl):
     """OPEN-price pivot aligned to `cl` (close panel), for realistic next-open fills.
     Gaps (open missing where close exists) fall back to close so a fill is never NaN."""
