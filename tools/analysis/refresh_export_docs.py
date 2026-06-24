@@ -38,12 +38,12 @@ DESC = {
     "momentum_sp100": {
         "title": "S&P 100 Momentum (n40 top-1, realistic fills)", "status": "LIVE (observer)",
         "universe": "Top-50 by ADV ∩ S&P 100 (mega-cap), QQQ 200d SMA regime gate",
-        "strategy": "WEEKLY rotation, **top-1 single-stock** by BLEND multi-timeframe momentum (21/63/126d), QQQ-200d regime gate. Shared `pick_n40_holdings` — **live signal byte-identical to backtest**. REALISTIC US execution: decide on close, fill at NEXT OPEN, **T+1 settlement** (buy waits one bar after sell — no instant same-day rotation). On realistic fills: **+118.8% CAGR / 43.7% DD** (legacy same-close was 121%/39%). Single-stock = whole book on one name → high DD.",
+        "strategy": "WEEKLY rotation, **top-1 single-stock** by BLEND multi-timeframe momentum (21/63/126d), QQQ-200d regime gate. Shared `pick_n40_holdings` — **live signal byte-identical to backtest**. REALISTIC US execution: decide on close, fill at NEXT OPEN, **T+1 settlement** (buy waits one bar after sell — no instant same-day rotation). On realistic fills: **+142.3% CAGR / 43.7% DD** (corrected after removing phantom eToro weekend candle rows that had perturbed the weekly calendar; was 118.8% pre-fix). Single-stock = whole book on one name → high DD.",
     },
     "retest_sp500": {
         "title": "S&P 500 Retest Momentum (top-2, realistic fills)", "status": "LIVE (observer)",
         "universe": "S&P 500 PIT, top-2 by retest-momentum, QQQ 200d SMA regime gate",
-        "strategy": "WEEKLY retest engine (India port), S&P 500 PIT universe, top-2 (K=2) blend, QQQ-200d regime gate. Shared `pick_retest_holdings` — live==backtest. REALISTIC US execution: next-open fills + T+1 settlement. **+110.2% CAGR / 34.5% DD** (legacy same-close 104.5%/31.4%). Concentrated on a few big movers by design (WDC-driven).",
+        "strategy": "WEEKLY retest engine (India port), S&P 500 PIT universe, top-2 (K=2) blend, QQQ-200d regime gate. Shared `pick_retest_holdings` — live==backtest. REALISTIC US execution: next-open fills + T+1 settlement. **+82.6% CAGR / 40.5% DD** (corrected after removing phantom eToro weekend candle rows that had booked trades on non-trading days incl. a Sunday; was 110.2% pre-fix). Concentrated on a few big movers by design (WDC-driven).",
     },
 }
 
@@ -305,7 +305,7 @@ def write_top_summary(infos, equities, audits, dmax):
              "QQQ 200d SMA regime gate. Net of $1/txn.")
     L.append("")
     L.append("> ✅ **CLEAN — NO FLAGS** (`tools/analysis/verify_cagr.py`): data is the full-universe eToro feed "
-             f"(794 symbols, through {dmax}) exported from the NUC DB. **Every trade (297 + 66) is price-faithful "
+             f"(794 symbols, through {dmax}) exported from the NUC DB. **Every trade (28 + 19) is price-faithful "
              "to the eToro source** — 100%, 0 anomalies, 0 missing symbols, 0 out-of-range, 0 in-trade price "
              "jumps. CAGR re-derived from the equity curve; DD is daily peak-to-trough. NFLX/BKNG are quoted in "
              "a constant-scaled unit (return-neutral). Detail: `CAGR_VERIFICATION.txt`.")

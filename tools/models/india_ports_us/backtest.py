@@ -177,16 +177,34 @@ def load_open(syms, start, end, cl):
     return op.where(op.notna(), cl)
 
 
-def load_regime(sym, index, start, end):
-    """QQQ (or other) > 200d SMA gate, reindexed to `index`."""
+def load_regime(sym, index, start, end, buckets=("yfinance",), join="2021-06-01"):
+    """`sym` (e.g. QQQ) > 200d SMA gate, reindexed to `index`.
+
+    Default reads the eToro bucket only (byte-for-byte the original behavior). When
+    `buckets` also includes 'yfinance_real' (extended 10yr runs), the pre-join real
+    series is ratio-spliced onto the eToro series so the 200d SMA has continuous
+    pre-2021 history — otherwise the regime gate is risk-OFF for the whole backfill
+    period (no pre-2021 eToro data) and the strategy never trades before 2021."""
     eng = get_engine()
     with eng.connect() as c:
-        q = pd.read_sql(text(
-            "SELECT date,close FROM historical_data WHERE symbol=:s AND data_source='yfinance' "
-            "AND date BETWEEN :a AND :b ORDER BY date"
-        ), c, params={"s": sym, "a": start - timedelta(days=400), "b": end})
-    q["date"] = pd.to_datetime(q["date"])
-    q = q.set_index("date")["close"]
+        df = pd.read_sql(text(
+            "SELECT date,close,data_source FROM historical_data WHERE symbol=:s "
+            "AND data_source = ANY(:bkt) AND date BETWEEN :a AND :b ORDER BY date"
+        ), c, params={"s": sym, "bkt": list(buckets),
+                      "a": start - timedelta(days=400), "b": end})
+    df["date"] = pd.to_datetime(df["date"])
+    if len(buckets) > 1 and not df.empty:
+        from tools.shared.splice import splice_ratio
+        j = pd.Timestamp(join)
+        old = df[df["data_source"] == "yfinance_real"].set_index("date")["close"].sort_index()
+        new = df[df["data_source"] == "yfinance"].set_index("date")["close"].sort_index()
+        r, status = splice_ratio(old, new, j)
+        if status == "ok":
+            old = old * r
+        q = pd.concat([old[old.index < j], new[new.index >= j]]).sort_index()
+        q = q[~q.index.duplicated(keep="last")]
+    else:
+        q = df.set_index("date")["close"]
     on = q > q.rolling(200).mean()
     return on.reindex(index).ffill().fillna(False)
 
@@ -840,7 +858,9 @@ def main():
     cl, dv = (load_panels_spliced(syms, s, e, join=a.join) if a.extended
               else load_panels(syms, s, e))
     dates = cl.index
-    reg = load_regime(a.regime_sym, dates, s, e) if a.regime else None
+    reg = load_regime(a.regime_sym, dates, s, e,
+                      buckets=("yfinance", "yfinance_real") if a.extended else ("yfinance",),
+                      join=a.join) if a.regime else None
     op_arg = None if a.legacy_fills else load_open(syms, s, e, cl)  # realistic next-open + T+1
 
     if a.sweep:
