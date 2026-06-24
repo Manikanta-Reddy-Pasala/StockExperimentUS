@@ -79,20 +79,22 @@ def max_drawdown(equity: pd.Series) -> float:
 CALENDAR_REFS = ("AAPL", "MSFT", "QQQ", "SPY")
 
 
-def load_calendar(start, end):
-    """DatetimeIndex of real US trading days from clean reference symbols, unioned
-    across BOTH the eToro bucket ('yfinance') and the real-yfinance backfill bucket
-    ('yfinance_real') so an extended 10yr span has a complete calendar. Phantom
-    weekend/holiday rows can never leak in (clean refs + weekday filter)."""
+def load_calendar(start, end, buckets=("yfinance",)):
+    """DatetimeIndex of real US trading days from clean reference symbols. `buckets`
+    selects which data_source buckets contribute dates: default ('yfinance',) =
+    eToro only (default backtest path, calendar provably unchanged); pass
+    ('yfinance','yfinance_real') for extended 10yr runs. Phantom weekend/holiday
+    rows can't leak in (clean refs + weekday filter)."""
     from tools.shared.splice import trading_days
     eng = get_engine()
     with eng.connect() as c:
         df = pd.read_sql(text(
             "SELECT DISTINCT date FROM historical_data "
             "WHERE symbol=ANY(:s) AND date BETWEEN :a AND :b "
-            "AND data_source IN ('yfinance','yfinance_real')"
+            "AND data_source = ANY(:bkt)"
         ), c, params={"s": list(CALENDAR_REFS),
-                      "a": start - timedelta(days=400), "b": end})
+                      "a": start - timedelta(days=400), "b": end,
+                      "bkt": list(buckets)})
     return trading_days(df["date"])
 
 
@@ -152,7 +154,7 @@ def load_panels_spliced(syms, start, end, join="2022-05-24"):
         raise SystemExit("load_panels_spliced: no data in either bucket for requested symbols")
     print(f"splice summary: {stats}", flush=True)
     df = pd.concat(parts, ignore_index=True)
-    cal = load_calendar(start, end)
+    cal = load_calendar(start, end, buckets=("yfinance", "yfinance_real"))
     cl = df.pivot(index="date", columns="symbol", values="close").reindex(cal).ffill()
     dv = df.assign(dv=df["close"] * df["volume"]).pivot(
         index="date", columns="symbol", values="dv").reindex(cal).ffill()
