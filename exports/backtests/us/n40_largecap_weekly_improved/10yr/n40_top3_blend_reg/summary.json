@@ -1,0 +1,10 @@
+{
+  "cagr": 40.53,
+  "mdd": 51.52,
+  "calmar": 0.79,
+  "final": 29748111.43,
+  "yrs": 9.97,
+  "trades": 390,
+  "wr": 54.9,
+  "model": "n40_top3_blend_reg"
+}

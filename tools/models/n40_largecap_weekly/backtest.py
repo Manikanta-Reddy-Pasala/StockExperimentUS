@@ -56,6 +56,14 @@ def main():
     ap.add_argument("--fast-sma", dest="fast_sma", type=int, default=0,
                     help="multi-timeframe regime confirm: also require regime-sym > "
                          "this faster SMA (e.g. 50/100). 0 = 200d gate only. Cuts DD.")
+    ap.add_argument("--regime-daily", dest="regime_daily", action="store_true",
+                    help="exit to cash the DAY the regime gate breaks (daily check), "
+                         "instead of waiting for the next weekly rebal. Cuts crash DD.")
+    ap.add_argument("--dd-exit", dest="dd_exit", type=float, default=0.0,
+                    help="crash trigger: risk-OFF when regime-sym is >this fraction "
+                         "below its trailing high (e.g. 0.10 = 10%%). 0 = off.")
+    ap.add_argument("--dd-win", dest="dd_win", type=int, default=60,
+                    help="lookback (days) for the --dd-exit trailing high")
     # locked knobs (overridable for research)
     ap.add_argument("--top", type=int, default=3)
     ap.add_argument("--topadv", type=int, default=40)
@@ -90,7 +98,8 @@ def main():
     dates = cl.index
     reg = load_regime(a.regime_sym, dates, s, e,
                       buckets=("yfinance", "yfinance_real") if a.extended else ("yfinance",),
-                      join=a.join, fast_sma=a.fast_sma) if a.regime else None
+                      join=a.join, fast_sma=a.fast_sma,
+                      dd_exit=a.dd_exit, dd_win=a.dd_win) if a.regime else None
 
     run_n40(cl, dv, dates, s, e, a.capital, topadv=a.topadv, top=a.top,
             signal=a.signal, trail=a.trail, out_dir=a.out,
@@ -98,6 +107,7 @@ def main():
             margin_apr=(a.margin_apr if a.lev > 1 else 0.0),
             membership_csv=a.membership_csv, txn_charge=a.txn_charge,
             op=(None if a.legacy_fills else op), decide_prior=a.decide_prior,
+            regime_daily=a.regime_daily,
             tag="_top%d_%s%s%s%s" % (a.top, a.signal, "_reg" if a.regime else "",
                                      ("_lev%g" % a.lev) if a.lev != 1 else "",
                                      "_pit" if a.membership_csv else ""))

@@ -178,7 +178,7 @@ def load_open(syms, start, end, cl):
 
 
 def load_regime(sym, index, start, end, buckets=("yfinance",), join="2022-05-18",
-                fast_sma=0):
+                fast_sma=0, dd_exit=0.0, dd_win=60):
     """`sym` (e.g. QQQ) > 200d SMA gate, reindexed to `index`.
 
     When `fast_sma` > 0, the gate ALSO requires `sym` > its `fast_sma`-day SMA
@@ -214,6 +214,12 @@ def load_regime(sym, index, start, end, buckets=("yfinance",), join="2022-05-18"
     on = q > q.rolling(200).mean()
     if fast_sma and fast_sma > 0:
         on = on & (q > q.rolling(fast_sma).mean())
+    if dd_exit and dd_exit > 0:
+        # crash trigger: risk-OFF when the index is more than dd_exit below its
+        # trailing dd_win-day high. Catches the fast initial leg of a selloff that
+        # the (lagging) 200d SMA hasn't crossed yet. Pair with --regime-daily.
+        roll_high = q.rolling(dd_win, min_periods=1).max()
+        on = on & (q >= (1.0 - dd_exit) * roll_high)
     return on.reindex(index).ffill().fillna(False)
 
 
@@ -266,7 +272,7 @@ def momscore(cl, di, mode="ret", lb=15):
 
 def _simulate_realistic(cl, op, run_dates, dates, capital, target_fn, rebal_days,
                         mid_days, regime_on, regime, trail, lev, margin_apr,
-                        txn_charge, settle_lag, decide_prior=False):
+                        txn_charge, settle_lag, decide_prior=False, regime_daily=False):
     """Realistic US-equity execution (see simulate docstring):
       - decide on bar d's CLOSE, fill at the NEXT bar's OPEN
       - T+settle_lag settlement: sale proceeds go to an unsettled pool and only become
@@ -380,6 +386,13 @@ def _simulate_realistic(cl, op, run_dates, dates, capital, target_fn, rebal_days
         if is_rebal and di + 1 < n:
             risk_on = (not regime) or (regime_on is not None and bool(regime_on.iloc[di]))
             decided = target_fn(di, d, pos, risk_on) if risk_on else {}
+        # 5b) DAILY regime exit (opt-in): if the gate is OFF today and we still hold,
+        # queue a full liquidation at the next open instead of waiting for the weekly
+        # rebal — catches fast crashes (e.g. 2022) up to a week earlier. Re-entry still
+        # happens at the next rebal when the gate is back on.
+        if regime_daily and regime and not is_rebal and regime_on is not None \
+                and not bool(regime_on.iloc[di]) and pos and decided is None and di + 1 < n:
+            decided = {}
         # 6) margin interest + daily MTM at close (unsettled cash still counts as NAV)
         if daily_borrow > 0 and cash < 0:
             cash += cash * daily_borrow
@@ -401,7 +414,7 @@ def _simulate_realistic(cl, op, run_dates, dates, capital, target_fn, rebal_days
 
 def simulate(cl, run_dates, dates, capital, target_fn, rebal_days, mid_days=None,
              regime_on=None, regime=False, trail=0.0, lev=1.0, margin_apr=0.0,
-             txn_charge=0.0, op=None, settle_lag=1, decide_prior=False):
+             txn_charge=0.0, op=None, settle_lag=1, decide_prior=False, regime_daily=False):
     """lev>1 = apply margin to the target weights (cash goes negative = borrowing).
     margin_apr = annual borrow cost charged daily on negative cash (e.g. 0.06 = IBKR-ish).
     txn_charge = flat per-transaction fee in $ deducted from cash on EVERY fill
@@ -416,7 +429,7 @@ def simulate(cl, run_dates, dates, capital, target_fn, rebal_days, mid_days=None
     if op is not None:
         return _simulate_realistic(cl, op, run_dates, dates, capital, target_fn, rebal_days,
                                    mid_days, regime_on, regime, trail, lev, margin_apr,
-                                   txn_charge, settle_lag, decide_prior)
+                                   txn_charge, settle_lag, decide_prior, regime_daily)
     slip = SLIPPAGE_BPS / 1e4
     trail_f = trail / 100.0
     daily_borrow = margin_apr / 252.0
@@ -486,6 +499,21 @@ def simulate(cl, run_dates, dates, capital, target_fn, rebal_days, mid_days=None
                         entry_px[s] = px; peak_px[s] = px
                         entry_date[s] = d.date().isoformat(); entry_di[s] = di
                     pos[s] = tgt
+        # daily regime exit (opt-in): liquidate to cash at this close the bar the gate
+        # breaks, instead of waiting for the next weekly rebal.
+        if regime_daily and regime and not is_rebal and pos and regime_on is not None \
+                and not bool(regime_on.iloc[di]):
+            for s in list(pos):
+                px = cl[s].iloc[di]
+                if pd.isna(px):
+                    continue
+                px = float(px)
+                cash += pos[s] * px * (1 - slip) - txn_charge
+                txns.append({"date": d.date().isoformat(), "action": "SELL_REGIME",
+                             "symbol": s, "price": round(px, 4), "shares": round(pos[s], 4)})
+                close_trade(s, d, px, pos[s], di)
+                pos.pop(s, None); entry_px.pop(s, None); peak_px.pop(s, None)
+                entry_date.pop(s, None); entry_di.pop(s, None)
         if daily_borrow > 0 and cash < 0:        # margin interest on borrowed cash
             cash += cash * daily_borrow
         val = cash + sum(sh * float(cl[s].iloc[di]) for s, sh in pos.items()
@@ -765,7 +793,8 @@ def pick_n40_holdings(cl, dv, di, universe, topadv=40, top=3, mom_lb=63,
 
 def run_n40(cl, dv, dates, start, end, capital, topadv=40, top=1, mom_lb=63,
             signal="ret", trail=0.0, out_dir=None, regime_on=None, regime=False, tag="",
-            lev=1.0, margin_apr=0.0, membership_csv=None, txn_charge=0.0, op=None, decide_prior=False):
+            lev=1.0, margin_apr=0.0, membership_csv=None, txn_charge=0.0, op=None, decide_prior=False,
+            regime_daily=False):
     """`membership_csv` (optional): path to a point-in-time index membership CSV
     (schema symbol,start_date,end_date). When provided, the selection universe is
     the FULL panel (cl.columns) restricted at EACH rebalance to the symbols that
@@ -798,7 +827,8 @@ def run_n40(cl, dv, dates, start, end, capital, topadv=40, top=1, mom_lb=63,
 
     res, trades, txns = simulate(cl, run_dates, dates, capital, target_fn, rebal,
                                  regime_on=regime_on, regime=regime, trail=trail,
-                                 lev=lev, margin_apr=margin_apr, txn_charge=txn_charge, op=op, decide_prior=decide_prior)
+                                 lev=lev, margin_apr=margin_apr, txn_charge=txn_charge, op=op,
+                                 decide_prior=decide_prior, regime_daily=regime_daily)
     _report(f"n40{tag}", res, trades, txns, out_dir)
     return res
 
