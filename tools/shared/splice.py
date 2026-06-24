@@ -45,3 +45,25 @@ def splice_ratio(old_close: pd.Series, new_close: pd.Series, join: pd.Timestamp,
     if not np.isfinite(r) or r <= 0 or not (lo <= r <= hi):
         return r, "bad_ratio"
     return r, "ok"
+
+
+_OHLC = ["open", "high", "low", "close"]
+
+def splice_symbol(old_df: pd.DataFrame, new_df: pd.DataFrame, join: pd.Timestamp):
+    """Join one symbol's older real-yfinance OHLCV (`old_df`) to its recent eToro
+    OHLCV (`new_df`) into a continuous series. Both frames have columns
+    [date, open, high, low, close, volume] with a datetime `date`.
+    Old rows (date < join) are scaled by the splice ratio; new rows (date >= join)
+    pass through. Volume is never scaled. Returns (df, ratio, status)."""
+    o = old_df.copy()
+    n = new_df.copy()
+    oc = o.set_index("date")["close"] if not o.empty else pd.Series(dtype=float)
+    nc = n.set_index("date")["close"] if not n.empty else pd.Series(dtype=float)
+    ratio, status = splice_ratio(oc, nc, join)
+    older = o[o["date"] < join].copy()
+    recent = n[n["date"] >= join].copy()
+    if status in ("ok",) and not older.empty:
+        older[_OHLC] = older[_OHLC] * ratio
+    out = pd.concat([older, recent], ignore_index=True)
+    out = out.sort_values("date").drop_duplicates("date", keep="last").reset_index(drop=True)
+    return out, ratio, status
