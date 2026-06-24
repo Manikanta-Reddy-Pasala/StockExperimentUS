@@ -7,7 +7,7 @@ bucket — that label now stores the recent eToro feed and is left UNTOUCHED her
 A spliced loader joins the two buckets (yfinance_real for older years, the eToro
 'yfinance' bucket for the recent window) so backtests can run on a longer window.
 
-- default window: 2016-06-01 -> 2021-05-31 (day before the eToro feed begins)
+- default window: 2016-06-01 -> 2022-05-17 (day before the eToro feed begins)
 - universe: distinct symbols from the PIT sp500_membership.csv
 - idempotent per symbol: deletes existing rows in the bucket/window before insert
 - emits a coverage report listing symbols yfinance returned nothing for
@@ -15,7 +15,7 @@ A spliced loader joins the two buckets (yfinance_real for older years, the eToro
 Usage:
   PYTHONPATH=. python tools/pull_yfinance_history.py \
       --membership src/data/symbols/sp500_membership.csv \
-      --start 2016-06-01 --end 2021-05-31 \
+      --start 2016-06-01 --end 2022-05-17 \
       --report exports/data/yfinance_backfill/DATA_GAPS.md
 """
 from __future__ import annotations
@@ -112,7 +112,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--membership", required=True)
     ap.add_argument("--start", default="2016-06-01")
-    ap.add_argument("--end", default="2021-05-31")
+    ap.add_argument("--end", default="2022-05-17")
     ap.add_argument("--report", default="exports/data/yfinance_backfill/DATA_GAPS.md")
     args = ap.parse_args()
 

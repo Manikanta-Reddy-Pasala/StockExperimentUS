@@ -125,7 +125,7 @@ def _read_bucket(syms, start, end, bucket):
         ), c, params={"s": syms, "a": start - timedelta(days=400), "b": end, "bkt": bucket})
 
 
-def load_panels_spliced(syms, start, end, join="2021-06-01"):
+def load_panels_spliced(syms, start, end, join="2022-05-18"):
     """Like load_panels, but joins the real-yfinance backfill (bucket
     'yfinance_real', date < join) to the eToro feed (bucket 'yfinance', date >=
     join) per symbol via a ratio splice, for extended (10yr) backtests.
@@ -177,7 +177,7 @@ def load_open(syms, start, end, cl):
     return op.where(op.notna(), cl)
 
 
-def load_regime(sym, index, start, end, buckets=("yfinance",), join="2021-06-01"):
+def load_regime(sym, index, start, end, buckets=("yfinance",), join="2022-05-18"):
     """`sym` (e.g. QQQ) > 200d SMA gate, reindexed to `index`.
 
     Default reads the eToro bucket only (byte-for-byte the original behavior). When
@@ -845,7 +845,7 @@ def main():
     ap.add_argument("--extended", action="store_true",
                     help="10yr history: splice real-yfinance backfill (pre-join) to "
                          "eToro (post-join) per symbol")
-    ap.add_argument("--join", default="2021-06-01",
+    ap.add_argument("--join", default="2022-05-18",
                     help="splice date: eToro authoritative on/after this day")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()

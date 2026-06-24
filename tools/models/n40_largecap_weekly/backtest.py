@@ -74,7 +74,7 @@ def main():
     ap.add_argument("--extended", action="store_true",
                     help="10yr history: splice real-yfinance backfill (pre-join) to "
                          "eToro (post-join) per symbol")
-    ap.add_argument("--join", default="2021-06-01",
+    ap.add_argument("--join", default="2022-05-18",
                     help="splice date: eToro authoritative on/after this day")
     ap.set_defaults(regime=True)
     a = ap.parse_args()
