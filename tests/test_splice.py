@@ -62,3 +62,31 @@ def test_splice_symbol_returns_unchanged_within_segment_returns():
     seg = out[out["date"] < "2022-05-24"].set_index("date")["close"]
     raw = old.set_index("date")["close"]
     assert np.allclose(seg.pct_change().dropna().values, raw.pct_change().dropna().values)
+def test_splice_symbol_only_new_when_old_empty():
+    new = _ohlcv([("2022-05-24",30,30,30,30,200),("2022-05-25",33,33,33,33,200)])
+    out, ratio, status = splice_symbol(_ohlcv([]), new, pd.Timestamp("2022-05-24"))
+    assert status == "only_new"
+    out = out.set_index("date")
+    assert out.loc["2022-05-24","close"] == pytest.approx(30.0)
+    assert out.loc["2022-05-25","close"] == pytest.approx(33.0)
+    assert list(out.index.strftime("%Y-%m-%d")) == ["2022-05-24", "2022-05-25"]
+def test_splice_symbol_only_old_when_new_empty():
+    old = _ohlcv([("2022-05-19",10,10,10,10,100),("2022-05-20",11,11,11,11,100)])
+    out, ratio, status = splice_symbol(old, _ohlcv([]), pd.Timestamp("2022-05-24"))
+    assert status == "only_old" and ratio == pytest.approx(1.0)
+    out = out.set_index("date")
+    assert out.loc["2022-05-19","close"] == pytest.approx(10.0)
+    assert out.loc["2022-05-20","close"] == pytest.approx(11.0)
+def test_splice_symbol_both_empty():
+    out, ratio, status = splice_symbol(_ohlcv([]), _ohlcv([]), pd.Timestamp("2022-05-24"))
+    assert status == "only_new"
+    assert out.empty
+def test_splice_symbol_bad_ratio_passes_old_through_unscaled():
+    old = _ohlcv([("2022-05-19",10,10,10,10,100),("2022-05-20",0,0,0,0,100)])
+    new = _ohlcv([("2022-05-20",22,22,22,22,200),("2022-05-24",30,30,30,30,200)])
+    out, ratio, status = splice_symbol(old, new, pd.Timestamp("2022-05-24"))
+    assert status == "bad_ratio"
+    out = out.set_index("date")
+    assert out.loc["2022-05-19","close"] == pytest.approx(10.0)
+    assert out.loc["2022-05-20","close"] == pytest.approx(0.0)
+    assert out.loc["2022-05-24","close"] == pytest.approx(30.0)
