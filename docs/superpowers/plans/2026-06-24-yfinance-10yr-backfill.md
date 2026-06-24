@@ -770,3 +770,17 @@ git commit -m "data(yf-backfill): 10yr S&P500 retest backtest + coverage report"
 **Type consistency:** `splice_ratio` returns `(float, str)`; `splice_symbol` returns `(df, ratio, status)` and calls `splice_ratio` — consistent. `trading_days` returns `DatetimeIndex`, used by `load_calendar`. `build_rows`/`insert_symbol` row-dict keys (`sym,d,ts,o,h,l,c,v,ac`) match the INSERT bind params. `BUCKET='yfinance_real'` used consistently in puller + loader queries.
 
 **Known limitation (documented, not a gap):** pre-join fills use close (open backfill not spliced) — see Component-2 note above; in-scope only if fill realism on 2016-2022 trades is later required.
+
+---
+
+## As-built amendments (2026-06-24)
+
+Reality differed from the spec in three ways, all resolved:
+
+1. **Join moved 2022-05-24 → 2021-06-01.** The `historical_data` table has `UNIQUE(symbol,date)` (NOT including data_source), so the `yfinance_real` bucket cannot overlap the eToro `yfinance` bucket. Backfill therefore ends 2021-05-28 (before eToro's 2021-06-01 start) and eToro is authoritative from 2021-06-01. No schema change.
+2. **Splice anchor: same-day → adjacent-boundary.** With no overlap there is no common day, so `splice_ratio` now uses anchor_old = last old bar `< join`, anchor_new = first new bar `>= join` (commit `2694e09`). `no_anchor` status removed.
+3. **`load_regime` extended (commit pending).** The plan flagged `load_open` but missed the regime gate: QQQ isn't in `sp500_membership` so it wasn't backfilled, leaving the 200d gate risk-OFF for all of 2016-2021 (zero pre-2021 trades). Fix: `load_regime` takes a `buckets` param and splices the regime symbol across both buckets in `--extended` mode; QQQ + SPY backfilled into `yfinance_real`.
+
+**Results (run on NUC venv against the cleaned DB):**
+- retest_sp500 10yr: 72 trades, CAGR +32.7%, DD 49.7%, Final $17.2M. Export: `exports/backtests/us/retest_sp500_10yr/`.
+- Weekend-bug 4yr regen (DB cleaned of 1,536 phantom rows): retest_sp500 110.2% → **82.6%** (phantom weekend trades were inflating it); momentum_sp100 118.8% → **142.3%** (corrected weekly calendar shifted a few exits). Both ledgers now have zero weekend/holiday legs.
