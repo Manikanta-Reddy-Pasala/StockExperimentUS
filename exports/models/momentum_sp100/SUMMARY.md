@@ -1,41 +1,24 @@
-# S&P 100 Momentum (n40 top-1, realistic fills) (`momentum_sp100`)
+# momentum_sp100 (top-1 single-stock) — 5-year summary
 
-**Status:** LIVE (observer)  
-WEEKLY rotation, **top-1 single-stock** by BLEND multi-timeframe momentum (21/63/126d), QQQ-200d regime gate. Shared `pick_n40_holdings` — **live signal byte-identical to backtest**. REALISTIC US execution: decide on close, fill at NEXT OPEN, **T+1 settlement** (buy waits one bar after sell — no instant same-day rotation). On realistic fills: **+142.3% CAGR / 43.7% DD** (corrected after removing phantom eToro weekend candle rows that had perturbed the weekly calendar; was 118.8% pre-fix). Single-stock = whole book on one name → high DD.
+**Window** 2021-06-24 -> 2026-06-24 (5.00y)  ·  engine `tools/models/n40_largecap_weekly/backtest.py` (`n40_top1_blend_reg`)  ·  ran on NUC (`stockexp_nuc_app` → `stockexp_nuc_db`).
 
-**Universe:** Top-50 by ADV ∩ S&P 100 (mega-cap), QQQ 200d SMA regime gate
-
-Backtest window: **2022-05-24 → 2026-06-18** (~4.07 years; $1,000,000 start). OBSERVER (cash, no leverage), net of $1/txn + 8bps slippage, **next-open fills + T+1 settlement** (realistic US execution), PIT survivorship-corrected, **eToro** daily data. QQQ 200d regime gate.
-
-## ✅ CAGR & DD VERIFIED CLEAN (see `tools/analysis/verify_cagr.py`)
-
-Evaluated on the common 4-year window (**2022-05-24 → 2026-06-18**) — the model has no trade before eToro data exists, so both models start the same day. Data = the full-universe eToro feed (794 symbols, through 2026-06-21) exported from the NUC DB. **All 28 trades are price-faithful to the eToro source** (100%, 0 anomalies, 0 missing symbols, 0 out-of-range, 0 in-trade price jumps). CAGR is re-derived from the equity curve. **No flags.** (NFLX/BKNG quoted in a constant-scaled unit — return-neutral.)
-
-## Results (net of $1/txn, common 4yr eToro window)
+Backtest capital $1,000,000. Next-open T+1 fills, $0 commission + 8bps slippage + $1/txn, QQQ 200d regime gate (100% cash when QQQ < 200d SMA). Data: eToro `yfinance` ≥2022-05-18 ratio-spliced to `yfinance_real` backfill (join 2022-05-18, `--extended`).
 
 | Metric | Value |
-|---|---|
-| Window | 2022-05-24 → 2026-06-18 (4.07y) |
-| Final NAV ($1,000,000 start) | $36,618,340 |
-| Total return | +3561.8% |
-| **CAGR (annualized)** | **+142.3%** |
-| **Max drawdown** | **43.7%** |
-| Calmar | 3.26 |
-| Trades | 28 · 71.4% win |
+|--------|------:|
+| CAGR | **93.53%** |
+| Max drawdown (true daily) | 56.70% |
+| Calmar | 1.65 |
+| Trades | 53 |
+| Win rate | 58.5% |
+| Avg win | +30.26% |
+| Avg loss | -10.13% |
+| Avg hold (bars) | 15.5 |
+| Final equity ($1M start) | $27,135,605 |
+| Multiple | 27.14× |
+| **$5,000 stake →** | **$135,678** |
 
-## Year-by-year breakdown
+### $5,000 outcome
+$5,000 → **$135,678** over 5.00 years (27.14× / 93.53% CAGR), riding a 56.7% max drawdown.
 
-| Year | Return % | Intra-yr DD % |
-|---|---:|---:|
-| 2022 | +0.0% | 0.0% |
-| 2023 | +48.4% | 29.6% |
-| 2024 | +231.3% | 28.6% |
-| 2025 | +135.0% | 43.7% |
-| 2026 | +203.5% | 18.3% |
-
-## Cap mix
-
-mega=28
-
----
-*Auto-generated from model_info.json + trade_ledger.csv by tools/analysis/refresh_export_docs.py — do not hand-edit.*
+Full ledger: [`TRADE_LEDGER.md`](TRADE_LEDGER.md) · raw: `trade_ledger.csv`, `transactions.csv`, `equity_curve.csv`, `model_info.json`.

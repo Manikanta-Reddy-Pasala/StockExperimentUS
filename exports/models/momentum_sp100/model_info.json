@@ -1,24 +1,22 @@
 {
   "model": "momentum_sp100",
-  "strategy": "momentum (S&P100 n40 top-1 single-stock, blend, WEEKLY, QQQ regime, REALISTIC next-open+T+1 fills)",
-  "note": "REALISTIC US fills: decide on close, fill next-open, T+1 settlement (buy waits 1 bar after sell); shared engine, live==backtest selection",
-  "window": "2022-05-24..2026-06-18",
-  "mode": "OBSERVER (cash, no leverage, $1/txn)",
-  "data_source": "eToro",
-  "regime": "QQQ 200d",
+  "engine_tag": "n40_top1_blend_reg",
+  "strategy": "top-1 single-stock weekly momentum, blend signal avg(21/63/126d ret), QQQ 200d regime gate, next-open T+1 fills",
+  "window": "2021-06-24 -> 2026-06-24 (5.00y)",
+  "mode": "backtest $1M book, $0 comm + 8bps slippage + $1/txn",
+  "data_source": "NUC stockexp_nuc_db; eToro yfinance >=2022-05-18 spliced to yfinance_real backfill (join 2022-05-18)",
   "metrics": {
-    "cagr": 142.3,
-    "mdd": 43.67,
-    "calmar": 3.26,
-    "final": 36618340.17521423,
-    "yrs": 4.07,
-    "trades": 28,
-    "wr": 71.4,
+    "cagr": 93.53,
+    "mdd": 56.7,
+    "calmar": 1.65,
+    "final": 27135604.72,
+    "yrs": 5.0,
+    "trades": 53,
+    "wr": 58.5,
     "model": "n40_top1_blend_reg"
   },
-  "trades": 28,
-  "cap_mix": {
-    "mega": 28
-  },
-  "win_rate_pct": 71.4
+  "stake_5000": {
+    "multiple": 27.1356,
+    "final": 135678.02
+  }
 }

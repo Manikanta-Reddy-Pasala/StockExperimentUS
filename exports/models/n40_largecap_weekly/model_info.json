@@ -1,0 +1,22 @@
+{
+  "model": "n40_largecap_weekly",
+  "engine_tag": "n40_top3_blend_reg",
+  "strategy": "top-3 blend weekly momentum, blend signal avg(21/63/126d ret), QQQ 200d regime gate, next-open T+1 fills",
+  "window": "2021-06-24 -> 2026-06-24 (5.00y)",
+  "mode": "backtest $1M book, $0 comm + 8bps slippage + $1/txn",
+  "data_source": "NUC stockexp_nuc_db; eToro yfinance >=2022-05-18 spliced to yfinance_real backfill (join 2022-05-18)",
+  "metrics": {
+    "cagr": 78.46,
+    "mdd": 47.4,
+    "calmar": 1.66,
+    "final": 18093165.49,
+    "yrs": 5.0,
+    "trades": 148,
+    "wr": 59.5,
+    "model": "n40_top3_blend_reg"
+  },
+  "stake_5000": {
+    "multiple": 18.0932,
+    "final": 90465.83
+  }
+}

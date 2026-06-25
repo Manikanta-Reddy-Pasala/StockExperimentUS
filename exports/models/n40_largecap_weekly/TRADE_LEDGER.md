@@ -2,12 +2,12 @@
 
 **Window** 2021-06-24 -> 2026-06-24 (5.00y)  ·  148 trades  ·  WR 59.5%  ·  CAGR 78.46%  ·  MaxDD 47.4%  ·  $1M → $18,093,165  ·  **$5k → $90,466**
 
-Fills: next-open, T+1 settlement. PnL/`ret_pct` are net of 8bps slippage + $1/txn. `pnl` is on the $1M book; scale by 0.0050 for the $5k-stake equivalent.
+Fills: next-open, T+1 settlement. PnL/`ret_pct` net of 8bps slippage + $1/txn. `PnL ($1M)` is on the $1M book; `PnL ($5k)` scales by 0.0050.
 
 ## Top 5 winners (by $ PnL)
 
-| # | Symbol | Entry | Exit | Ret % | PnL ($1M book) | PnL ($5k) |
-|--:|--------|-------|------|------:|---------------:|----------:|
+| # | Symbol | Entry | Exit | Ret % | PnL ($1M) | PnL ($5k) |
+|--:|--------|-------|------|------:|----------:|----------:|
 | 1 | SNDK | 2025-10-08 | 2026-03-24 | +468.82 | $5,695,362 | $28,477 |
 | 2 | WDC | 2026-04-15 | 2026-05-12 | +41.17 | $1,603,251 | $8,016 |
 | 3 | MU | 2026-05-28 | 2026-06-16 | +16.06 | $657,073 | $3,285 |
@@ -16,8 +16,8 @@ Fills: next-open, T+1 settlement. PnL/`ret_pct` are net of 8bps slippage + $1/tx
 
 ## Worst 5 losers (by $ PnL)
 
-| # | Symbol | Entry | Exit | Ret % | PnL ($1M book) | PnL ($5k) |
-|--:|--------|-------|------|------:|---------------:|----------:|
+| # | Symbol | Entry | Exit | Ret % | PnL ($1M) | PnL ($5k) |
+|--:|--------|-------|------|------:|----------:|----------:|
 | 1 | ARM | 2026-06-03 | 2026-06-09 | -13.68 | $-678,190 | $-3,391 |
 | 2 | INTC | 2026-05-13 | 2026-06-02 | -9.53 | $-522,776 | $-2,614 |
 | 3 | MSTR | 2025-01-08 | 2025-02-25 | -19.54 | $-242,136 | $-1,211 |
@@ -26,8 +26,8 @@ Fills: next-open, T+1 settlement. PnL/`ret_pct` are net of 8bps slippage + $1/tx
 
 ## Most-traded symbols
 
-| Symbol | Trades | Total PnL ($1M book) |
-|--------|------:|---------------------:|
+| Symbol | Trades | Total PnL ($1M) |
+|--------|------:|----------------:|
 | TSLA | 9 | $-83,510 |
 | NVDA | 9 | $501,672 |
 | MU | 9 | $1,122,548 |
